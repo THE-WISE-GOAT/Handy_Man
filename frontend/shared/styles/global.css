@@ -1,0 +1,128 @@
+/* Modern Reset & Base Variables */
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --dark: #1e293b;
+  --light: #f8fafc;
+  --border: #e2e8f0;
+  --text-muted: #64748b;
+  --radius: 8px;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--light);
+  color: var(--dark);
+  line-height: 1.5;
+}
+
+/* Header & Navigation Styling */
+header, nav {
+  background: white;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+nav a {
+  text-decoration: none;
+  color: var(--dark);
+  margin-right: 1.5rem;
+  font-weight: 500;
+}
+
+nav a:hover {
+  color: var(--primary);
+}
+
+button, .btn {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background-color: var(--primary-hover);
+}
+
+/* Main Container Layout */
+main, .container, .page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.025em;
+}
+
+/* Modern Inputs & Forms Setup */
+input, select {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: white;
+  font-size: 1rem;
+}
+
+input:focus, select:focus {
+  outline: 2px solid var(--primary);
+}
+
+/* Creating Grids for the Popular Services */
+.services-grid, .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+/* Turn boring lists into beautiful cards */
+.card, .service-item, section > div {
+  background: white;
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+/* Footer layout */
+footer {
+  background: white;
+  margin-top: 5rem;
+  padding: 3rem 2rem;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 2rem;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+footer ul {
+  list-style: none;
+  padding: 0;
+}
+
+footer ul li {
+  margin-bottom: 0.5rem;
+  color: var(--text-muted);
+}
