@@ -1,0 +1,23 @@
+we have to write a proposal for a project.
+here's the background for it:
+the core idea/goal is this: an app/website that connects workers with customers.
+lets take pov examples. from customer's pov, they want certain task to be done. it can be anything like fixing plumbing, fixing electrical, at-home barber service, quick pet checkup, mechanics service, etc. they simply define their needs and post a temporary job. they are then connected with the relevant worker through our app/website.
+some narrower details:
+customer has a location, after they post a job they get workers list and worker recommendation. only workers available in their city is shown unless wider zone is chosen. for workers within the city, the customer can see list of all available ones(workers). now based on certain criteria like locality, ratings, num of completed jobs the user gets recommendation for which worker to choose.
+now from worker's pov,
+they associate themselves with #tags which identifies what jobs they can do.
+they associate themselves with a location/zone/radius. if any relevant jobs are posted within that location/zone/radius they get notified about that job. worker also has the ability to see job posting outside their zone if they want to.
+other features:
+user can post a work requiring multiple workers, for eg: a whole house needs to be painted. they can either choose to group together multiple workers(select multiple workers) or they can simply choose the nearest professional organization/shop who sends their professionals instead.
+eg: when a whole house needs to be painted user can group multiple people together. relevant material(paint) is discussed upon worker meetup. not much coordination is needed among the workers. they can simply decide who covers what areas.
+but for a job requiring close communication/ relation and specific blueprint like doing plumbing for the whole house an organization is already capable and experienced to do so.
+pricing: worker and client negotiate a deal.
+based on job posted by the customer along with description, worker can give an initial estimate to the customer which play a factor on worker recommendation.
+Problems:
+certification/validation for workers: tbd
+ui/ux detail: for worker think of the ui as a map. workers are located at a certain point represented by a red dot. a zone around worker is created which is their working zone any jobs posted around the zone appears as another point identifying the place of service. more tbd
+//ai/ml integration chai, user le kaam vanxa, ani ai le automatic tags/workers suitable suggest garxa and manually ni milxa tags halna user side bata.
+// aarko ranking/ worker suggestion ko ma ni halna milxa hola ai/ml or just kaam ko lagi kati paisa lagla- “suggestion” matrai, client offers, worker quotes. 
+// aarko urgency ko hisaab le price higher, appointment reminder on both client and user side
+// worker profile ma euta calender type ko ni banauna parle, appointments track/conflict herna. Dher complex nai, just timeline hernia milne gari. (User side ma ni calender ?)
+//
