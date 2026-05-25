@@ -20,4 +20,5 @@ ui/ux detail: for worker think of the ui as a map. workers are located at a cert
 // aarko ranking/ worker suggestion ko ma ni halna milxa hola ai/ml or just kaam ko lagi kati paisa lagla- “suggestion” matrai, client offers, worker quotes. 
 // aarko urgency ko hisaab le price higher, appointment reminder on both client and user side
 // worker profile ma euta calender type ko ni banauna parle, appointments track/conflict herna. Dher complex nai, just timeline hernia milne gari. (User side ma ni calender ?)
-//
+//testing
+
