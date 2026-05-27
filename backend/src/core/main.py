@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware # allows frontend to make requests to our backend
-from src.core.router import user, login
 
 app = FastAPI() # creates a new FastAPI application instance
 
@@ -14,6 +13,3 @@ app.add_middleware(
     allow_methods=["*"], # allows all HTTP methods (GET, POST, PUT, DELETE, etc.) to be used in requests from the frontend
     allow_headers=["*"], # allows all headers to be included in requests from the frontend
 )
-
-app.include_router(user.router) # includes the user router, which contains all the API endpoints related to user's CRUD operations
-app.include_router(login.router) # includes the login router, which contains the API endpoint for user login and token generation
