@@ -1,10 +1,9 @@
 import React from 'react';
-import WorkerDashboard from './pages/WorkerDashboard';
+import '../../shared/styles/global.css';
+import WorkerDashboard from './pages/Worker_Dashboard';
 
-export default function App() {
+function App() {
   return (
-    <div className="app-container">
-      <WorkerDashboard />
-    </div>
+    <WorkerDashboard />
   );
 }
