@@ -13,7 +13,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # autocommit = False means that changes are not automatically committed to the database, that way we can have more control over when changes are saved
 # autoflush = False means that changes are not automatically sent to the database, just wait until we explicitly commit them
 # bind=engine means that the sessions created by this factory will be bound to the engine we created, so they will use that engine to connect to the database
-#SUSHANT SINGH RAUT
+
 Base = declarative_base() # creates a base class for our database models, acts as glue between our Python classes and the database tables, allows us to define our models as Python classes and have them automatically mapped to database tables.
 
 def get_db():
