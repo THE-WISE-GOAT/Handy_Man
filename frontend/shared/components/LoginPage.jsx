@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { apiClient, normalizeApiError } from '@shared/api/client';
 
 const socialLinks = [
   { label: 'Google', glyph: 'G' },
@@ -10,22 +8,20 @@ const socialLinks = [
 ];
 
 const benefits = [
-  { icon: '⏱', title: 'Fast Dispatch' },
+  { icon: '⏱', title: '2-Hr Dispatch' },
   { icon: '🛠', title: 'Specialized Trades' },
   { icon: '★', title: 'Verified Reviews' },
-  { icon: '🛡', title: 'Licensed & Insured' } 
+  { icon: '🛡', title: 'Licensed & Insured' }
 ];
 
 export default function LoginPage({ initialMode = 'login', onNavigate }) {
-  const { login } = useAuth();
   const [activeMode, setActiveMode] = useState(initialMode === 'signup' ? 'signup' : 'login');
   const [identity, setIdentity] = useState('');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
-  const [statusType, setStatusType] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [accountType, setAccountType] = useState('customer');
 
   useEffect(() => {
     setActiveMode(initialMode === 'signup' ? 'signup' : 'login');
@@ -36,97 +32,44 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
     onNavigate?.(mode);
   };
 
-  const handleSignInSubmit = async (event) => {
+  const handleSignInSubmit = (event) => {
     event.preventDefault();
 
-    const trimmedIdentity = identity.trim();
-    const trimmedPassword = password.trim();
+    /* ====== TEMP ROLE ROUTING: client/client -> customer_dashboard, worker/worker -> worker_dashboard, admin/admin -> admin_dashboard.
+       Remove this block when backend session-based auth and role resolution are wired in.
+    ====== */
+    const normalizedIdentity = identity.trim().toLowerCase();
+    const normalizedPassword = password.trim().toLowerCase();
 
-    if (!trimmedIdentity || !trimmedPassword) {
-      setStatusType('error');
-      setStatusMessage('Please enter username and password.');
+    if (normalizedIdentity === 'client' && normalizedPassword === 'client') {
+      onNavigate?.('customer_dashboard');
       return;
     }
 
-    setIsSubmitting(true);
-    setStatusType('');
-    setStatusMessage('');
+    if (normalizedIdentity === 'worker' && normalizedPassword === 'worker') {
+      onNavigate?.('worker_dashboard');
+      return;
+    }
 
-     try {
-       const data = await apiClient.post('/login/', new URLSearchParams({
-         username: trimmedIdentity,
-         password: trimmedPassword
-       }), {
-         skipAuth: true,
-         headers: {
-           'Content-Type': 'application/x-www-form-urlencoded'
-         }
-       });
+    if (normalizedIdentity === 'admin' && normalizedPassword === 'admin') {
+      onNavigate?.('admin_dashboard');
+      return;
+    }
+    /* ====== END TEMP ROLE ROUTING ====== */
 
-const profile = await login({
-          token: data.access_token,
-          type: data.token_type,
-          usernameValue: trimmedIdentity
-        });
-
-        // Redirect based on role (worker/technician/provider/service specialis -> worker dashboard)
-        const hasWorkerRole = profile.roles?.some(r => ['worker', 'technician', 'provider'].includes(r.toLowerCase()));
-        if (hasWorkerRole) {
-          onNavigate?.('worker_dashboard', { replace: true });
-        } else {
-          onNavigate?.('customer_dashboard', { replace: true });
-        }
-
-       setStatusType('success');
-       setStatusMessage('Login successful. Loading your profile...');
-     } catch (error) {
-       setStatusType('error');
-       const normalized = normalizeApiError(error, 'Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
-       setStatusMessage(normalized.message);
-     } finally {
-       setIsSubmitting(false);
-     }
+    console.log('Login submission requested:', { identity });
   };
 
-  const handleSignUpSubmit = async (event) => {
+  const handleSignUpSubmit = (event) => {
     event.preventDefault();
 
-    const trimmedUsername = username.trim();
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
+    /* ====== BACKEND INTEGRATION PLACEHOLDER: Insert API endpoint/Auth payload here ======
+       - POST the signup payload to the database-backed account endpoint.
+       - Include full name, contact details, password hash, and selected role here.
+       - Handle verification, duplicate checks, and onboarding routing here.
+    ====== */
 
-    if (!trimmedUsername || !trimmedEmail || !trimmedPassword) {
-      setStatusType('error');
-      setStatusMessage('Please fill in all fields.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setStatusType('');
-    setStatusMessage('');
-
-    try {
-      const data = await apiClient.post('/auth/register', {
-        username: trimmedUsername,
-        email: trimmedEmail,
-        password: trimmedPassword
-      }, {
-        skipAuth: true
-      });
-
-      setStatusType('success');
-      setStatusMessage(`Account Created Successfully! Welcome aboard, ${data.username}. Your account ID is #${data.id}.`);
-      setIdentity(data.username);
-      setPassword('');
-      setActiveMode('login');
-      onNavigate?.('login', { replace: true });
-    } catch (error) {
-      setStatusType('error');
-      const normalized = normalizeApiError(error, 'Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
-      setStatusMessage(normalized.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    console.log('Signup submission requested:', { fullName, phone, email, accountType });
   };
 
   return (
@@ -172,14 +115,10 @@ const profile = await login({
           </div>
 
           <div className="auth-stage">
-            <form
-              name="signup-form"
-              className={`auth-form auth-form--signup ${activeMode === 'signup' ? 'is-active' : ''}`}
-              onSubmit={handleSignUpSubmit}
-            >
+            <form className={`auth-form auth-form--signup ${activeMode === 'signup' ? 'is-active' : ''}`} onSubmit={handleSignUpSubmit}>
               <div className="auth-form__heading">
                 <h2>Create Account</h2>
-                <p>Register with username, email, and password.</p>
+                <p>Register with your name, contact info, and role preference.</p>
               </div>
 
               <div className="auth-socials" aria-label="Social signup options">
@@ -191,17 +130,41 @@ const profile = await login({
               </div>
 
               <span className="auth-form__hint">or use your email for registration</span>
-              <input type="text" name="username" placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="off" required />
-              <input type="email" name="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="off" required />
-              <input type="password" name="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required />
+              <input type="text" placeholder="Name" value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" required />
+              <input type="tel" placeholder="Phone" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" required />
+              <input type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
+              <input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required />
 
               <div className="auth-submit-stack" aria-label="Create account actions">
+                <div className="auth-submit-stack__row">
+                  <button
+                    type="button"
+                    className={`auth-submit-stack__button ${accountType === 'customer' ? 'is-active' : ''}`}
+                    onClick={() => setAccountType('customer')}
+                  >
+                    Sign Up as Customer
+                  </button>
+                  <button
+                    type="button"
+                    className={`auth-submit-stack__button ${accountType === 'provider' ? 'is-active' : ''}`}
+                    onClick={() => setAccountType('provider')}
+                  >
+                    Sign Up as Provider
+                  </button>
+                </div>
+
                 <button
                   type="submit"
                   className="auth-submit-stack__button auth-submit-stack__button--primary"
-                  disabled={isSubmitting}
+                  onClick={() => {
+                    /* ====== BACKEND INTEGRATION PLACEHOLDER: Insert API endpoint/Auth payload here ======
+                       - Choose accountType, role, and contact details here.
+                       - POST to your account-creation endpoint for customer or handyman profile creation.
+                       - Return auth/session state and route the user after success.
+                    ====== */
+                  }}
                 >
-                  {isSubmitting ? 'CREATING...' : 'CREATE MY ACCOUNT'}
+                  CREATE MY ACCOUNT
                 </button>
               </div>
 
@@ -210,11 +173,7 @@ const profile = await login({
               </p>
             </form>
 
-            <form
-              name="signin-form"
-              className={`auth-form auth-form--signin ${activeMode === 'login' ? 'is-active' : ''}`}
-              onSubmit={handleSignInSubmit}
-            >
+            <form className={`auth-form auth-form--signin ${activeMode === 'login' ? 'is-active' : ''}`} onSubmit={handleSignInSubmit}>
               <div className="auth-form__heading">
                 <h2>Sign In</h2>
                 <p>Access the dashboard with your email or phone number and password.</p>
@@ -229,43 +188,20 @@ const profile = await login({
               </div>
 
               <span className="auth-form__hint">or use your email password</span>
-              <input type="text" name="identity" placeholder="Username" value={identity} onChange={(event) => setIdentity(event.target.value)} autoComplete="username" required />
-              <input type="password" name="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
+              <input type="text" placeholder="Name or Email" value={identity} onChange={(event) => setIdentity(event.target.value)} autoComplete="username" required />
+              <input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
 
               <a className="auth-form__link" href="#forgot" onClick={(event) => event.preventDefault()}>
                 Forgot Your Password?
               </a>
 
               <div className="auth-signin-actions" aria-label="Sign in actions">
-                <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'SIGNING IN...' : 'SIGN IN'}</button>
+                <button type="submit">SIGN IN</button>
                 <button type="button" className="auth-signin-actions__secondary" onClick={() => activateMode('signup')}>
                   NEED AN ACCOUNT? SIGN UP
                 </button>
               </div>
             </form>
-
-            <div className="auth-status-slot">
-              {statusMessage ? (
-                <div
-                  key={`${activeMode}-${statusType || 'neutral'}`}
-                  role="status"
-                  aria-live="polite"
-                  style={{
-                    marginTop: '1rem',
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: statusType === 'success' ? '#eafaf1' : '#eee',
-                    color: statusType === 'success' ? '#27ae60' : '#333',
-                    borderLeft: statusType === 'success' ? 'none' : '5px solid #dc3545',
-                    textAlign: statusType === 'success' ? 'center' : 'left',
-                    lineHeight: '1.5',
-                    gridColumn: '1 / -1'
-                  }}
-                >
-                  {statusMessage}
-                </div>
-              ) : null}
-            </div>
           </div>
         </section>
       </div>
