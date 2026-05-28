@@ -2,8 +2,9 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from backend.src.configuration.config import settings # imports the settings from our config.py file, which allows environement variables indirectly
 
-SQLALCHEMY_DATABASE_URL = f"postgresql://postgres:password@localhost:5432/handyman" # URL to connect to the PostgreSQL database
+SQLALCHEMY_DATABASE_URL = f"postgresql://{settings.DATABASE_USERNAME}:{settings.DATABASE_PASSWORD}@{settings.DATABASE_HOST}:{settings.DATABASE_PORT}/{settings.DATABASE_NAME}" # URL to connect to the PostgreSQL database
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL) # creates a engine to connect to the database
 
