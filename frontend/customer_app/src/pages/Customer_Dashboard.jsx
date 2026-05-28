@@ -1,6 +1,4 @@
 import React from 'react';
-import { useAuth } from '@shared/context/AuthContext';
-import LogoutButton from '@shared/components/LogoutButton';
 
 /* ====== BACKEND COMPONENT LIFECYCLE: Fetch Authenticated User Session & Role Data Here ====== */
 const mockSession = {
@@ -39,32 +37,23 @@ const mockSession = {
 
 const pipelineOrder = mockSession.activeJob.pipeline;
 
-export default function ClientDashboard({ onNavigate }) {
-  const { username } = useAuth();
-
+export default function ClientDashboard() {
   return (
     <div className="ind-page marketplace-dashboard">
       <main className="marketplace-shell">
         <header className="dash-card marketplace-header">
           <div className="marketplace-header__copy">
             <p className="marketplace-kicker">Client Dashboard</p>
-            <h1>Welcome back, {username || `${mockSession.user.firstName} ${mockSession.user.lastName}`} 🛠️</h1>
+            <h1>Welcome back, {mockSession.user.firstName} {mockSession.user.lastName} 🛠️</h1>
             <div className="marketplace-header__meta">
               <span className="marketplace-pill">{mockSession.user.locationLabel}</span>
               <span className="marketplace-pill">{mockSession.user.accountType}</span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="button" className="marketplace-action marketplace-action--primary">
-              New Booking
-            </button>
-            <LogoutButton
-              className="marketplace-action"
-              children="Logout"
-              style={{ backgroundColor: '#f8f8f8', color: '#222' }}
-            />
-          </div>
+          <button type="button" className="marketplace-action marketplace-action--primary">
+            New Booking
+          </button>
         </header>
 
         <section className="dash-card marketplace-hero" aria-labelledby="active-project-hub">
