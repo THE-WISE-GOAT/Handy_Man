@@ -1,1 +1,5 @@
-Generic single-database configuration.
+# Alembic : database migration
+* this alembic is needed for SQLAlchemy and python ecosystem.
+* this is needed to migrate or make changes in database as similar to git
+* For eg: if we add any column  using SQL commands this does not make changes to prod-db or risk of breaking data
+* alembic solves this by: we can track changes, update without losing existing data, can easily roll back if there is problem
