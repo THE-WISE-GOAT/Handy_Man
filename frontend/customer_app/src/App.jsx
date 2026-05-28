@@ -1,88 +1,83 @@
-import React from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
 import HomePage from '@shared/components/HomePage';
 import AdminDashboard from '@shared/components/AdminDashboard';
 import LoginPage from '@shared/components/LoginPage';
-import ProtectedRoute from '@shared/routes/ProtectedRoute';
-import AnonymousRoute from '@shared/routes/AnonymousRoute';
 import CustomerDashboard from './pages/Customer_Dashboard';
 import WorkerDashboard from '../../worker_app/src/pages/Worker_Dashboard';
-//ANUP GURAGAiN
-export default function App() {
-  const navigate = useNavigate();
 
-  const goTo = (target, options = {}) => {
-    const routes = {
-      login: '/login',
-      signup: '/signup',
-      customer_dashboard: '/customer',
-      worker_dashboard: '/worker',
-      admin_dashboard: '/admin',
-      home: '/'
+export default function App() {
+  const resolvePage = (hashValue) => {
+    const normalizedHash = (hashValue || '').replace('#', '').trim().toLowerCase();
+
+     /* ====== TEMP ROLE ROUTING: client/login-test -> customer_dashboard, worker/login-test -> worker_dashboard.
+       Remove this switch when backend session claims are available.
+    ====== */
+     if (normalizedHash === 'dashboard' || normalizedHash === 'client' || normalizedHash === 'customer_dashboard') return 'customer_dashboard';
+     if (normalizedHash === 'worker' || normalizedHash === 'worker_dashboard') return 'worker_dashboard';
+    /* ====== END TEMP ROLE ROUTING ====== */
+
+     if (normalizedHash === 'admin' || normalizedHash === 'admin_dashboard') return 'admin_dashboard';
+    if (normalizedHash === 'login') return 'login';
+    if (normalizedHash === 'signup') return 'signup';
+
+    return 'home';
+  };
+
+  const [activePage, setActivePage] = useState(() => {
+    if (typeof window === 'undefined') {
+      return 'home';
+    }
+
+    return resolvePage(window.location.hash);
+  });
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setActivePage(resolvePage(window.location.hash));
     };
 
-    navigate(routes[target] || '/', { replace: Boolean(options.replace) });
-  };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const targetHash = activePage === 'home' ? '' : `#${activePage}`;
+    if (window.location.hash !== targetHash) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${targetHash}`);
+    }
+  }, [activePage]);
+
+  const pageNode = useMemo(() => {
+    if (activePage === 'customer_dashboard') {
+      return <CustomerDashboard />;
+    }
+
+    if (activePage === 'worker_dashboard') {
+      return <WorkerDashboard />;
+    }
+
+    if (activePage === 'admin_dashboard') {
+      return <AdminDashboard />;
+    }
+
+    if (activePage === 'login') {
+      return <LoginPage initialMode="login" onNavigate={setActivePage} />;
+    }
+
+    if (activePage === 'signup') {
+      return <LoginPage initialMode="signup" onNavigate={setActivePage} />;
+    }
+
+    return <HomePage onNavigate={setActivePage} />;
+  }, [activePage]);
 
   return (
     <div className="ind-app-shell">
-      <Routes>
-        <Route
-          path="/"
-          element={(
-            <AnonymousRoute>
-              <HomePage onNavigate={goTo} />
-            </AnonymousRoute>
-          )}
-        />
-
-        <Route
-          path="/login"
-          element={(
-            <AnonymousRoute>
-              <LoginPage initialMode="login" onNavigate={goTo} />
-            </AnonymousRoute>
-          )}
-        />
-
-        <Route
-          path="/signup"
-          element={(
-            <AnonymousRoute>
-              <LoginPage initialMode="signup" onNavigate={goTo} />
-            </AnonymousRoute>
-          )}
-        />
-
-        <Route
-          path="/customer"
-          element={(
-            <ProtectedRoute>
-              <CustomerDashboard onNavigate={goTo} />
-            </ProtectedRoute>
-          )}
-        />
-
-        <Route
-          path="/worker"
-          element={(
-            <ProtectedRoute>
-              <WorkerDashboard />
-            </ProtectedRoute>
-          )}
-        />
-
-        <Route
-          path="/admin"
-          element={(
-            <ProtectedRoute>
-              <AdminDashboard />
-            </ProtectedRoute>
-          )}
-        />
-
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      {pageNode}
     </div>
   );
 }
