@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 
-const MAP_PREVIEW_URL = import.meta.env.VITE_MAP_STANDALONE_URL || 'http://localhost:5174';
-
 /* ====== BACKEND COMPONENT LIFECYCLE: Fetch Authenticated User Session & Role Data Here ====== */
 const mockSession = {
   worker: {
@@ -88,25 +86,6 @@ export default function WorkerDashboard() {
               </span>
             </div>
           </div>
-
-          <a
-            href={MAP_PREVIEW_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="marketplace-action marketplace-action--secondary"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textDecoration: 'none',
-              backgroundColor: '#eef6ff',
-              color: '#0f3d73',
-              border: '1px solid #c7ddff'
-            }}
-            aria-label="Open live worker map sandbox in a new tab"
-          >
-            🗺️ Live Worker Map (PostGIS Sandbox)
-          </a>
 
           <button
             type="button"
