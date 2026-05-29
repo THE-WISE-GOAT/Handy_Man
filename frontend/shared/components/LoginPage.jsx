@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 const socialLinks = [
   { label: 'Google', glyph: 'G' },
@@ -15,13 +18,15 @@ const benefits = [
 ];
 
 export default function LoginPage({ initialMode = 'login', onNavigate }) {
+  const { login } = useAuth();
   const [activeMode, setActiveMode] = useState(initialMode === 'signup' ? 'signup' : 'login');
   const [identity, setIdentity] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [accountType, setAccountType] = useState('customer');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusType, setStatusType] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     setActiveMode(initialMode === 'signup' ? 'signup' : 'login');
@@ -32,44 +37,109 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
     onNavigate?.(mode);
   };
 
-  const handleSignInSubmit = (event) => {
+  const handleSignInSubmit = async (event) => {
     event.preventDefault();
 
-    /* ====== TEMP ROLE ROUTING: client/client -> customer_dashboard, worker/worker -> worker_dashboard, admin/admin -> admin_dashboard.
-       Remove this block when backend session-based auth and role resolution are wired in.
-    ====== */
-    const normalizedIdentity = identity.trim().toLowerCase();
-    const normalizedPassword = password.trim().toLowerCase();
+    const trimmedIdentity = identity.trim();
+    const trimmedPassword = password.trim();
 
-    if (normalizedIdentity === 'client' && normalizedPassword === 'client') {
-      onNavigate?.('customer_dashboard');
+    if (!trimmedIdentity || !trimmedPassword) {
+      setStatusType('error');
+      setStatusMessage('Please enter username and password.');
       return;
     }
 
-    if (normalizedIdentity === 'worker' && normalizedPassword === 'worker') {
-      onNavigate?.('worker_dashboard');
-      return;
-    }
+    setIsSubmitting(true);
+    setStatusType('');
+    setStatusMessage('');
 
-    if (normalizedIdentity === 'admin' && normalizedPassword === 'admin') {
-      onNavigate?.('admin_dashboard');
-      return;
-    }
-    /* ====== END TEMP ROLE ROUTING ====== */
+    try {
+      const formBody = new URLSearchParams();
+      formBody.append('username', trimmedIdentity);
+      formBody.append('password', trimmedPassword);
 
-    console.log('Login submission requested:', { identity });
+      const response = await fetch(`${API_BASE_URL}/login/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: formBody.toString()
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setStatusType('error');
+        setStatusMessage(`Error: ${data.detail || 'Could not log in.'}`);
+        return;
+      }
+
+      login({
+        token: data.access_token,
+        type: data.token_type,
+        usernameValue: trimmedIdentity
+      });
+      setStatusType('success');
+      setStatusMessage('Login successful. Redirecting to client dashboard...');
+      onNavigate?.('customer_dashboard', { replace: true });
+    } catch (error) {
+      setStatusType('error');
+      setStatusMessage('Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSignUpSubmit = (event) => {
+  const handleSignUpSubmit = async (event) => {
     event.preventDefault();
 
-    /* ====== BACKEND INTEGRATION PLACEHOLDER: Insert API endpoint/Auth payload here ======
-       - POST the signup payload to the database-backed account endpoint.
-       - Include full name, contact details, password hash, and selected role here.
-       - Handle verification, duplicate checks, and onboarding routing here.
-    ====== */
+    const trimmedUsername = username.trim();
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
 
-    console.log('Signup submission requested:', { fullName, phone, email, accountType });
+    if (!trimmedUsername || !trimmedEmail || !trimmedPassword) {
+      setStatusType('error');
+      setStatusMessage('Please fill in all fields.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatusType('');
+    setStatusMessage('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: trimmedUsername,
+          email: trimmedEmail,
+          password: trimmedPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setStatusType('error');
+        setStatusMessage(`Error: ${data.detail || 'Could not register user.'}`);
+        return;
+      }
+
+      setStatusType('success');
+      setStatusMessage(`Account Created Successfully! Welcome aboard, ${data.username}. Your account ID is #${data.id}.`);
+      setIdentity(data.username);
+      setPassword('');
+      setActiveMode('login');
+      onNavigate?.('login', { replace: true });
+    } catch (error) {
+      setStatusType('error');
+      setStatusMessage('Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -118,7 +188,7 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
             <form className={`auth-form auth-form--signup ${activeMode === 'signup' ? 'is-active' : ''}`} onSubmit={handleSignUpSubmit}>
               <div className="auth-form__heading">
                 <h2>Create Account</h2>
-                <p>Register with your name, contact info, and role preference.</p>
+                <p>Register with username, email, and password.</p>
               </div>
 
               <div className="auth-socials" aria-label="Social signup options">
@@ -130,41 +200,17 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
               </div>
 
               <span className="auth-form__hint">or use your email for registration</span>
-              <input type="text" placeholder="Name" value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" required />
-              <input type="tel" placeholder="Phone" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" required />
+              <input type="text" placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required />
               <input type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
               <input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required />
 
               <div className="auth-submit-stack" aria-label="Create account actions">
-                <div className="auth-submit-stack__row">
-                  <button
-                    type="button"
-                    className={`auth-submit-stack__button ${accountType === 'customer' ? 'is-active' : ''}`}
-                    onClick={() => setAccountType('customer')}
-                  >
-                    Sign Up as Customer
-                  </button>
-                  <button
-                    type="button"
-                    className={`auth-submit-stack__button ${accountType === 'provider' ? 'is-active' : ''}`}
-                    onClick={() => setAccountType('provider')}
-                  >
-                    Sign Up as Provider
-                  </button>
-                </div>
-
                 <button
                   type="submit"
                   className="auth-submit-stack__button auth-submit-stack__button--primary"
-                  onClick={() => {
-                    /* ====== BACKEND INTEGRATION PLACEHOLDER: Insert API endpoint/Auth payload here ======
-                       - Choose accountType, role, and contact details here.
-                       - POST to your account-creation endpoint for customer or handyman profile creation.
-                       - Return auth/session state and route the user after success.
-                    ====== */
-                  }}
+                  disabled={isSubmitting}
                 >
-                  CREATE MY ACCOUNT
+                  {isSubmitting ? 'CREATING...' : 'CREATE MY ACCOUNT'}
                 </button>
               </div>
 
@@ -188,7 +234,7 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
               </div>
 
               <span className="auth-form__hint">or use your email password</span>
-              <input type="text" placeholder="Name or Email" value={identity} onChange={(event) => setIdentity(event.target.value)} autoComplete="username" required />
+              <input type="text" placeholder="Username" value={identity} onChange={(event) => setIdentity(event.target.value)} autoComplete="username" required />
               <input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
 
               <a className="auth-form__link" href="#forgot" onClick={(event) => event.preventDefault()}>
@@ -196,12 +242,32 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
               </a>
 
               <div className="auth-signin-actions" aria-label="Sign in actions">
-                <button type="submit">SIGN IN</button>
+                <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'SIGNING IN...' : 'SIGN IN'}</button>
                 <button type="button" className="auth-signin-actions__secondary" onClick={() => activateMode('signup')}>
                   NEED AN ACCOUNT? SIGN UP
                 </button>
               </div>
             </form>
+
+            {statusMessage ? (
+              <div
+                role="status"
+                aria-live="polite"
+                style={{
+                  marginTop: '1rem',
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: statusType === 'success' ? '#eafaf1' : '#eee',
+                  color: statusType === 'success' ? '#27ae60' : '#333',
+                  borderLeft: statusType === 'success' ? 'none' : '5px solid #dc3545',
+                  textAlign: statusType === 'success' ? 'center' : 'left',
+                  lineHeight: '1.5',
+                  gridColumn: '1 / -1'
+                }}
+              >
+                {statusMessage}
+              </div>
+            ) : null}
           </div>
         </section>
       </div>
