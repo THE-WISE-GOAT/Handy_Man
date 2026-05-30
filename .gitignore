@@ -6,58 +6,22 @@
 # === Python / FastAPI ===
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.venv/
-venv/
-env/
-sush_env/
+.env
+alembic.ini
+backend/migrations/
 
-# === Node / React / Vite ===
-node_modules/
+# === REACT / NODE IGNORES ===
+# This ignores node_modules and build outputs anywhere inside your frontend folders
 **/node_modules/
-dist/
-**/dist/
-build/
 **/build/
-dist-ssr/
-.next/
-.vite/
-.turbo/
-.eslintcache
+**/dist/
+**/.next/
+**/.docusaurus/
+
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-# === OS files ===
+# System Files
 .DS_Store
-Thumbs.db
-
-# === IDE / editor ===
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# === Node / React / Vite ===
-node_modules/
-**/node_modules/
-dist/
-**/dist/
-build/
-**/build/
-dist-ssr/
-.next/
-.eslintcache
-npm-debug.log*
-
-# Fix: Ensure all hidden Vite caches are explicitly ignored everywhere
-.vite/
-**/.vite/
-.vite_cache/
-**/.vite_cache/
