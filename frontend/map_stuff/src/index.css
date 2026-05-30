@@ -29,7 +29,6 @@
     font-size: 16px;
   }
 }
-
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #9ca3af;
@@ -108,4 +107,19 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
 }
