@@ -3,9 +3,9 @@ from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent #this gets the path to the root folder (Handy_Man). This moves up 3 levels from config.py to hit .env
-# config.py -> configuration -> src -> root 
+# config.py -> configuration -> src -> backend-> root
 
-ENV_PATH = BASE_DIR / ".env" # this stores the path to the .env file in a variable so we can use it in our Settings class
+ENV_PATH = str(BASE_DIR / ".env") # this stores the path to the .env file in a variable so we can use it in our Settings class
 
 
 class Settings(BaseSettings):
