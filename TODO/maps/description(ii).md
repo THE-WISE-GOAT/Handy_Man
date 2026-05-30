@@ -75,7 +75,7 @@ AND ST_DWithin(location, ST_MakePoint(job_long, job_lat)::geography, radius);
 ---
 
 ## Phase 4: Connecting the Real-Time Pipes
-<!-- 
+
 ### Step 6: Setup Socket.io (The Live Bridge)
 
 Instead of the worker constantly refreshing their app to check for jobs, the server pushes the job directly to them.
@@ -83,8 +83,8 @@ Instead of the worker constantly refreshing their app to check for jobs, the ser
 * **The Flow:**
 1. Customer submits job $\rightarrow$ Server runs the PostGIS query.
 2. Server finds 3 matching workers who are currently online.
-3. Server uses **Socket.io** to send a private packet directly to those 3 workers' devices: `"Hey, a new job just appeared at these coordinates!"` -->
-<!-- setup using fastapi -->
+3. Server uses **Socket.io** to send a private packet directly to those 3 workers' devices: `"Hey, a new job just appeared at these coordinates!"`
+
 
 
 ### Step 7: Render on React Leaflet
