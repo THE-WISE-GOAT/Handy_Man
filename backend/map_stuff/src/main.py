@@ -1,66 +1,67 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from geoalchemy2.functions import ST_DWithin
+from pydantic import BaseModel
+from typing import List
+import asyncpg
 
-# Universal imports updated to match your latest structure
-from .schemas import JobCreate, MatchResultResponse
-from .database import get_db
-from .models import Worker # This points to our modern Mapped Worker model
-
-app_config = {"title": "kamigo"}
-app = FastAPI(**app_config)
+app = FastAPI(title="Handyman Matching Engine")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allows any origin (including localhost:5173)
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"],  # Allows POST, GET, OPTIONS, etc.
     allow_headers=["*"],
 )
 
+# Database Connection URL String
+# Format: postgresql://username:password@localhost:port/database_name
+DB_URL = "postgresql://postgres:password@localhost:5432/handyman_db"
+
+# Data schemas incoming from React
+class JobCreate(BaseModel):
+    title: str
+    tag: str
+    latitude: float
+    longitude: float
+
 @app.get("/")
-async def get_server_health():
+async def root():
     return {"status": "Server running successfully"}
 
-
-@app.post("/api/jobs/match", response_model=MatchResultResponse)
-async def match_job(job: JobCreate, db: AsyncSession = Depends(get_db)):
-    """
-    Finds nearby matching handymen using modern SQLAlchemy ORM expressions
-    and your structural matching schemas.
-    """
+@app.post("/api/jobs/match")
+async def match_job(job: JobCreate):
+    # 1. Open a lightning-fast async connection to your local database
+    conn = await asyncpg.connect(DB_URL)
     
-    # 1. Standardize frontend decimal coordinates into a clear geometric coordinate point
-    user_location = func.ST_SetSRID(
-        func.ST_MakePoint(job.longitude, job.latitude), 
-        4326
-    )
-    
-    # 2. Build out the query constraints
-    # Changed Worker.tags.contains to handle JSONB/Array matching natively depending on your DB layout.
-    # We loop through job.tags (plural) to find array intersections.
-    query = select(Worker.id, Worker.operating_radius).where(
-        Worker.tags.has_any(job.tags), # Fast array/json search matrix intersection
-        ST_DWithin(Worker.location, user_location, Worker.operating_radius)
-    )
-    
-    # 3. Asynchronously execute the query pool using asyncpg
-    query_result = await db.execute(query)
-    
-    # 4. Formulate dictionary mappings to align directly with your WorkerMatchResponse schema
-    formatted_matches = [
-        {
-            "worker_id": row.id, 
-            "operating_radius": row.operating_radius,
-            # If you want real distance calculation from user_location, PostGIS can do it here!
+    try:
+        # 2. THE REAL POSTGIS MATCHING QUERY
+        # Finds workers who have the skill AND whose radius covers this job site
+        # Update your SELECT statement to use user_id or your exact column name
+        query = """
+            SELECT w.user_id, w.radius
+            FROM workers w
+            WHERE $1 = ANY(w.tags)
+              AND ST_DWithin(
+                w.location, 
+                ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, 
+                w.radius
+              );
+        """
+        
+        matched_workers = await conn.fetch(query, job.tag, job.longitude, job.latitude)
+        
+        # Update the row mapping key here as well
+        results = [
+            {"worker_id": row["user_id"], "radius": row["radius"]} 
+            for row in matched_workers
+        ]
+        return {
+            "status": "success",
+            "total_matches": len(results),
+            "matches": results
         }
-        for row in query_result.all()
-    ]
-    
-    return {
-        "status": "success",
-        "total_matches": len(formatted_matches),
-        "matches": formatted_matches
-    }
+        
+    finally:
+        # Always close the connection when done!
+        await conn.close()
