@@ -1,6 +1,9 @@
 # this page is for the validation of data that is sent to database
-from pydantic import BaseModel, EmailStr
 from datetime import datetime
+from typing import Literal
+from pydantic import Field
+from pydantic import BaseModel, Field, EmailStr
+
 
 
 # we put value through this schema before it goes to the database, so we can validate that the data is in the correct format and that all required fields are present, this is also used for the API endpoints to validate the data that is sent to the API
@@ -28,3 +31,16 @@ class Token(BaseModel):
     
 class TokenData(BaseModel):
     user_id: str | None = None # this is the data that will be contained in the token, it will be used to identify the user when the token is decoded, it will be set to None by default, and it will be populated with the user_id when the token is created.
+    
+ 
+# Define the Strict Target JSON Schema for Customer Problem Extraction   
+class CustomerProblemSchema(BaseModel):
+    problem_category: Literal["plumbing", "electrical", "hvac", "appliance_repair", "other"] = Field(
+        description="The general category of the household problem."
+    )
+    detailed_problem: str = Field(
+        description="A concise summary of exactly what is wrong and symptoms mentioned."
+    )
+    urgency_level: Literal["low", "medium", "high"] = Field(
+        description="The priority of the issue based on damage risk or safety issues."
+    )
