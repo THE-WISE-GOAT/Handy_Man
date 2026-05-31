@@ -26,6 +26,9 @@ const jobIcon = L.icon({
   iconAnchor: [12, 41],
 });
 
+// Environment-agnostic backend base URL configuration
+const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000";
+
 // SUB-COMPONENT: Listens for map clicks and fires the API payload
 function MapClickHandler({ onMapClick }) {
   useMapEvents({
@@ -52,7 +55,7 @@ function MainMap() {
     setJob({ pos: coords }); // Store location instantly to drop the pin
 
     try {
-      const response = await fetch("http://localhost:8000/api/jobs/match", {
+      const response = await fetch(`${API_BASE_URL}/api/jobs/match`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -215,4 +218,3 @@ function MainMap() {
 }
 
 export default MainMap;
-//ignore
