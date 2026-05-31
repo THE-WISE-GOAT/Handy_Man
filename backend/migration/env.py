@@ -5,7 +5,10 @@ from sqlalchemy import pool
 
 from alembic import context
 from src.configuration.config import settings
-from src.core.model import Base
+from src.core.model import Base, Service_tasks, User, Role, UserRole, Worker, Bids, Chat_logs
+from geoalchemy2 import alembic_helpers
+
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
