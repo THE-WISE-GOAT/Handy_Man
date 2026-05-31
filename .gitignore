@@ -2,8 +2,8 @@ sush_env/
 __pycache__/
 *.pyc
 .env
-alembic.ini
-backend/migrations/
+
+
 
 # === REACT / NODE IGNORES ===
 # This ignores node_modules and build outputs anywhere inside your frontend folders
