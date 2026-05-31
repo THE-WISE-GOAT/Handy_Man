@@ -5,7 +5,10 @@ from sqlalchemy import pool
 
 from alembic import context
 from src.configuration.config import settings
-from src.core.model import Base
+from src.core.model import Base, Service_tasks, User, Role, UserRole, Worker, Bids, Chat_logs
+from geoalchemy2 import alembic_helpers
+
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -43,12 +46,17 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(
+    def run_migrations_offline() -> None:
+        url = config.get_main_option("sqlalchemy.url")
+        context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,  # <-- ADD THIS
+        include_object=alembic_helpers.include_object,  # <-- ADD THIS
+        process_revision_directives=alembic_helpers.writer,  # <-- ADD THIS
+        render_item=alembic_helpers.render_item,  # <-- ADD THIS
     )
 
     with context.begin_transaction():
@@ -56,12 +64,6 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -70,7 +72,12 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,  # <-- ADD THIS
+            include_object=alembic_helpers.include_object,  # <-- ADD THIS
+            process_revision_directives=alembic_helpers.writer,  # <-- ADD THIS
+            render_item=alembic_helpers.render_item,  # <-- ADD THIS
         )
 
         with context.begin_transaction():
