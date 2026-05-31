@@ -1,34 +1,29 @@
 import os
-from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Fallback updated to target your Handy Man database name
+# Production URL uses the +asyncpg driver for async operations
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql+asyncpg://postgres:password@localhost:5432/handy_man_db"
+    "postgresql+asyncpg://postgres:password@localhost:5432/handyman_db"
 )
 
-# 1. Create the Asynchronous Database Engine
+# Engine manages a high-performance concurrent pool of connections
 engine = create_async_engine(DATABASE_URL, echo=True)
 
-# 2. Modern Session Factory optimized for async execution loops
-AsyncSessionLocal = async_sessionmaker(
+# Session factory for route-level transactions
+AsyncSessionLocal = sessionmaker(
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False
 )
 
-# 3. Modern Declarative Base Class required for Mapped[...] columns to resolve types properly
-class Base(DeclarativeBase):
-    pass
+Base = declarative_base()
 
-# 4. Dependency Injection Provider for FastAPI routes
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+# Request lifecycle dependency to avoid memory leaks
+async def get_db():
     async with AsyncSessionLocal() as session:
         try:
             yield session
         finally:
-            # The context manager ('async with') handles closing automatically, 
-            # but explicit closing provides an extra layer of protection against connection leaks.
             await session.close()

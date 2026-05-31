@@ -1,41 +1,49 @@
-import asyncio
-import os
 from logging.config import fileConfig
 
-from alembic import context
+from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
-# 1. CRITICAL: Import GeoAlchemy2 so Alembic recognizes the Geography column type
-import geoalchemy2
+from alembic import context
 
-# 2. Import your central database Base layout
-from backend.map_stuff.src.database import Base
-
-# 3. CRITICAL: Import ALL model source files so Alembic's autogenerate detects your complete schema
-import backend.map_stuff.src.models  # Imports your Map/Worker models
-# If your User/Role tables live in a separate file (e.g., core app models), import them here too:
-# from src.auth import models as auth_models 
-
-# This is the Alembic Config object, which provides access to the values within the .ini file.
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
 config = context.config
 
 # Interpret the config file for Python logging.
+# This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Point Alembic directly to your mapped model metadata structure
+# add your model's MetaData object here
+# for 'autogenerate' support
+# from myapp import mymodel
+# target_metadata = mymodel.Base.metadata
+# Change this line:
+# target_metadata = None
+
+# To exactly this:
+from src.database import Base
+import src.models  # Crucial: imports models so alembic can auto-detect tables
 target_metadata = Base.metadata
+# other values from the config, defined by the needs of env.py,
+# can be acquired:
+# my_important_option = config.get_main_option("my_important_option")
+# ... etc.
 
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
-    This configures the context with just a URL and not an Engine.
-    Calls to context.execute() here emit the given string to the script output.
+    This configures the context with just a URL
+    and not an Engine, though an Engine is acceptable
+    here as well.  By skipping the Engine creation
+    we don't even need a DBAPI to be available.
+
+    Calls to context.execute() here emit the given string to the
+    script output.
+
     """
-    url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:password@localhost:5432/handyman_db")
-    
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -47,11 +55,15 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+import asyncio
+from sqlalchemy.ext.asyncio import async_engine_from_config
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode using an async engine."""
     configuration = config.get_section(config.config_ini_section) or {}
     
-    # Injects your environment variable database connection URL dynamically
+    # Injects your environment variable database string dynamically
+    import os
     db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:password@localhost:5432/handyman_db")
     configuration["sqlalchemy.url"] = db_url
 
@@ -64,25 +76,10 @@ def run_migrations_online() -> None:
     async def do_run_migrations():
         async with connectable.connect() as connection:
             await connection.run_sync(do_run_all_migrations)
-        await connectable.dispose()
 
     def do_run_all_migrations(connection):
-        # include_object can be passed here if you ever need to filter system tables
-        context.configure(
-            connection=connection, 
-            target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()
 
-    # Safely executes the async event block inside Alembic's wrapper
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    if loop and loop.is_running():
-        # Handles nested event loops cleanly if called inside an active execution space
-        loop.create_task(do_run_migrations())
-    else:
-        asyncio.run(do_run_migrations())
+    asyncio.run(do_run_migrations())
