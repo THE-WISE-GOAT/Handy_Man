@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+import { apiClient, normalizeApiError } from '@shared/api/client';
 
 const socialLinks = [
   { label: 'Google', glyph: 'G' },
@@ -54,25 +53,15 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
     setStatusMessage('');
 
     try {
-      const formBody = new URLSearchParams();
-      formBody.append('username', trimmedIdentity);
-      formBody.append('password', trimmedPassword);
-
-      const response = await fetch(`${API_BASE_URL}/login/`, {
-        method: 'POST',
+      const data = await apiClient.post('/login/', new URLSearchParams({
+        username: trimmedIdentity,
+        password: trimmedPassword
+      }), {
+        skipAuth: true,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: formBody.toString()
+        }
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setStatusType('error');
-        setStatusMessage(`Error: ${data.detail || 'Could not log in.'}`);
-        return;
-      }
 
       await login({
         token: data.access_token,
@@ -84,7 +73,8 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
       onNavigate?.('customer_dashboard', { replace: true });
     } catch (error) {
       setStatusType('error');
-      setStatusMessage(error?.message || 'Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+      const normalized = normalizeApiError(error, 'Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+      setStatusMessage(normalized.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -108,25 +98,13 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
     setStatusMessage('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          username: trimmedUsername,
-          email: trimmedEmail,
-          password: trimmedPassword
-        })
+      const data = await apiClient.post('/users/', {
+        username: trimmedUsername,
+        email: trimmedEmail,
+        password: trimmedPassword
+      }, {
+        skipAuth: true
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setStatusType('error');
-        setStatusMessage(`Error: ${data.detail || 'Could not register user.'}`);
-        return;
-      }
 
       setStatusType('success');
       setStatusMessage(`Account Created Successfully! Welcome aboard, ${data.username}. Your account ID is #${data.id}.`);
@@ -136,7 +114,8 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
       onNavigate?.('login', { replace: true });
     } catch (error) {
       setStatusType('error');
-      setStatusMessage('Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+      const normalized = normalizeApiError(error, 'Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+      setStatusMessage(normalized.message);
     } finally {
       setIsSubmitting(false);
     }
