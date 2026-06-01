@@ -2,6 +2,8 @@ import React from 'react';
 import { useAuth } from '@shared/context/AuthContext';
 import LogoutButton from '@shared/components/LogoutButton';
 
+const MAP_PREVIEW_URL = import.meta.env.VITE_MAP_STANDALONE_URL || 'http://localhost:5174';
+
 /* ====== BACKEND COMPONENT LIFECYCLE: Fetch Authenticated User Session & Role Data Here ====== */
 const mockSession = {
   user: {
@@ -56,6 +58,24 @@ export default function ClientDashboard({ onNavigate }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <a
+              href={MAP_PREVIEW_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="marketplace-action"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textDecoration: 'none',
+                backgroundColor: '#eef6ff',
+                color: '#0f3d73',
+                border: '1px solid #c7ddff'
+              }}
+              aria-label="Open live worker map sandbox in a new tab"
+            >
+              🗺️ Live Worker Map (PostGIS Sandbox)
+            </a>
             <button type="button" className="marketplace-action marketplace-action--primary">
               New Booking
             </button>
