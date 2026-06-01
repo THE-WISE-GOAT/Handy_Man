@@ -1,22 +1,45 @@
-sush_env/
+# === Repository-wide local artifacts ===
+.env
+.env.*
+*.local
+
+# === Python / FastAPI ===
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+sush_env/
 
-
-
-# === REACT / NODE IGNORES ===
-# This ignores node_modules and build outputs anywhere inside your frontend folders
+# === Node / React / Vite ===
+node_modules/
 **/node_modules/
-**/build/
+dist/
 **/dist/
-**/.next/
-**/.docusaurus/
-
-# Logs
+build/
+**/build/
+dist-ssr/
+.next/
+.vite/
+.turbo/
+.eslintcache
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# System Files
+# === OS files ===
 .DS_Store
+Thumbs.db
+
+# === IDE / editor ===
+.vscode/
+.idea/
+*.swp
+*.swo
