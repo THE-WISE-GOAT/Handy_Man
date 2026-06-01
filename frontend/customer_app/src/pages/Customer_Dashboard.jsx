@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@shared/context/AuthContext';
 import LogoutButton from '@shared/components/LogoutButton';
+import JobIntakeForm from '@shared/components/JobIntakeForm';
+import { apiClient, normalizeApiError } from '@shared/api/client';
 
 const MAP_PREVIEW_URL = import.meta.env.VITE_MAP_STANDALONE_URL || 'http://localhost:5174';
 
@@ -43,6 +45,24 @@ const pipelineOrder = mockSession.activeJob.pipeline;
 
 export default function ClientDashboard({ onNavigate }) {
   const { username } = useAuth();
+  const [intakeSummary, setIntakeSummary] = useState(null);
+  const [intakeFeedback, setIntakeFeedback] = useState({ kind: 'idle', message: '' });
+
+  const handleJobIntakeSubmit = async (payload) => {
+    setIntakeFeedback({ kind: 'loading', message: 'Preparing dispatch intake...' });
+
+    try {
+      // Backend-friendly placeholder: if the intake endpoint exists later, this will start working
+      // without changing the UI. Until then we keep the drafted payload available locally.
+      await apiClient.post('/api/customer/problem-intake', payload);
+      setIntakeSummary(payload);
+      setIntakeFeedback({ kind: 'success', message: 'Intake captured and sent to the backend.' });
+    } catch (error) {
+      const normalized = normalizeApiError(error, 'Saved locally for now. The intake endpoint is not live yet.');
+      setIntakeSummary(payload);
+      setIntakeFeedback({ kind: 'warning', message: normalized.message });
+    }
+  };
 
   return (
     <div className="ind-page marketplace-dashboard">
@@ -131,6 +151,67 @@ export default function ClientDashboard({ onNavigate }) {
               ))}
             </ol>
           </div>
+        </section>
+
+        <section className="dash-card marketplace-card" aria-labelledby="job-intake-hub">
+          <div className="marketplace-section-head">
+            <p className="marketplace-kicker">New Request</p>
+            <h2 id="job-intake-hub">Create a problem intake</h2>
+          </div>
+
+          <p className="marketplace-muted" style={{ marginTop: 0 }}>
+            Capture the issue in the same shape the AI extraction pipeline expects. The UI is ready now, and the backend can accept it later without redesign.
+          </p>
+
+          {intakeFeedback.message ? (
+            <div
+              style={{
+                marginBottom: '16px',
+                padding: '12px 14px',
+                borderRadius: '12px',
+                background:
+                  intakeFeedback.kind === 'success'
+                    ? '#eafaf1'
+                    : intakeFeedback.kind === 'warning'
+                      ? '#fff7ed'
+                      : '#f8fafc',
+                color:
+                  intakeFeedback.kind === 'success'
+                    ? '#137333'
+                    : intakeFeedback.kind === 'warning'
+                      ? '#9a3412'
+                      : '#334155',
+                border: '1px solid rgba(148, 163, 184, 0.22)'
+              }}
+            >
+              {intakeFeedback.message}
+            </div>
+          ) : null}
+
+          <JobIntakeForm
+            submitLabel="Submit intake"
+            onSubmit={handleJobIntakeSubmit}
+          />
+
+          {intakeSummary ? (
+            <div style={{ marginTop: '16px' }}>
+              <h3 className="marketplace-kicker">Latest intake payload</h3>
+              <pre
+                style={{
+                  margin: 0,
+                  padding: '16px',
+                  borderRadius: '14px',
+                  background: '#0f172a',
+                  color: '#dbeafe',
+                  overflowX: 'auto',
+                  fontSize: '13px',
+                  lineHeight: 1.6
+                }}
+              >
+{JSON.stringify(intakeSummary, null, 2)}
+              </pre>
+            </div>
+          ) : null}
         </section>
 
         <section className="marketplace-split-grid" aria-label="Quick actions and order history">
