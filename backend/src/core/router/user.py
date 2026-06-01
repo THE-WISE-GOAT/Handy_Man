@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from src.database.database import get_db, engine
+from src.database.database import get_db
 from src.core import model, schema
 from src.core.utils import hash_password
 
@@ -11,8 +11,6 @@ router = APIRouter(
     prefix="/users", # sets the prefix for all API endpoints same  for this router 
     tags=["users"], # this is used for documentation purposes, it allows to group User related endpoints
 ) # creates a new APIRouter instance, which allows us to define API endpoints related to the User model in a separate file, and then include this router in our main application 
-
-model.Base.metadata.create_all(bind=engine) # this will create the tables in the database based on the model.py we defined, if they don't already exist
 
 # to create a new user, we will use the UserCreate schema to validate the data that is sent to the API, and then we will create a new user in the database using the User model, and return the created user using the UserOut schema, which does not include the password field, for security reasons.
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut)
