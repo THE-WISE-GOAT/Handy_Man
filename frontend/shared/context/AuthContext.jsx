@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { API_BASE_URL } from '@shared/config/api';
+import { apiClient } from '@shared/api/client';
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = 'handy_man_access_token';
@@ -68,21 +68,12 @@ export function AuthProvider({ children }) {
     let profile = null;
 
     if (userId) {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-        headers: {
-          Authorization: `${type} ${token}`
-        }
+      const responseBody = await apiClient.get(`/users/${userId}`, {
+        token,
+        tokenType: type
       });
 
-      const responseBody = await response.json();
-
-      if (response.ok) {
-        profile = normalizeUserProfile(responseBody, usernameValue);
-      } else {
-        const error = new Error(responseBody?.detail || 'Could not load user session.');
-        error.responseBody = responseBody;
-        throw error;
-      }
+      profile = normalizeUserProfile(responseBody, usernameValue);
     }
 
     localStorage.setItem(TOKEN_KEY, token);
