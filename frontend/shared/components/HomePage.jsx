@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+const MAP_PREVIEW_URL = import.meta.env.VITE_MAP_STANDALONE_URL || 'http://localhost:5174';
+
 const serviceCards = [
   {
     tag: 'Mechanical Core',
@@ -61,6 +63,15 @@ export default function HomePage({ onNavigate }) {
           <div className="ind-topbar__actions">
             <a className="ind-nav-link" href="#services">Services</a>
             <a className="ind-nav-link" href="#trust">Trust</a>
+            <a
+              className="ind-nav-link"
+              href={MAP_PREVIEW_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open live worker map sandbox in a new tab"
+            >
+              🗺️ Live Worker Map
+            </a>
             <button className="ind-cta-button" type="button" onClick={navigateToAuth}>
               Login / Signup
             </button>
@@ -97,6 +108,19 @@ export default function HomePage({ onNavigate }) {
                 <strong className="hero-stat__value">Grid</strong>
                 <span className="hero-stat__label">Structured service routing</span>
               </div>
+            </div>
+
+            <div style={{ marginTop: '1.25rem' }}>
+              <a
+                className="ind-primary-button"
+                href={MAP_PREVIEW_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open live worker map sandbox in a new tab"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+              >
+                🗺️ Live Worker Map (PostGIS Sandbox)
+              </a>
             </div>
           </div>
 

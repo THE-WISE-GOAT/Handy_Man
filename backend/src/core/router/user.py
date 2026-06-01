@@ -13,8 +13,6 @@ router = APIRouter(
     tags=["users"], # this is used for documentation purposes, it allows to group User related endpoints
 ) # creates a new APIRouter instance, which allows us to define API endpoints related to the User model in a separate file, and then include this router in our main application 
 
-model.Base.metadata.create_all(bind=engine) # this will create the tables in the database based on the model.py we defined, if they don't already exist
-
 # to create a new user, we will use the UserCreate schema to validate the data that is sent to the API, and then we will create a new user in the database using the User model, and return the created user using the UserOut schema, which does not include the password field, for security reasons.
 
 
