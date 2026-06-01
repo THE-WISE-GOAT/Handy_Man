@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from src.database.database import get_db
+from src.core.oauth2 import get_current_user
+from src.database.database import get_db, engine
 from src.core import model, schema
 from src.core.utils import hash_password
 
@@ -13,17 +14,6 @@ router = APIRouter(
 ) # creates a new APIRouter instance, which allows us to define API endpoints related to the User model in a separate file, and then include this router in our main application 
 
 # to create a new user, we will use the UserCreate schema to validate the data that is sent to the API, and then we will create a new user in the database using the User model, and return the created user using the UserOut schema, which does not include the password field, for security reasons.
-@router.post("/", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut)
-def create_user(new_user:schema.UserCreate, db: Session = Depends(get_db)):
-    # hash the password
-    hashed_password= hash_password(new_user.password)
-    new_user.password=hashed_password
-    
-    user = model.User(**new_user.model_dump()) # this creates a new User object using schema, the model_dump() method is used to convert the Pydantic model to a dictionary, ** is use to unpack dictionary and provide equivalent values to User model
-    db.add(user) # adds the new user to the database session
-    db.commit() # commits the changes to the database, this will save the new user to the database
-    db.refresh(user) # this will refresh the user object with the data from the database
-    return user # returns the created user, which will be serialized using the UserOut schema, and sent back to the frontend
 
 
 # to get the current logged in user profile we will use the get_current_user function 
