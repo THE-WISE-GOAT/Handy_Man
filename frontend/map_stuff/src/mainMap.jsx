@@ -10,6 +10,7 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { apiClient, normalizeApiError } from '@shared/api/client';
 
 // Reliable CDN Icon Assets
 const DefaultIcon = L.icon({
@@ -40,8 +41,6 @@ const emptyIcon = L.icon({
   iconAnchor: [12, 41],
 });
 
-// Environment-agnostic backend base URL configuration
-const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000";
 const DEFAULT_CENTER = [27.7172, 85.324];
 const DEFAULT_RADIUS_METERS = 5000;
 
@@ -248,20 +247,13 @@ function MainMap() {
     });
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/jobs/match`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: "Live Map Job Request",
-          tag: jobTag,
-          latitude: coords[0], // Lat
-          longitude: coords[1], // Long
-        }),
+      const result = await apiClient.post('/api/jobs/match', {
+        title: "Live Map Job Request",
+        tag: jobTag,
+        latitude: coords[0], // Lat
+        longitude: coords[1], // Long
       });
 
-      const result = await response.json();
       const normalizedMatches = Array.isArray(result?.matches)
         ? result.matches.map(normalizeMatch)
         : [];
@@ -292,10 +284,10 @@ function MainMap() {
       console.error("Error matching job via backend:", error);
       setMatches([]);
       setResponseMeta({ status: "error", totalMatches: 0 });
+      const normalized = normalizeApiError(error, "Unable to reach the match service. Please check your network or backend server.");
       setFeedback({
         kind: "error",
-        message:
-          error?.message || "Unable to reach the match service. Please check your network or backend server.",
+        message: normalized.message,
       });
     } finally {
       setLoading(false);
