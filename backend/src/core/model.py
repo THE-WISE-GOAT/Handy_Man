@@ -1,16 +1,18 @@
 # This file defines the database schema for the User model using SQLAlchemy. This is use for components of database components
 
+from typing import List
 import uuid
 
 from src.database.database import Base
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text
 from sqlalchemy.sql.sqltypes import TIMESTAMP, UUID, Numeric
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 import enum
 from datetime import datetime
 from geoalchemy2 import Geography
 from geoalchemy2.elements import WKBElement
+
 
 class User(Base):
     __tablename__ = "users"
@@ -21,14 +23,28 @@ class User(Base):
     username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default='TRUE')
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default="now()")
-
-
+    
+    # THE RELATIONSHIP LINK FOR USER
+    roles: Mapped[List["Role"]] = relationship(
+        "Role",
+        secondary="user_roles",       # Maps to the __tablename__ string of UserRole
+        back_populates="users",       # Matches the attribute name inside the Role class
+        lazy="selectin"               # CRITICAL FOR ASYNCPG: Pre-loads data safely, lazy="selectin" is crucial here. It tells SQLAlchemy to fetch the user's roles automatically so they are ready when your endpoint asks for them (Mainly to have asysnc process)
+    )
+    
 class Role(Base):
     __tablename__ = "roles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
 
+    # THE RELATIONSHIP LINK FOR ROLE
+    users: Mapped[List["User"]] = relationship(
+        "User",
+        secondary="user_roles",
+        back_populates="roles",
+        lazy="selectin"
+    )
 
 class UserRole(Base):
     __tablename__ = "user_roles"
