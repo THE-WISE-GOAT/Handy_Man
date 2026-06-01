@@ -8,7 +8,14 @@ class UserCreate(BaseModel):
     username: str
     email: str
     password: str
-    
+
+class RoleOut(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+           
 # this is the schema for the data that is sent back to the frontend, we don't want to send the password back to the frontend, so we create a separate schema for that   
 class UserOut(BaseModel):
     id: int
@@ -16,6 +23,7 @@ class UserOut(BaseModel):
     username: str
     is_active: bool
     created_at: datetime
+    roles: list[RoleOut]
 
     class Config:
         from_attributes = True # this is used as database does not return data in the form of a dictionary, but rather as an object, so we need to tell Pydantic to read the data as an object and not a dictionary, this allows us to use the same schema for both input and output data. As, pydantic by default expects data to be in the form of a dictionary, but when we get data from the database, it is in the form of an object, so we need to tell Pydantic to read the data as an object and not a dictionary. This allows us to use the same schema for both input and output data.
@@ -28,3 +36,20 @@ class Token(BaseModel):
     
 class TokenData(BaseModel):
     user_id: str | None = None # this is the data that will be contained in the token, it will be used to identify the user when the token is decoded, it will be set to None by default, and it will be populated with the user_id when the token is created.
+    
+ 
+# Define the Strict Target JSON Schema for Customer Problem Extraction   
+class CustomerProblemSchema(BaseModel):
+    problem_category: Literal["plumbing", "electrical", "hvac", "appliance_repair", "other"] = Field(
+        description="The general category of the household problem."
+    )
+    detailed_problem: str = Field(
+        description="A concise summary of exactly what is wrong and symptoms mentioned."
+    )
+    urgency_level: Literal["low", "medium", "high"] = Field(
+        description="The priority of the issue based on damage risk or safety issues."
+    )
+    
+# 1. Schema for a single Role
+class UserRolesOut(BaseModel):
+    roles: list[str]
