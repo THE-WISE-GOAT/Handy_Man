@@ -26,10 +26,11 @@ Here is the exact, 100% free tech stack you should use for your gig-worker map a
 * **What it does:** It stores your user data and performs the heavy map math.
 * **Why use it:** Standard databases are bad at maps. The **PostGIS** extension is specifically designed for spatial math. When a customer posts a job, PostGIS instantly calculates exactly which workers have a radius overlapping that specific job location.
 
-**4. Socket.io (The Live Connection)**
+<!-- **4. Socket.io (The Live Connection)**
 
 * **What it does:** It keeps the frontend and backend connected in real-time.
-* **Why use it:** When a customer posts a job, the worker's map needs to update instantly without them refreshing the page. Socket.io pushes that new job marker directly to the Leaflet map.
+* **Why use it:** When a customer posts a job, the worker's map needs to update instantly without them refreshing the page. Socket.io pushes that new job marker directly to the Leaflet map. -->
+<!-- connect through fastapi -->
 
 ---
 
