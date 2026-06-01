@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+import { apiClient, normalizeApiError } from '@shared/api/client';
 
 const socialLinks = [
   { label: 'Google', glyph: 'G' },
@@ -11,10 +10,10 @@ const socialLinks = [
 ];
 
 const benefits = [
-  { icon: '⏱', title: '2-Hr Dispatch' },
+  { icon: '⏱', title: 'Fast Dispatch' },
   { icon: '🛠', title: 'Specialized Trades' },
   { icon: '★', title: 'Verified Reviews' },
-  { icon: '🛡', title: 'Licensed & Insured' }
+  { icon: '🛡', title: 'Licensed & Insured' } 
 ];
 
 export default function LoginPage({ initialMode = 'login', onNavigate }) {
@@ -54,37 +53,28 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
     setStatusMessage('');
 
     try {
-      const formBody = new URLSearchParams();
-      formBody.append('username', trimmedIdentity);
-      formBody.append('password', trimmedPassword);
-
-      const response = await fetch(`${API_BASE_URL}/login/`, {
-        method: 'POST',
+      const data = await apiClient.post('/login/', new URLSearchParams({
+        username: trimmedIdentity,
+        password: trimmedPassword
+      }), {
+        skipAuth: true,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: formBody.toString()
+        }
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setStatusType('error');
-        setStatusMessage(`Error: ${data.detail || 'Could not log in.'}`);
-        return;
-      }
-
-      login({
+      await login({
         token: data.access_token,
         type: data.token_type,
         usernameValue: trimmedIdentity
       });
       setStatusType('success');
-      setStatusMessage('Login successful. Redirecting to client dashboard...');
+      setStatusMessage('Login successful. Loading your profile...');
       onNavigate?.('customer_dashboard', { replace: true });
     } catch (error) {
       setStatusType('error');
-      setStatusMessage('Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+      const normalized = normalizeApiError(error, 'Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+      setStatusMessage(normalized.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -108,25 +98,13 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
     setStatusMessage('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          username: trimmedUsername,
-          email: trimmedEmail,
-          password: trimmedPassword
-        })
+      const data = await apiClient.post('/users/', {
+        username: trimmedUsername,
+        email: trimmedEmail,
+        password: trimmedPassword
+      }, {
+        skipAuth: true
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setStatusType('error');
-        setStatusMessage(`Error: ${data.detail || 'Could not register user.'}`);
-        return;
-      }
 
       setStatusType('success');
       setStatusMessage(`Account Created Successfully! Welcome aboard, ${data.username}. Your account ID is #${data.id}.`);
@@ -136,7 +114,8 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
       onNavigate?.('login', { replace: true });
     } catch (error) {
       setStatusType('error');
-      setStatusMessage('Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+      const normalized = normalizeApiError(error, 'Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+      setStatusMessage(normalized.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -185,7 +164,11 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
           </div>
 
           <div className="auth-stage">
-            <form className={`auth-form auth-form--signup ${activeMode === 'signup' ? 'is-active' : ''}`} onSubmit={handleSignUpSubmit}>
+            <form
+              name="signup-form"
+              className={`auth-form auth-form--signup ${activeMode === 'signup' ? 'is-active' : ''}`}
+              onSubmit={handleSignUpSubmit}
+            >
               <div className="auth-form__heading">
                 <h2>Create Account</h2>
                 <p>Register with username, email, and password.</p>
@@ -200,9 +183,9 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
               </div>
 
               <span className="auth-form__hint">or use your email for registration</span>
-              <input type="text" placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required />
-              <input type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
-              <input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required />
+              <input type="text" name="username" placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="off" required />
+              <input type="email" name="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="off" required />
+              <input type="password" name="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required />
 
               <div className="auth-submit-stack" aria-label="Create account actions">
                 <button
@@ -219,7 +202,11 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
               </p>
             </form>
 
-            <form className={`auth-form auth-form--signin ${activeMode === 'login' ? 'is-active' : ''}`} onSubmit={handleSignInSubmit}>
+            <form
+              name="signin-form"
+              className={`auth-form auth-form--signin ${activeMode === 'login' ? 'is-active' : ''}`}
+              onSubmit={handleSignInSubmit}
+            >
               <div className="auth-form__heading">
                 <h2>Sign In</h2>
                 <p>Access the dashboard with your email or phone number and password.</p>
@@ -234,8 +221,8 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
               </div>
 
               <span className="auth-form__hint">or use your email password</span>
-              <input type="text" placeholder="Username" value={identity} onChange={(event) => setIdentity(event.target.value)} autoComplete="username" required />
-              <input type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
+              <input type="text" name="identity" placeholder="Username" value={identity} onChange={(event) => setIdentity(event.target.value)} autoComplete="username" required />
+              <input type="password" name="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
 
               <a className="auth-form__link" href="#forgot" onClick={(event) => event.preventDefault()}>
                 Forgot Your Password?
@@ -249,25 +236,28 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
               </div>
             </form>
 
-            {statusMessage ? (
-              <div
-                role="status"
-                aria-live="polite"
-                style={{
-                  marginTop: '1rem',
-                  padding: '12px 14px',
-                  borderRadius: '8px',
-                  backgroundColor: statusType === 'success' ? '#eafaf1' : '#eee',
-                  color: statusType === 'success' ? '#27ae60' : '#333',
-                  borderLeft: statusType === 'success' ? 'none' : '5px solid #dc3545',
-                  textAlign: statusType === 'success' ? 'center' : 'left',
-                  lineHeight: '1.5',
-                  gridColumn: '1 / -1'
-                }}
-              >
-                {statusMessage}
-              </div>
-            ) : null}
+            <div className="auth-status-slot">
+              {statusMessage ? (
+                <div
+                  key={`${activeMode}-${statusType || 'neutral'}`}
+                  role="status"
+                  aria-live="polite"
+                  style={{
+                    marginTop: '1rem',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: statusType === 'success' ? '#eafaf1' : '#eee',
+                    color: statusType === 'success' ? '#27ae60' : '#333',
+                    borderLeft: statusType === 'success' ? 'none' : '5px solid #dc3545',
+                    textAlign: statusType === 'success' ? 'center' : 'left',
+                    lineHeight: '1.5',
+                    gridColumn: '1 / -1'
+                  }}
+                >
+                  {statusMessage}
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
       </div>
