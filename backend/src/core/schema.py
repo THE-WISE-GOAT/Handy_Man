@@ -56,3 +56,6 @@ class CustomerProblemSchema(BaseModel):
 # 1. Schema for a single Role
 class UserRolesOut(BaseModel):
     roles: list[str]
+    
+    
+    
