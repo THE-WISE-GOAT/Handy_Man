@@ -4,7 +4,7 @@ from typing import List
 import uuid
 
 from src.database.database import Base
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY
 from sqlalchemy.sql.sqltypes import TIMESTAMP, UUID, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
@@ -59,6 +59,8 @@ class Worker(Base):
     id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
     location: Mapped[WKBElement] = mapped_column(Geography(geometry_type='POINT', srid=4326), nullable=False)
     ai_accessed_skills_json: Mapped[dict] = mapped_column(JSONB, nullable=True)
+    operating_radius: Mapped[float] = mapped_column(nullable=False)
+    tags: Mapped[List[str]] = mapped_column(ARRAY(String), nullable=False)
 
 
 class JobStatus(str, enum.Enum):
