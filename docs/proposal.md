@@ -36,13 +36,19 @@ ui/ux detail: for worker think of the ui as a map. workers are located at a cert
 
 //ai/ml integration chai, user le kaam vanxa, ani ai le automatic tags/workers suitable suggest garxa and manually ni milxa tags halna user side bata.
 
-// aarko ranking/ worker suggestion ko ma ni halna milxa hola ai/ml or just kaam ko lagi kati paisa lagla- “suggestion” matrai, client offers, worker quotes. 
+// ranking system 
 
-// aarko urgency ko hisaab le price higher, appointment reminder on both client and user side
+// aarko urgency ko hisaab le query. emergency notification jancha. price higher (5-10 %)
 
 // worker profile ma euta calender type ko ni banauna parle, appointments track/conflict herna. Dher complex nai, just timeline hernia milne gari. (User side ma ni calender ?)
 
-//
+// client side negotiation portal
+
+// client side map ma chai indrive pathao jasto gari relevant workers jo jo cha city ma saab dekhaucha. tei bata ani 
+ratings hercha workers browse garcha.
+
+// maybe video appointment system ni rakhdi therapist, tutor, doctor, etc
+
 ### **Project Abstract**
 
 * **Background & Problem:** While existing local service platforms (such as TaskRabbit or Thumbtack) connect users with professionals, they often restrict open price negotiation and struggle to handle both single ad-hoc tasks and complex multi-worker projects seamlessly. There is a significant gap for a highly localized, dynamic marketplace that gives users flexible hiring tiers and workers total geographic control.
