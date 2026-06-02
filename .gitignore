@@ -43,3 +43,21 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# === Node / React / Vite ===
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+dist-ssr/
+.next/
+.eslintcache
+npm-debug.log*
+
+# Fix: Ensure all hidden Vite caches are explicitly ignored everywhere
+.vite/
+**/.vite/
+.vite_cache/
+**/.vite_cache/
