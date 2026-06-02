@@ -44,17 +44,23 @@ const decodeUserId = (token) => {
 };
 
 const normalizeUserProfile = (profile, fallbackUsername = '') => {
-  if (!profile) {
-    return null;
-  }
+   if (!profile) {
+     return null;
+   }
 
-  return {
-    ...profile,
-    role: profile.role || profile.primary_role || profile.account_type || profile.user_role || null,
-    username: profile.username || fallbackUsername,
-    email: profile.email || ''
-  };
-};
+   // Extract role names from the roles array if present (expected from backend)
+   const roleNames = Array.isArray(profile.roles)
+     ? profile.roles.map((role) => role.name)
+     : [];
+
+   return {
+     ...profile,
+     roles: roleNames, // array of role names (strings)
+     role: profile.role || profile.primary_role || profile.account_type || profile.user_role || (roleNames.length > 0 ? roleNames[0] : null),
+     username: profile.username || fallbackUsername,
+     email: profile.email || ''
+   };
+ };
 
 export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState('');
@@ -63,18 +69,16 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const bootstrapUserSession = async ({ token, type = 'bearer', usernameValue = '' }) => {
-    const userId = decodeUserId(token);
-    let profile = null;
+    const bootstrapUserSession = async ({ token, type = 'bearer', usernameValue = '' }) => {
+     let profile = null;
 
-    if (userId) {
-      const responseBody = await apiClient.get(`/users/${userId}`, {
-        token,
-        tokenType: type
-      });
+     // Always fetch the current user profile using /users/me
+     const responseBody = await apiClient.get(`/users/me`, {
+       token,
+       tokenType: type
+     });
 
-      profile = normalizeUserProfile(responseBody, usernameValue);
-    }
+     profile = normalizeUserProfile(responseBody, usernameValue);
 
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(TOKEN_TYPE_KEY, type);
