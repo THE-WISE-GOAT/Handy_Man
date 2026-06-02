@@ -1,7 +1,10 @@
 # This file defines the database schema for the User model using SQLAlchemy. This is use for components of database components
 
-from typing import List
+from dataclasses import Field
+from typing import List, Optional
 import uuid
+
+from pydantic import BaseModel
 
 from src.database.database import Base
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY
@@ -122,3 +125,15 @@ class Bids(Base):
         nullable=False,
         server_default=BidStatus.SUBMITTED.value
     )
+    
+    
+    
+    
+class WorkerSkillsSchema(BaseModel):
+    primary_trades: List[str] = Field(description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
+    specific_skills: List[str] = Field(description="Specific tasks they can do, e.g., fixing leaks, installing ceiling fans, drywall patching")
+    years_of_experience: int = Field(description="Total years of experience as an integer")
+    special_tools: List[str] = Field(description="Key tools they own, e.g., ladders, power drills, welding gear, snakes")
+    certifications: List[str] = Field(description="Any professional licenses or certifications mentioned")
+    estimated_hourly_rate: Optional[float] = Field(None, description="Their preferred hourly rate if mentioned, otherwise null")
+    ai_confidence_summary: str = Field(description="A brief paragraph summarizing their professional background and reliability based on the chat")
