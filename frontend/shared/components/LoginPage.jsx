@@ -52,32 +52,39 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
     setStatusType('');
     setStatusMessage('');
 
-    try {
-      const data = await apiClient.post('/login/', new URLSearchParams({
-        username: trimmedIdentity,
-        password: trimmedPassword
-      }), {
-        skipAuth: true,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
+     try {
+       const data = await apiClient.post('/login/', new URLSearchParams({
+         username: trimmedIdentity,
+         password: trimmedPassword
+       }), {
+         skipAuth: true,
+         headers: {
+           'Content-Type': 'application/x-www-form-urlencoded'
+         }
+       });
 
-      await login({
-        token: data.access_token,
-        type: data.token_type,
-        usernameValue: trimmedIdentity
-      });
-      setStatusType('success');
-      setStatusMessage('Login successful. Loading your profile...');
-      onNavigate?.('customer_dashboard', { replace: true });
-    } catch (error) {
-      setStatusType('error');
-      const normalized = normalizeApiError(error, 'Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
-      setStatusMessage(normalized.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+       const profile = await login({
+         token: data.access_token,
+         type: data.token_type,
+         usernameValue: trimmedIdentity
+       });
+
+       // Redirect based on role
+       if (profile.roles?.includes('WORKER')) {
+         onNavigate?.('worker_dashboard', { replace: true });
+       } else {
+         onNavigate?.('customer_dashboard', { replace: true });
+       }
+
+       setStatusType('success');
+       setStatusMessage('Login successful. Loading your profile...');
+     } catch (error) {
+       setStatusType('error');
+       const normalized = normalizeApiError(error, 'Error connecting to backend server. Make sure FastAPI is running and CORS is enabled.');
+       setStatusMessage(normalized.message);
+     } finally {
+       setIsSubmitting(false);
+     }
   };
 
   const handleSignUpSubmit = async (event) => {
@@ -98,7 +105,7 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
     setStatusMessage('');
 
     try {
-      const data = await apiClient.post('/users/', {
+      const data = await apiClient.post('/auth/register', {
         username: trimmedUsername,
         email: trimmedEmail,
         password: trimmedPassword
