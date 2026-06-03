@@ -67,7 +67,7 @@ export default function App() {
           path="/worker"
           element={(
             <ProtectedRoute>
-              <WorkerDashboard />
+              <WorkerDashboard onNavigate={goTo} />
             </ProtectedRoute>
           )}
         />
