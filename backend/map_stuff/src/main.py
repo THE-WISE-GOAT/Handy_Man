@@ -1,48 +1,56 @@
 import os
+from typing import List, Dict, Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
 import asyncpg
 
-app = FastAPI(title="Handyman Matching Engine")
+# Initialize API instance with custom configuration metadata
+app_config = {"title": "Handyman Matching Engine"}
+app = FastAPI(**app_config)
 
+# CORS configuration allowing explicit resource sharing for web applications
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows any origin (including localhost:5173)
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows POST, GET, OPTIONS, etc.
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# GIT-SAFE DATABASE CONFIGURATION
-# Looks for DATABASE_URL in your system environment variables. 
-# Falls back to local sandbox configuration if not found.
-DB_URL = os.getenv(
+# Extract infrastructure coordinates from environment space 
+# Default string points to local sandbox database cluster
+TARGET_DB_URI = os.getenv(
     "DATABASE_URL", 
     "postgresql://postgres:password@localhost:5432/handyman_db"
 )
 
-# Data schemas incoming from React
+# Incoming Pydantic payload interface definition
 class JobCreate(BaseModel):
     title: str
     tag: str
     latitude: float
     longitude: float
 
+
 @app.get("/")
-async def root():
+async def get_server_health() -> Dict[str, str]:
+    """Simple status check route to verify engine execution."""
     return {"status": "Server running successfully"}
 
+
 @app.post("/api/jobs/match")
-async def match_job(job: JobCreate):
-    # 1. Open a lightning-fast async connection to your local database
-    conn = await asyncpg.connect(DB_URL)
+async def match_job(job: JobCreate) -> Dict[str, Any]:
+    """
+    Executes a high-velocity spatial query against the worker index.
+    Matches availability across category tags and geographic radius bounds.
+    """
+    # Establish single-use network connection to target database cluster
+    db_connection = await asyncpg.connect(TARGET_DB_URI)
     
     try:
-        # 2. THE REAL POSTGIS MATCHING QUERY
-        # Finds workers who have the skill AND whose radius covers this job site
-        query = """
+        # Optimized spatial calculation tracking intersecting geometries
+        geospatial_matching_sql = """
             SELECT w.user_id, w.radius
             FROM workers w
             WHERE $1 = ANY(w.tags)
@@ -53,20 +61,29 @@ async def match_job(job: JobCreate):
               );
         """
         
-        matched_workers = await conn.fetch(query, job.tag, job.longitude, job.latitude)
+        # Transmit query parameters through database wire protocol
+        query_records = await db_connection.fetch(
+            geospatial_matching_sql, 
+            job.tag, 
+            job.longitude, 
+            job.latitude
+        )
         
-        # 3. Format the results cleanly into a list of dictionaries
-        results = [
-            {"worker_id": row["user_id"], "radius": row["radius"]} 
-            for row in matched_workers
+        # Serialize database row metrics into a standardized list structure
+        formatted_matches = [
+            {
+                "worker_id": record["user_id"], 
+                "radius": record["radius"]
+            }
+            for record in query_records
         ]
         
         return {
             "status": "success",
-            "total_matches": len(results),
-            "matches": results
+            "total_matches": len(formatted_matches),
+            "matches": formatted_matches
         }
         
     finally:
-        # Always close the connection when done!
-        await conn.close()
+        # Guarantee connection lifecycle termination to prevent socket leak
+        await db_connection.close()
