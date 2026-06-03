@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '@shared/context/AuthContext';
 
 const MAP_PREVIEW_URL = import.meta.env.VITE_MAP_STANDALONE_URL || 'http://localhost:5174';
 
@@ -48,11 +49,12 @@ const mockSession = {
   ]
 };
 
-export default function WorkerDashboard() {
+export default function WorkerDashboard({ onNavigate }) {
+  const { user } = useAuth();
   const [isOnline, setIsOnline] = useState(true);
   const [dispatchState, setDispatchState] = useState('live');
 
-  const isDispatchLive = dispatchState === 'live';
+const canSwitchToClient = user?.roles?.includes('client');
 
   // Clicking this switch should immediately update the worker's visibility in the job feed,
   // which is exactly where the backend availability flag will later be synchronized.
@@ -71,6 +73,8 @@ export default function WorkerDashboard() {
   const handleDeclineJob = () => {
     setDispatchState('declined');
   };
+
+  const isDispatchLive = dispatchState === 'live';
 
   return (
     <div className="ind-page marketplace-dashboard">
@@ -107,6 +111,21 @@ export default function WorkerDashboard() {
           >
             🗺️ Live Worker Map (PostGIS Sandbox)
           </a>
+
+          {canSwitchToClient && (
+            <button
+              type="button"
+              className="marketplace-action"
+              style={{
+                backgroundColor: '#fef3c7',
+                color: '#92400e',
+                border: '1px solid #f59e0b'
+              }}
+              onClick={() => onNavigate?.('customer_dashboard', { replace: true })}
+            >
+              Switch to Client Mode
+            </button>
+          )}
 
           <button
             type="button"

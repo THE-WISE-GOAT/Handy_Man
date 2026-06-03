@@ -52,7 +52,7 @@ const mockSession = {
 const pipelineOrder = mockSession.activeJob.pipeline;
 
 export default function ClientDashboard({ onNavigate }) {
-  const { username } = useAuth();
+   const { username, user } = useAuth();
   const [intakeSummary, setIntakeSummary] = useState(null);
   const [intakeFeedback, setIntakeFeedback] = useState({ kind: 'idle', message: '' });
   const [showWorkerForm, setShowWorkerForm] = useState(false);
@@ -111,6 +111,20 @@ export default function ClientDashboard({ onNavigate }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {user?.roles?.includes('worker') && (
+              <button
+                type="button"
+                className="marketplace-action"
+                style={{
+                  backgroundColor: '#dcfce7',
+                  color: '#166534',
+                  border: '1px solid #86efac'
+                }}
+                onClick={() => onNavigate?.('worker_dashboard', { replace: true })}
+              >
+                Switch to Worker Mode
+              </button>
+            )}
             <a
               href={MAP_PREVIEW_URL}
               target="_blank"
