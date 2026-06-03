@@ -25,7 +25,6 @@ build/
 **/build/
 dist-ssr/
 .next/
-.vite/
 .turbo/
 .eslintcache
 npm-debug.log*
@@ -33,6 +32,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# Fix: Ensure all hidden Vite caches are explicitly ignored everywhere
+.vite/
+**/.vite/
+.vite_cache/
+**/.vite_cache/
 
 # === OS files ===
 .DS_Store
@@ -43,21 +48,3 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-
-# === Node / React / Vite ===
-node_modules/
-**/node_modules/
-dist/
-**/dist/
-build/
-**/build/
-dist-ssr/
-.next/
-.eslintcache
-npm-debug.log*
-
-# Fix: Ensure all hidden Vite caches are explicitly ignored everywhere
-.vite/
-**/.vite/
-.vite_cache/
-**/.vite_cache/
