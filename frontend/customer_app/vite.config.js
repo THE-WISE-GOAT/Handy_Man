@@ -4,9 +4,11 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    port: 5173,
+  },
   resolve: {
     alias: {
-      // This tells React that '@shared' points to your global shared directory
       '@shared': path.resolve(__dirname, '../shared'),
     },
   },
