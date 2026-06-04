@@ -22,9 +22,9 @@ def create_user(new_user:schema.UserCreate, db: Session = Depends(get_db)):
     user_data["password"] = hash_password(new_user.password)
     
     user = model.User(**user_data) # this creates a new User object using schema, the model_dump() method is used to convert the Pydantic model to a dictionary, ** is use to unpack dictionary and provide equivalent values to User model
-    default_role = db.query(model.Role).filter(model.Role.name == "Customer").first()
+    default_role = db.query(model.Role).filter(model.Role.name == "customer").first()
     if not default_role:
-        default_role = model.Role(name="Customer")
+        default_role = model.Role(name="customer")
         db.add(default_role)
         db.flush()  # This generates an ID for the role without committing yet
         
