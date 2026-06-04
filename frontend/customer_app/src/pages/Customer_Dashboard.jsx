@@ -52,13 +52,33 @@ const mockSession = {
 const pipelineOrder = mockSession.activeJob.pipeline;
 
 export default function ClientDashboard({ onNavigate }) {
-   const { username, user } = useAuth();
+   const { username, user, accessToken } = useAuth();
   const [intakeSummary, setIntakeSummary] = useState(null);
   const [intakeFeedback, setIntakeFeedback] = useState({ kind: 'idle', message: '' });
   const [showWorkerForm, setShowWorkerForm] = useState(false);
   const [workerApplication, setWorkerApplication] = useState(workerApplicationInitialFormState);
   const [workerAppFeedback, setWorkerAppFeedback] = useState({ kind: 'idle', message: '' });
   const [isWorkerSubmitting, setIsWorkerSubmitting] = useState(false);
+  const [isWorker, setIsWorker] = useState(false);
+  const [isCheckingRole, setIsCheckingRole] = useState(true);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setIsCheckingRole(false);
+      return;
+    }
+    const checkWorkerRole = async () => {
+      try {
+        const response = await apiClient.get('/workers/can-switch-to-client');
+        setIsWorker(response.is_worker);
+      } catch {
+        setIsWorker(false);
+      } finally {
+        setIsCheckingRole(false);
+      }
+    };
+    checkWorkerRole();
+  }, [accessToken]);
 
   const handleJobIntakeSubmit = async (payload) => {
     setIntakeFeedback({ kind: 'loading', message: 'Preparing dispatch intake...' });
@@ -111,7 +131,7 @@ export default function ClientDashboard({ onNavigate }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {user?.roles?.includes('worker') && (
+            {isWorker && !isCheckingRole && (
               <button
                 type="button"
                 className="marketplace-action"
