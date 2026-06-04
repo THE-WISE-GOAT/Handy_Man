@@ -4,10 +4,10 @@ import { useAuth } from '@shared/context/AuthContext';
 
 export default function LogoutButton({ className = '', children = 'Logout', style }) {
   const navigate = useNavigate();
-  const { logoutLocal } = useAuth();
+  const { logout } = useAuth();
 
-  const handleLogout = () => {
-    logoutLocal();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login', { replace: true });
   };
 
