@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@shared/context/AuthContext';
+import { apiClient, normalizeApiError } from '@shared/api/client';
 
 const MAP_PREVIEW_URL = import.meta.env.VITE_MAP_STANDALONE_URL || 'http://localhost:5174';
 
@@ -50,26 +51,33 @@ const mockSession = {
 };
 
 export default function WorkerDashboard({ onNavigate }) {
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
   const [isOnline, setIsOnline] = useState(true);
   const [dispatchState, setDispatchState] = useState('live');
+  const [canSwitchToClient, setCanSwitchToClient] = useState(false);
 
-const canSwitchToClient = user?.roles?.includes('client');
+  const fetchSwitchPermission = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const response = await apiClient.get('/workers/can-switch-to-client');
+      setCanSwitchToClient(response.can_switch_to_client);
+    } catch {
+      setCanSwitchToClient(false);
+    }
+  }, [accessToken]);
 
-  // Clicking this switch should immediately update the worker's visibility in the job feed,
-  // which is exactly where the backend availability flag will later be synchronized.
+  useEffect(() => {
+    fetchSwitchPermission();
+  }, [fetchSwitchPermission]);
+
   const handleAvailabilityToggle = () => {
     setIsOnline((current) => !current);
   };
 
-  // Accepting a dispatch should promote the live job into the worker's active state,
-  // clear the emergency card, and leave a durable confirmation surface for the current session.
   const handleAcceptJob = () => {
     setDispatchState('accepted');
   };
 
-  // Declining a dispatch should remove the offer from the active queue without disturbing
-  // the rest of the worker's scheduled assignments.
   const handleDeclineJob = () => {
     setDispatchState('declined');
   };

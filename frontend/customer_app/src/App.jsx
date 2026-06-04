@@ -6,17 +6,22 @@ import LoginPage from '@shared/components/LoginPage';
 import ProtectedRoute from '@shared/routes/ProtectedRoute';
 import AnonymousRoute from '@shared/routes/AnonymousRoute';
 import CustomerDashboard from './pages/Customer_Dashboard';
-import WorkerDashboard from '../../worker_app/src/pages/Worker_Dashboard';
-//ANUP GURAGAiN
+
+const WORKER_APP_URL = import.meta.env.VITE_WORKER_URL || 'http://localhost:5174';
+
 export default function App() {
   const navigate = useNavigate();
 
   const goTo = (target, options = {}) => {
+    if (target === 'worker_dashboard') {
+      window.location.href = WORKER_APP_URL + '/worker';
+      return;
+    }
+    
     const routes = {
       login: '/login',
       signup: '/signup',
       customer_dashboard: '/customer',
-      worker_dashboard: '/worker',
       admin_dashboard: '/admin',
       home: '/'
     };
@@ -59,24 +64,6 @@ export default function App() {
           element={(
             <ProtectedRoute>
               <CustomerDashboard onNavigate={goTo} />
-            </ProtectedRoute>
-          )}
-        />
-
-        <Route
-          path="/worker"
-          element={(
-            <ProtectedRoute>
-              <WorkerDashboard onNavigate={goTo} />
-            </ProtectedRoute>
-          )}
-        />
-
-        <Route
-          path="/admin"
-          element={(
-            <ProtectedRoute>
-              <AdminDashboard />
             </ProtectedRoute>
           )}
         />
