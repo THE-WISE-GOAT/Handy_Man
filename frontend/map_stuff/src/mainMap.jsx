@@ -1,3 +1,7 @@
+/**
+ * MainMap.jsx
+ * Renders an interactive Leaflet map to visualize PostGIS worker matches.
+ */
 import React, { useEffect, useMemo, useState } from "react";
 import {
   MapContainer,
@@ -168,7 +172,7 @@ function MapViewportController({ focusPoints }) {
   return null;
 }
 
-// Visual layout configuration constants to reduce workspace clutter
+// Visual layout configuration constants
 const STYLES = {
   viewWrapper: { position: "relative", width: "100%", height: "100vh", background: "#e5ecf3" },
   controlPanel: {
@@ -231,10 +235,6 @@ function MainMap() {
         status: serverPayload?.status ?? (processedRecords.length ? "success" : "empty"),
         totalMatches: aggregateCount,
       });
-
-      if (!response.ok) {
-        throw new Error(serverPayload?.detail || `Match request failed with status ${response.status}.`);
-      }
 
       if (processedRecords.length > 0) {
         setFeedback({
