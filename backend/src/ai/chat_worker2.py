@@ -1,696 +1,495 @@
 """
-Kamigo Worker Interview System — Nepal Universal Edition
-=========================================================
-Supports ANY local job a worker in Nepal might offer.
-No hardcoded trade list. AI dynamically discovers the job,
-probes for a genuine specialty, then runs a scenario test.
+Kamigo Worker Interview System
+================================
+AI-powered vetting terminal for home service tradespeople.
 
 Pipeline:
-  Stage 1 — Job discovery      → what work do they do?
-  Stage 2 — Experience gate    → blocks beginners and zero-exp
-  Stage 3 — Sub-skill probe    → drills to a real advanced niche
-  Stage 4 — Scenario test      → AI writes a real field problem
-  Stage 5 — AI evaluation      → scores 0–100, pass = >75
-  Stage 6 — JSON output        → structured profile for Kamigo DB
+  Stage 1 - Trade gate        → confirms supported trade, rejects out-of-scope
+  Stage 2 - Experience gate   → blocks 0-year workers and beginners
+  Stage 3 - Sub-skill probe   → drills to a real advanced niche (not basic tasks)
+  Stage 4 - Scenario test     → generates a field problem for the claimed sub-skill
+  Stage 5 - AI evaluation     → scores the answer 0-100, pass = >75
+  Stage 6 - JSON output       → structured profile for the Kamigo database
 """
 
 import json
 import re
 import ollama
-from typing import List, Optional
+from typing import List, Literal
 from pydantic import BaseModel, Field
 
 
 # ─────────────────────────────────────────────────────────────
-# OUTPUT SCHEMA
-# Dynamic — works for any job category in Nepal
+# SCHEMA
 # ─────────────────────────────────────────────────────────────
 
-class WorkerProfile(BaseModel):
-    job_category: str = Field(
-        description=(
-            "The broad job type in plain English. "
-            "Examples: plumber, electrician, carpenter, mechanic, tailor, "
-            "painter, gardener, cook, delivery driver, mason, welder, "
-            "cleaner, tutor, photographer, IT technician, beautician, etc."
-        )
+SUPPORTED_TRADES = ["plumbing", "electrical", "hvac", "appliance_repair", "handyman"]
+
+# Sub-skills that are considered TOO BASIC to be a validated specialty.
+# These are implied by the trade itself and must never be accepted as an
+# advanced niche.  Any answer that resolves to one of these gets pushed back.
+GENERIC_SUBSKILLS = {
+    "plumbing": [
+        "pipe repair", "pipe installation", "leak repair", "leak fixing",
+        "sink repair", "sink installation", "faucet repair", "faucet installation",
+        "toilet repair", "toilet installation", "basic plumbing", "general plumbing",
+        "drain cleaning", "water pressure", "tap repair", "tap installation",
+    ],
+    "electrical": [
+        "wiring", "basic wiring", "light installation", "light fitting",
+        "switch installation", "outlet installation", "socket repair",
+        "bulb replacement", "circuit breaker", "general electrical",
+        "cable installation", "plug installation",
+    ],
+    "hvac": [
+        "air conditioning", "ac repair", "ac installation", "heating repair",
+        "general hvac", "filter replacement", "thermostat installation",
+        "duct cleaning", "ventilation", "basic hvac",
+    ],
+    "appliance_repair": [
+        "appliance repair", "general appliance", "washing machine repair",
+        "fridge repair", "oven repair", "basic repair", "dishwasher repair",
+    ],
+    "handyman": [
+        "painting", "wall painting", "basic repairs", "general handyman",
+        "furniture assembly", "wall mounting", "tile laying", "basic tiling",
+        "fixing doors", "door installation", "window repair", "carpentry basics",
+    ],
+}
+
+
+class WorkerProfileSchema(BaseModel):
+    trade_category: Literal[
+        "plumbing", "electrical", "hvac", "appliance_repair", "handyman"
+    ] = Field(description="Primary trade category.")
+
+    verified_specialty: str = Field(
+        description="The single advanced sub-skill that was TESTED and PASSED during the scenario step. Must be specific and non-trivial."
     )
-    specialities: List[str] = Field(
-        description=(
-            "Slug-style tags for the worker's verified advanced sub-skills. "
-            "Each tag must be lowercase, hyphen-separated, and machine-readable. "
-            "Examples: ['leak-detection', 'sewer-inspection', 'camera-survey'], "
-            "['carburetor-rebuild', 'fuel-system-tuning'], "
-            "['solar-water-heater', 'pressurised-system-commissioning'], "
-            "['three-phase-panel', 'load-balancing'], "
-            "['tig-welding', 'stainless-steel-fabrication']. "
-            "Derive 2–4 tags from the tested specialty — one tag per distinct concept."
-        )
-    )
+
     years_experience: int = Field(
-        description="Total years of professional experience in this job."
+        description="Total professional years in this trade."
     )
-    license_or_certification: str = Field(
-        description=(
-            "Any license, certification, or formal training they hold. "
-            "Examples: 'CTEVT certified electrician', 'driving license class A', "
-            "'no formal certification', 'apprenticeship under master craftsman'."
-        )
+
+    license_status: Literal["verified_active", "pending_review", "unlicensed"] = Field(
+        description="License status based on candidate statements."
     )
-    specialized_tools_or_equipment: List[str] = Field(
-        description=(
-            "Specialized tools, machines, or equipment they own/operate "
-            "that go beyond basic hand tools. "
-            "Exclude: screwdrivers, hammers, measuring tape, basic spanners. "
-            "Include: welding machine, pipe inspection camera, oscilloscope, "
-            "DSLR camera kit, industrial sewing machine, angle grinder, etc."
-        )
+
+    heavy_equipment_owned: List[str] = Field(
+        description="Specialized equipment, diagnostic tools, or machinery they own and operate. Exclude hand tools every tradesperson has."
     )
-    emergency_available: bool = Field(
-        description=(
-            "True ONLY if they explicitly said they are available for "
-            "urgent/emergency/after-hours calls. False if not stated."
-        )
+
+    emergency_24_7: bool = Field(
+        description="True only if they explicitly stated they accept 24/7 emergency dispatches."
     )
+
+    background_check_consent: bool = Field(
+        description="True only if they explicitly agreed to a background check."
+    )
+
     scenario_passed: bool = Field(
-        description="Always True — worker only reaches JSON stage after passing the test."
-    )
-    scenario_score: int = Field(
-        description="The score (0–100) the worker received on their technical scenario test."
+        description="Always True at this point — candidate reached JSON stage only after passing the scenario."
     )
 
 
 # ─────────────────────────────────────────────────────────────
-# PIPELINE TOKENS
-# These are the control signals the interviewer AI outputs
-# to trigger the next pipeline stage. The orchestrator
-# watches for these in every AI response.
+# PROMPT CONSTANTS
 # ─────────────────────────────────────────────────────────────
 
+# Exact token strings the interviewer AI must output to trigger pipeline stages.
+# These are parsed by the orchestrator — the AI must reproduce them verbatim.
 REJECTION_TOKEN = "[REJECTED]"
 TEST_TOKEN_RE   = re.compile(r'\[TEST_REQUIRED:\s*(.+?)\]', re.IGNORECASE)
 COMPLETE_TOKEN  = "[COMPLETE]"
 
+INTERVIEWER_SYSTEM_PROMPT = f"""You are a strict, professional technical vetting officer for Kamigo — a home services platform in South Africa.
+Your role is to interview a tradesperson applying to join the platform.
 
-# ─────────────────────────────────────────────────────────────
-# PROMPT 1 — INTERVIEWER
-# The main conversational AI. Runs the full interview.
-# ─────────────────────────────────────────────────────────────
+══════════════════════════════════════════════════════════════
+SUPPORTED TRADES (only these are accepted):
+  plumbing | electrical | hvac | appliance_repair | handyman
+══════════════════════════════════════════════════════════════
 
-INTERVIEWER_SYSTEM_PROMPT = f"""You are a professional technical vetting officer for Kamigo — a local services platform in Nepal.
-Your job is to interview workers who want to register on the platform to provide paid services to customers.
-
-Kamigo connects customers with skilled local workers across ALL types of work:
-trades, crafts, repair, domestic, transport, creative, technical, and personal services.
-There is NO restricted list of jobs. Any legitimate work a person can be hired to do in Nepal is valid.
-
-════════════════════════════════════════════════════
-YOUR MISSION
-════════════════════════════════════════════════════
-Discover the worker's job, verify they have real experience,
-uncover ONE genuine advanced specialty, then trigger a test.
-
-════════════════════════════════════════════════════
-STRICT RULES — FOLLOW EVERY ONE
-════════════════════════════════════════════════════
-
+────────────────────────────────────────────────────
 RULE 1 — ONE QUESTION PER TURN
-Ask exactly ONE question per response.
-Never combine two questions.
-Keep each response under 30 words.
-Be direct. No filler phrases.
-
-────────────────────────────────────────────────────
-RULE 2 — LANGUAGE
-Respond in the same language the worker uses.
-If they write in Nepali, reply in Nepali.
-If they write in English, reply in English.
-If they mix both, follow their lead.
-Use simple, everyday language — avoid jargon the worker may not know.
+Ask exactly ONE short, direct question per response.
+Never chain two questions together.
+Keep every response under 25 words.
 ────────────────────────────────────────────────────
 
 ────────────────────────────────────────────────────
-RULE 3 — INFORMATION TO COLLECT (collect in this order)
-  a) What is their job or work?
-  b) How many years of professional experience?
-  c) Do they have any license, certificate, or formal training?
-  d) What is their ONE advanced specialty? (see Rule 5)
-  e) What specialized tools or equipment do they own?
-  f) Are they available for emergency/urgent calls?
-
-Collect these strictly one at a time. Do not skip ahead.
-Do not ask about equipment until you have the specialty.
+RULE 2 — INSTANT REJECTION TRIGGERS
+Output exactly {REJECTION_TOKEN} (nothing else) if:
+  • The worker states 0 years of experience.
+  • The worker explicitly says they are a beginner or still learning.
+  • The worker's response is completely unrelated gibberish
+    (e.g. "2+2=4", "hello world", random letters, math formulas,
+    song lyrics, or any text with zero trade relevance).
+  • The worker becomes abusive or repeatedly refuses to answer.
+Do NOT reject on the very first turn if the input is ambiguous —
+give exactly ONE follow-up question to clarify. After that, reject.
 ────────────────────────────────────────────────────
 
 ────────────────────────────────────────────────────
-RULE 4 — REJECTION TRIGGERS
-Output ONLY the exact token {REJECTION_TOKEN} (nothing else) when:
-
-  • Worker says they have 0 years of experience.
-  • Worker calls themselves a beginner, student, or trainee.
-  • Worker says they are "still learning" or "just started".
-  • Worker's response is complete gibberish with no work relevance
-    (e.g. random letters, math formulas like "2+2", song lyrics,
-    nonsense words, completely off-topic responses).
-  • Worker provides evasive non-answers THREE times in a row.
-  • Worker becomes abusive or threatening.
-
-IMPORTANT: Do NOT reject on the FIRST unclear answer.
-Give ONE follow-up question to clarify before rejecting.
-After the follow-up, if still invalid → {REJECTION_TOKEN}.
+RULE 3 — UNSUPPORTED TRADE
+If the worker names a trade NOT in our supported list
+(e.g. phone repair, web design, painting contractor, pest control):
+  • On the FIRST mention: politely inform them we only onboard
+    the five supported trades and ask if they have any of those skills.
+  • If they confirm they have none: output {REJECTION_TOKEN}.
 ────────────────────────────────────────────────────
 
 ────────────────────────────────────────────────────
-RULE 5 — SUB-SKILL PROBING (most critical rule)
+RULE 4 — INFORMATION YOU MUST COLLECT (in order)
+  a) Primary trade (must match supported list)
+  b) Years of professional experience
+  c) License status (active / pending / unlicensed)
+  d) ONE advanced sub-skill (see Rule 5 below)
+  e) Specialized equipment they own
+  f) Whether they accept 24/7 emergency calls
+  g) Whether they consent to a background check
 
-Goal: Find ONE genuine advanced niche — not a basic task
-that any person with that job title can do.
-
-Use plain, friendly language. Workers may not know the word "speciality."
-Ask like this instead:
-  "What kind of [job] jobs do customers usually call YOU for, not others?"
-  "What is the hardest type of [job] work you do regularly?"
-  "What is one job you have done that not many [job] workers can do?"
-
-STEP A — First, ask for their primary focus using simple words:
-  "What type of [job] work do you do most?"
-
-STEP B — If the answer is vague, probe deeper with ONE of:
-  "Do you work in houses or big buildings?"
-  "What is the hardest job you finished recently?"
-  "What special machine or tool do you use that others don't?"
-  "Give one example of a job that only someone very experienced can do."
-
-STEP C — Reject generic answers.
-  Generic means: any basic task that comes with the job title.
-  Examples of answers that are TOO BASIC to accept as a specialty:
-
-  Mechanic → "I fix cars" / "engine repair" / "tyre change"
-  Plumber → "fix leaks" / "install pipes" / "unclog drains"
-  Electrician → "install wiring" / "fix switches" / "change bulbs"
-  Carpenter → "make furniture" / "fix doors" / "wood cutting"
-  Tailor → "stitch clothes" / "make shirts" / "repair clothes"
-  Painter → "paint walls" / "house painting" / "colour mixing"
-  Cook → "cook food" / "make dal bhat" / "general cooking"
-  Driver → "drive vehicle" / "transport people" / "car driving"
-  Cleaner → "clean house" / "sweep floors" / "mopping"
-  Mason → "build walls" / "brick laying" / "plastering"
-
-  These are what ANY person in that job can do. They do NOT qualify.
-
-  If the worker claims something too basic, push back ONCE with simple words:
-  "Most [job] workers do that. What harder or more special work do you do
-   that needs extra training or skill?"
-
-  If after TWO push-backs they still cannot name anything advanced
-  → output {REJECTION_TOKEN}.
-
-STEP D — Accept answers that show genuine specialisation.
-  Valid advanced specialties look like:
-
-  Mechanic → "motorcycle carburetor rebuilding and fuel system tuning"
-  Plumber → "solar water heater installation and pressurised system commissioning"
-  Electrician → "three-phase industrial panel installation and load balancing"
-  Carpenter → "traditional Newari wood carving and antique furniture restoration"
-  Tailor → "hand-embroidered Dhaka fabric garments and custom traditional wear"
-  Cook → "authentic Newar feast preparation for large events (100+ guests)"
-  Welder → "TIG welding of stainless steel food-grade equipment"
-  IT technician → "CCTV and access control system installation and networking"
-  Photographer → "high-altitude trekking and wildlife photography"
-
-  When you have identified a valid advanced specialty,
-  STOP all other questions and output exactly:
-  [TEST_REQUIRED: <the exact specialty in plain words>]
-
-  The specialty name must be specific enough that a technical
-  scenario test question can be written about it.
+Collect these one at a time. Do not skip ahead.
 ────────────────────────────────────────────────────
 
 ────────────────────────────────────────────────────
-RULE 6 — AFTER THE SCENARIO TEST
-The system will inject a message telling you the test result.
-  • If the worker PASSED: immediately output {COMPLETE_TOKEN}
-  • If the worker FAILED: immediately output {REJECTION_TOKEN}
+RULE 5 — SUB-SKILL PROBING (the most critical rule)
+
+Goal: identify ONE genuine advanced niche, not a basic task.
+
+Step A — Ask for their primary focus area:
+  "What is your primary specialisation within [trade]?"
+
+Step B — If the answer is vague or too broad, probe further:
+  "Do you focus on residential or commercial work?"
+  "What type of [sub-area] do you work on most often?"
+  "What was your most complex project in the last six months?"
+
+Step C — Evaluate what they claim.
+  The following sub-skills are TOO BASIC for a plumber and must be REJECTED
+  as a specialty claim (they do not represent advanced expertise):
+    {json.dumps(GENERIC_SUBSKILLS, indent=4)}
+
+  If the worker claims one of these as their specialty, push back:
+  "That is standard for most [trade] workers. What advanced or specialist
+   work do you do beyond that?"
+
+  If after TWO push-backs they cannot name an advanced specialty,
+  output {REJECTION_TOKEN}.
+
+Step D — Once you have an advanced, specific sub-skill, stop probing
+  and output exactly:
+  [TEST_REQUIRED: <exact sub-skill name>]
+
+  Example valid outputs:
+    [TEST_REQUIRED: solar geyser installation and fault diagnosis]
+    [TEST_REQUIRED: commercial three-phase electrical panel upgrades]
+    [TEST_REQUIRED: VRF multi-split HVAC system commissioning]
+    [TEST_REQUIRED: gas hob conversion and leak testing]
+    [TEST_REQUIRED: structural timber repairs and load-bearing beam replacement]
+
+  The sub-skill must be specific enough that a technical test question
+  can be written about it.
+────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────
+RULE 6 — AFTER THE TEST
+You will be told the test result by the system.
+If told the worker passed: output {COMPLETE_TOKEN} immediately.
+If told the worker failed: output {REJECTION_TOKEN} immediately.
 ────────────────────────────────────────────────────
 
 ────────────────────────────────────────────────────
 TONE
-Professional and respectful. Not warm, not cold.
-Use plain, simple words — many workers are not highly educated.
-No greetings after the opening. No compliments.
-No filler like "Great!" or "Thank you for sharing."
-Just direct, clear questions.
+Professional, brief, neutral. No greetings after the first turn.
+No compliments. No pleasantries. No filler words.
 ────────────────────────────────────────────────────"""
 
 
-# ─────────────────────────────────────────────────────────────
-# PROMPT 2 — SCENARIO GENERATOR
-# Writes the technical test question for any job type.
-# ─────────────────────────────────────────────────────────────
-
 SCENARIO_GENERATOR_PROMPT = """\
-You are a senior technical supervisor who has managed skilled workers
-across many trades and services in Nepal for over 20 years.
+You are a senior technical assessor for home services tradespeople.
 
-Your task: Write ONE realistic, practical test scenario for a worker
-claiming expertise in the specific sub-skill given to you.
+Your task: Write a realistic, field-specific troubleshooting scenario
+for the sub-skill provided. The scenario must:
+  1. Describe a real situation a worker would encounter on a job site.
+  2. Be specific enough that only someone with hands-on experience could
+     answer it correctly.
+  3. End with a direct question asking exactly what steps or tools the
+     worker would use to diagnose or fix the problem.
+  4. Be 40–60 words maximum.
+  5. Avoid textbook definitions — write as a supervisor would speak.
 
-The scenario MUST:
-  1. Describe a real on-the-job situation or problem the worker would face.
-  2. Be specific to the sub-skill — not generic to the whole job category.
-  3. Require hands-on field knowledge to answer correctly.
-     A person who only read about the job cannot answer it well.
-  4. End with a direct question: "What would you do?" or
-     "Walk me through your exact steps."
-  5. Be 45–65 words. No longer.
-  6. Sound like a supervisor speaking to a worker, not a textbook.
-  7. Use simple, clear language — avoid technical jargon in the question itself.
+Output ONLY the scenario. No preamble, no labels, no explanation."""
 
-Write ONLY the scenario. No title, no label, no introduction."""
-
-
-# ─────────────────────────────────────────────────────────────
-# PROMPT 3 — EVALUATOR
-# Grades the worker's scenario answer for any job type.
-# ─────────────────────────────────────────────────────────────
 
 EVALUATOR_PROMPT_TEMPLATE = """\
-You are an expert assessor grading a practical interview for a skilled worker.
+You are an expert trade assessor grading a practical skills interview.
 
 Sub-skill being tested: {sub_skill}
-Scenario given to the worker: {scenario}
+Scenario presented to the worker: {scenario}
 Worker's answer: {answer}
 
-GRADING RULES — read carefully:
+GRADING RULES:
+1. Do NOT penalise poor grammar, casual language, slang, broken English,
+   or short answers. Many skilled tradespeople are not strong writers.
+2. DO award marks for:
+     • Correct trade-specific terminology (tool names, part names, codes)
+     • Logical troubleshooting sequence (even if briefly stated)
+     • Mention of safety steps where relevant
+     • Correct identification of the likely fault or root cause
+3. Award ZERO if the answer:
+     • Is completely unrelated to the scenario
+     • Contains only filler words with no technical content
+     • Shows no understanding of the sub-skill at all
+4. Partial credit: if they name the right tools but wrong sequence, or
+   right sequence but wrong tools — score 40–70.
+5. Score > 75 = they have demonstrated real field knowledge.
 
-AWARD MARKS FOR:
-  ✓ Job-specific terminology (tool names, part names, material names,
-    technique names, process steps) — even if spelled wrong or informal
-  ✓ Correct troubleshooting or work sequence, even if brief
-  ✓ Identification of the core problem or key challenge
-  ✓ Mention of safety, quality checks, or common mistakes to avoid
-  ✓ Practical knowledge that only comes from doing the job, not reading about it
-
-DO NOT PENALISE:
-  ✗ Poor grammar, spelling mistakes, or broken English
-  ✗ Short answers (a skilled worker may answer in 2–3 sentences)
-  ✗ Casual or informal language
-  ✗ Mixing Nepali/Hindi words with English
-  ✗ Not knowing a single technical term if the overall approach is correct
-
-SCORE ZERO IF:
-  ✗ The answer has no connection to the scenario or sub-skill
-  ✗ The answer is pure filler ("I would fix it", "I know how to do it")
-  ✗ The answer shows no understanding of the specific work involved
-
-PARTIAL CREDIT (40–74):
-  → Correct direction but missing key steps or tools
-  → Right tools mentioned but wrong sequence
-  → Understands the problem but gives incomplete solution
-
-PASS THRESHOLD: Score above 75 means real field knowledge is demonstrated.
-
-Write a 2–3 sentence assessment explaining your grade.
-Then output EXACTLY (on separate lines, no extra text):
-SCORE: <integer 0 to 100>
-VERDICT: PASS
+First write a brief assessment (2–3 sentences).
+Then on a new line write EXACTLY one of:
+  SCORE: <number between 0 and 100>
+  VERDICT: PASS
 or
-SCORE: <integer 0 to 100>
-VERDICT: FAIL"""
+  SCORE: <number between 0 and 100>
+  VERDICT: FAIL
 
+Only these two formats are valid. Do not add anything after the verdict."""
 
-# ─────────────────────────────────────────────────────────────
-# PROMPT 4 — JSON EXTRACTOR
-# Parses the full conversation into a clean profile.
-# ─────────────────────────────────────────────────────────────
 
 EXTRACTOR_PROMPT = """\
-You are a strict data parser for the Kamigo worker registration system in Nepal.
+You are a strict data compliance parser for the Kamigo worker registry.
 
-Read the interview transcript carefully and extract the worker profile.
-Follow every rule below precisely.
+Analyse the interview transcript below and extract the structured
+worker profile. Follow these rules exactly:
 
-FIELD RULES:
+1. trade_category: map to one of the five allowed values only.
+   plumbing | electrical | hvac | appliance_repair | handyman
 
-job_category:
-  The broad job title in plain English.
-  Normalise to a standard label: "plumber", "electrician", "mechanic",
-  "carpenter", "tailor", "cook", "welder", "painter", "mason",
-  "cleaner", "driver", "photographer", "IT technician", etc.
+2. verified_specialty: copy the exact sub-skill that was TESTED and PASSED.
+   Do not invent or summarise — use the name from the [TEST_REQUIRED: ...]
+   token in the transcript.
 
-specialities:
-  Generate 2–4 slug-style tags derived from the EXACT sub-skill name
-  in the [TEST_REQUIRED: ...] token in the transcript.
-  Rules for tags:
-    - Lowercase only
-    - Hyphen-separated words (no spaces, no underscores)
-    - Each tag = one distinct concept or skill from the specialty
-    - Do not repeat the job_category as a tag
-    - Tags must be specific enough to be used as database search filters
+3. years_experience: integer only. If unclear, default to the lowest
+   reasonable value they mentioned.
 
-  Conversion examples:
-    "solar water heater installation and pressurised system commissioning"
-    → ["solar-water-heater", "pressurised-system", "heater-installation"]
+4. license_status: derive from their exact words.
+   - "I have a license" / "active" / "registered" → verified_active
+   - "applied" / "in progress" / "pending" → pending_review
+   - no mention or "no license" → unlicensed
 
-    "motorcycle carburetor rebuilding and fuel system tuning"
-    → ["carburetor-rebuild", "fuel-system-tuning", "motorcycle-engine"]
+5. heavy_equipment_owned: list only tools/machines that are NOT standard
+   hand tools every tradesperson carries. Examples: thermal imaging camera,
+   hydro jet, oscilloscope, refrigerant recovery machine, pipe inspection
+   camera. Exclude: screwdrivers, spanners, tape measures, multimeters.
 
-    "three-phase industrial panel installation and load balancing"
-    → ["three-phase-panel", "load-balancing", "industrial-wiring"]
+6. emergency_24_7: True ONLY if they explicitly said yes to emergency /
+   after-hours / 24-hour calls. False if not explicitly stated.
 
-    "traditional Newari wood carving and antique furniture restoration"
-    → ["newari-woodcarving", "antique-restoration", "traditional-carving"]
+7. background_check_consent: True ONLY if they explicitly agreed.
+   False if not explicitly stated.
 
-    "advanced leak detection using electronic equipment and camera inspections for main sewer lines"
-    → ["leak-detection", "sewer-inspection", "camera-survey", "electronic-testing"]
+8. scenario_passed: always True (they passed the test to reach this stage).
 
-    "CCTV and access control system installation and networking"
-    → ["cctv-installation", "access-control", "network-setup"]
-
-  Always output as a JSON array of strings.
-
-years_experience:
-  Integer only. If a range was given (e.g. "8 to 10 years"), use the lower number.
-  If unclear, use the most conservative number mentioned.
-
-license_or_certification:
-  Exact description of any formal credential.
-  If none mentioned: "no formal certification".
-  If they mentioned training/apprenticeship but no formal cert: describe it.
-
-specialized_tools_or_equipment:
-  List only non-basic tools or machines they mentioned owning or regularly using.
-  Do NOT include: screwdrivers, hammers, spanners, measuring tape,
-  basic drill, paintbrush, mop, broom, or any tool every person in
-  that job would have.
-  DO include: welding machine, DSLR camera kit, industrial sewing machine,
-  pipe inspection camera, thermal imager, oscilloscope, angle grinder,
-  motorcycle lift, commercial mixer, etc.
-  If nothing specialized was mentioned, output an empty list [].
-
-emergency_available:
-  True ONLY if they explicitly said yes to emergency/urgent/after-hours calls.
-  Any ambiguous answer → false.
-
-scenario_passed:
-  Always output true. The worker only reaches extraction after passing.
-
-scenario_score:
-  The integer score from the SCORE: line in the evaluator report
-  that was injected into the transcript. Extract it exactly.
-
-Output ONLY valid JSON. No markdown fences. No explanation. No extra keys.
-
-The output JSON must always have EXACTLY these keys in this order:
-  job_category, specialities, years_experience, license_or_certification,
-  specialized_tools_or_equipment, emergency_available,
-  scenario_passed, scenario_score"""
+Output ONLY valid JSON matching the schema. No markdown, no explanation."""
 
 
 # ─────────────────────────────────────────────────────────────
-# OLLAMA API HELPERS
+# ENGINE FUNCTIONS
 # ─────────────────────────────────────────────────────────────
 
-def chat(model_name: str, history: list, temperature: float = 0.1) -> str:
-    """Send conversation history to Ollama and return the response text."""
+def chat(model: str, messages: list, temperature: float = 0.1) -> str:
+    """Single Ollama chat call, returns text content."""
     response = ollama.chat(
-        model=model_name,
-        messages=history,
+        model=model,
+        messages=messages,
         options={"temperature": temperature},
     )
-    return response['message']['content'].strip()
+    return response["message"]["content"].strip()
 
 
-def generate_scenario(sub_skill: str, model_name: str) -> str:
-    """Generate a field-specific test scenario for the claimed sub-skill."""
+def generate_scenario(sub_skill: str, model: str) -> str:
+    """Create a field-specific troubleshooting scenario for the sub-skill."""
     messages = [
         {"role": "system", "content": SCENARIO_GENERATOR_PROMPT},
-        {"role": "user",   "content": f"Sub-skill to test: {sub_skill}"},
+        {"role": "user", "content": f"Sub-skill: {sub_skill}"},
     ]
-    response = ollama.chat(
-        model=model_name,
-        messages=messages,
-        options={"temperature": 0.5},
-    )
-    return response['message']['content'].strip()
+    return chat(model, messages, temperature=0.4)
 
 
-def evaluate_answer(
-    sub_skill: str, scenario: str, answer: str, model_name: str
-) -> tuple[bool, int, str]:
+def evaluate_answer(sub_skill: str, scenario: str, answer: str, model: str) -> tuple[bool, int, str]:
     """
     Grade the worker's scenario answer.
-    Returns: (passed: bool, score: int, full_evaluator_report: str)
+    Returns (passed: bool, score: int, verdict_text: str).
     """
     prompt = EVALUATOR_PROMPT_TEMPLATE.format(
         sub_skill=sub_skill,
         scenario=scenario,
         answer=answer,
     )
-    response = ollama.chat(
-        model=model_name,
-        messages=[{"role": "user", "content": prompt}],
-        options={"temperature": 0.0},
-    )
-    result = response['message']['content'].strip()
+    messages = [{"role": "system", "content": prompt}]
+    result = chat(model, messages, temperature=0.0)
 
+    # Parse score
     score_match = re.search(r'SCORE:\s*(\d+)', result, re.IGNORECASE)
     score = int(score_match.group(1)) if score_match else 0
+
+    # Parse verdict
     passed = bool(re.search(r'VERDICT:\s*PASS', result, re.IGNORECASE))
 
     return passed, score, result
 
 
-def extract_profile(history: list, score: int, model_name: str) -> WorkerProfile:
-    """
-    Parse the full conversation into a structured WorkerProfile.
-    Uses Ollama's JSON format mode for reliable output.
-    """
-    # Build message list: extractor system prompt + conversation (no original system msg)
-    messages = [{"role": "system", "content": EXTRACTOR_PROMPT}]
-    for msg in history:
-        if msg["role"] != "system":
-            messages.append({"role": msg["role"], "content": msg["content"]})
-
+def extract_profile(history: list, model: str) -> WorkerProfileSchema:
+    """Extract the validated worker profile JSON from the full conversation."""
+    # Strip system messages — only send the dialogue
+    cleaned = [m for m in history if m["role"] != "system"]
+    messages = [
+        {"role": "system", "content": EXTRACTOR_PROMPT},
+        *cleaned,
+    ]
     response = ollama.chat(
-        model=model_name,
+        model=model,
         messages=messages,
+        format=WorkerProfileSchema.model_json_schema(),
         options={"temperature": 0.0},
-        format="json",          # Ollama's native JSON mode
     )
-    raw = response['message']['content'].strip()
-    # Strip any accidental markdown fences
+    raw = response["message"]["content"].strip()
+    # Strip markdown fences if present
     raw = re.sub(r'^```(?:json)?\s*', '', raw)
     raw = re.sub(r'\s*```$', '', raw)
-
-    profile = WorkerProfile.model_validate_json(raw)
-    # Ensure score is always accurate from the evaluator, not hallucinated
-    profile.scenario_score = score
-    return profile
+    return WorkerProfileSchema.model_validate_json(raw)
 
 
 # ─────────────────────────────────────────────────────────────
-# DISPLAY HELPERS
+# MAIN INTERVIEW LOOP
 # ─────────────────────────────────────────────────────────────
 
-DIVIDER     = "=" * 62
-SUB_DIVIDER = "─" * 62
-
-def print_header():
-    print(f"\n{DIVIDER}")
-    print("  KAMIGO — Worker Registration & Vetting Terminal")
-    print("  Nepal Local Services Platform")
-    print(f"  Type 'exit' at any time to quit.")
-    print(f"{DIVIDER}\n")
-
-def print_stage(label: str):
-    print(f"\n{SUB_DIVIDER}")
-    print(f"  {label}")
-    print(f"{SUB_DIVIDER}")
-
-def print_terminated(reason: str):
-    print(f"\n{DIVIDER}")
-    print(f"  INTERVIEW TERMINATED")
-    print(f"  Reason: {reason}")
-    print(f"{DIVIDER}\n")
-
-def print_success(profile_json: str):
-    print(f"\n{DIVIDER}")
-    print("  VERIFICATION COMPLETE — WORKER PROFILE GENERATED")
-    print(f"{DIVIDER}")
-    print("\n" + profile_json + "\n")
-
-
-# ─────────────────────────────────────────────────────────────
-# MAIN INTERVIEW ORCHESTRATOR
-# ─────────────────────────────────────────────────────────────
-
-def run_interview(model_name: str = "qwen2.5:3b") -> Optional[WorkerProfile]:
-    """
-    Run the full Kamigo worker interview.
-    Returns the WorkerProfile on success, None on failure/exit.
-    """
+def run_interview(model_name: str = "qwen2.5:3b"):
     history: list = [{"role": "system", "content": INTERVIEWER_SYSTEM_PROMPT}]
 
-    print_header()
+    print("=" * 62)
+    print("  KAMIGO — Worker Technical Vetting Terminal")
+    print("  Type 'exit' at any time to leave.")
+    print("=" * 62)
 
     opening = (
-        "Welcome to the Kamigo worker registration process. "
-        "What type of work or service do you provide?"
+        "Welcome to the Kamigo vetting process. "
+        "What is your primary trade?"
     )
-    print(f"AI: {opening}\n")
+    print(f"\nAI: {opening}\n")
     history.append({"role": "assistant", "content": opening})
 
-    MAX_TURNS   = 18    # Enough for organic one-question-at-a-time flow
-    turn        = 0
-    final_score = 0
-    passed      = False
+    MAX_TURNS = 14
+    turn = 0
+    passed_scenario = False
 
-    # ── Main conversation loop ────────────────────────────────
     while turn < MAX_TURNS:
-
-        try:
-            raw_input = input("You: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            print("\n\n[SESSION ENDED]")
-            return None
-
+        raw_input = input("You: ").strip()
         if not raw_input:
             continue
-
-        if raw_input.lower() in ("exit", "quit", "bye"):
-            print("\n[SESSION ENDED BY WORKER]")
-            return None
+        if raw_input.lower() == "exit":
+            print("\n[SESSION ENDED]")
+            return
 
         history.append({"role": "user", "content": raw_input})
         turn += 1
 
-        # ── Get AI response ───────────────────────────────────
-        try:
-            ai_reply = chat(model_name, history, temperature=0.1)
-        except Exception as e:
-            print(f"\n[SYSTEM ERROR] Could not reach Ollama: {e}")
-            print("Make sure Ollama is running and qwen2.5:3b is pulled.")
-            return None
+        ai_reply = chat(model_name, history, temperature=0.1)
 
-        # ── Check for rejection ───────────────────────────────
+        # ── Rejection check ──────────────────────────────────
         if REJECTION_TOKEN in ai_reply.upper():
             print(
-                "\nAI: Thank you for your time. Unfortunately your application "
-                "does not meet our minimum requirements at this stage."
+                "\nAI: Your application does not meet our minimum criteria. "
+                "This interview is now closed."
             )
-            print_terminated("Worker did not meet vetting criteria.")
-            return None
+            print("\n[INTERVIEW TERMINATED — criteria not met]")
+            return
 
-        # ── Check for scenario test trigger ───────────────────
+        # ── Scenario trigger check ────────────────────────────
         test_match = TEST_TOKEN_RE.search(ai_reply)
         if test_match:
             sub_skill = test_match.group(1).strip()
 
-            # Show the AI message up to (but not including) the token
-            visible_reply = ai_reply[:test_match.start()].strip()
-            if visible_reply:
-                print(f"\nAI: {visible_reply}\n")
+            print(f"\n[SYSTEM]: Advanced specialty identified → '{sub_skill}'")
+            print("[SYSTEM]: Generating technical scenario test...\n")
 
-            print_stage(f"TECHNICAL SCENARIO TEST  →  '{sub_skill}'")
-            print("Generating your test scenario...\n")
+            scenario = generate_scenario(sub_skill, model_name)
 
-            # Generate scenario
-            try:
-                scenario = generate_scenario(sub_skill, model_name)
-            except Exception as e:
-                print(f"[SYSTEM ERROR] Could not generate scenario: {e}")
-                return None
+            print(f"AI (Technical Test):\n\n  {scenario}\n")
 
-            print(f"AI (Test Question):\n\n    {scenario}\n")
-
-            # Get worker's answer
-            try:
-                worker_answer = input("You (describe your approach): ").strip()
-            except (KeyboardInterrupt, EOFError):
-                print("\n[SESSION ENDED]")
-                return None
-
-            if not worker_answer or worker_answer.lower() in ("exit", "quit"):
+            worker_answer = input("You (describe your approach): ").strip()
+            if not worker_answer or worker_answer.lower() == "exit":
                 print("\n[SESSION ENDED — no answer provided]")
-                return None
+                return
 
-            print("\n[Evaluating your answer...]\n")
+            print("\n[SYSTEM]: Evaluating your response...\n")
+            passed, score, verdict_log = evaluate_answer(
+                sub_skill, scenario, worker_answer, model_name
+            )
 
-            # Evaluate
-            try:
-                passed, final_score, verdict_log = evaluate_answer(
-                    sub_skill, scenario, worker_answer, model_name
-                )
-            except Exception as e:
-                print(f"[SYSTEM ERROR] Evaluation failed: {e}")
-                return None
-
-            # Show internal evaluator report (remove this in production)
-            print(f"[EVALUATOR REPORT]\n{verdict_log}\n")
-            print(f"[SCORE: {final_score}/100  |  PASS THRESHOLD: 75]\n")
+            # Internal log (visible in terminal for debugging)
+            print(f"[INTERNAL EVALUATOR REPORT]\n{verdict_log}\n")
+            print(f"[SCORE: {score}/100]")
 
             if passed:
-                print("AI: Technical verification complete. Your expertise has been confirmed.")
-
-                # Inject result back into history so extractor can see it
+                print(
+                    "\nAI: Technical verification complete. "
+                    "Your expertise has been confirmed."
+                )
+                passed_scenario = True
+                # Inject the pass event into history so the extractor sees it
                 history.append({
                     "role": "assistant",
                     "content": (
-                        f"[TEST_REQUIRED: {sub_skill}]\n"
-                        f"System record: Worker answered the scenario test for "
-                        f"'{sub_skill}'. Evaluator score: {final_score}/100. "
-                        f"Result: PASS. {COMPLETE_TOKEN}"
+                        f"System: Worker passed technical scenario test for "
+                        f"'{sub_skill}' with a score of {score}/100. {COMPLETE_TOKEN}"
                     ),
                 })
-                break  # Exit loop → go to JSON extraction
-
+                break
             else:
                 print(
-                    "AI: Your answer did not demonstrate sufficient field knowledge "
-                    "for this specialty. This application cannot proceed."
+                    "\nAI: Your answer did not demonstrate sufficient technical "
+                    "knowledge for this specialty. This interview is now closed."
                 )
-                print_terminated(
-                    f"Scenario test failed — score {final_score}/100 "
-                    f"(required >75) for '{sub_skill}'."
-                )
-                return None
+                print(f"\n[INTERVIEW TERMINATED — scenario score {score}/100, threshold 75]")
+                return
 
-        # ── Check for early completion ─────────────────────────
+        # ── Completion check ──────────────────────────────────
         elif COMPLETE_TOKEN in ai_reply:
             clean = ai_reply.replace(COMPLETE_TOKEN, "").strip()
             if clean:
-                print(f"\nAI: {clean}\n")
+                print(f"\nAI: {clean}")
             history.append({"role": "assistant", "content": ai_reply})
-            passed = True
+            passed_scenario = True
             break
 
-        # ── Normal conversational turn ─────────────────────────
+        # ── Normal turn ───────────────────────────────────────
         else:
             print(f"\nAI: {ai_reply}\n")
             history.append({"role": "assistant", "content": ai_reply})
 
-    # ── Max turns reached without reaching scenario ───────────
-    if not passed:
-        print_terminated(
-            "Maximum interview length reached without completing the scenario test."
+    # ── Max turns reached without completion ─────────────────
+    if not passed_scenario:
+        print(
+            "\n[INTERVIEW CLOSED — maximum questions reached without "
+            "completing the scenario test]"
         )
-        return None
+        return
 
-    # ── Stage 6: Extract structured JSON profile ──────────────
-    print_stage("COMPILING WORKER PROFILE FOR DATABASE")
-    print("Processing...\n")
+    # ── Stage 6: Profile extraction ───────────────────────────
+    print("\n" + "=" * 62)
+    print("  COMPILING VERIFIED WORKER PROFILE")
+    print("=" * 62)
 
     try:
-        profile = extract_profile(history, final_score, model_name)
+        profile = extract_profile(history, model_name)
+        output = json.dumps(profile.model_dump(), indent=2)
+        print("\n[SUCCESS] Kamigo Worker Profile — ready for database:\n")
+        print(output)
+        return profile
     except Exception as e:
-        print(f"[ERROR] Could not compile profile: {e}")
-        print("The raw conversation has been preserved for manual review.")
-        return None
-
-    profile_json = json.dumps(profile.model_dump(), indent=2, ensure_ascii=False)
-    print_success(profile_json)
-    return profile
+        print(f"\n[ERROR] Failed to compile profile: {e}")
+        print("Raw conversation saved for manual review.")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -698,4 +497,4 @@ def run_interview(model_name: str = "qwen2.5:3b") -> Optional[WorkerProfile]:
 # ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    run_interview(model_name="qwen2.5:7b")
+    run_interview(model_name="qwen2.5:3b")
