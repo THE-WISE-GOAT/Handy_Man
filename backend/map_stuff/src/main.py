@@ -5,11 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import asyncpg
 
-# Initialize API instance with custom configuration metadata
 app_config = {"title": "Handyman Matching Engine"}
 app = FastAPI(**app_config)
 
-# CORS configuration allowing explicit resource sharing for web applications
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,14 +16,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Extract infrastructure coordinates from environment space 
-# Default string points to local sandbox database cluster
 TARGET_DB_URI = os.getenv(
     "DATABASE_URL", 
     "postgresql://postgres:password@localhost:5432/handyman_db"
 )
 
-# Incoming Pydantic payload interface definition
+
 class JobCreate(BaseModel):
     title: str
     tag: str
@@ -45,11 +41,11 @@ async def match_job(job: JobCreate) -> Dict[str, Any]:
     Executes a high-velocity spatial query against the worker index.
     Matches availability across category tags and geographic radius bounds.
     """
-    # Establish single-use network connection to target database cluster
+    
     db_connection = await asyncpg.connect(TARGET_DB_URI)
     
     try:
-        # Optimized spatial calculation tracking intersecting geometries
+       
         geospatial_matching_sql = """
             SELECT w.user_id, w.radius
             FROM workers w
@@ -61,7 +57,7 @@ async def match_job(job: JobCreate) -> Dict[str, Any]:
               );
         """
         
-        # Transmit query parameters through database wire protocol
+       
         query_records = await db_connection.fetch(
             geospatial_matching_sql, 
             job.tag, 
@@ -69,7 +65,7 @@ async def match_job(job: JobCreate) -> Dict[str, Any]:
             job.latitude
         )
         
-        # Serialize database row metrics into a standardized list structure
+      
         formatted_matches = [
             {
                 "worker_id": record["user_id"], 
@@ -85,5 +81,5 @@ async def match_job(job: JobCreate) -> Dict[str, Any]:
         }
         
     finally:
-        # Guarantee connection lifecycle termination to prevent socket leak
+     
         await db_connection.close()
