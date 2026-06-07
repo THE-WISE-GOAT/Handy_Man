@@ -1,17 +1,22 @@
 # this page is for the validation of data that is sent to database
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 from pydantic import Field
 from pydantic import BaseModel, Field, EmailStr
-
-
 
 # we put value through this schema before it goes to the database, so we can validate that the data is in the correct format and that all required fields are present, this is also used for the API endpoints to validate the data that is sent to the API
 class UserCreate(BaseModel):
     username: str
     email: str
     password: str
-    
+
+class RoleOut(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+            
 # this is the schema for the data that is sent back to the frontend, we don't want to send the password back to the frontend, so we create a separate schema for that   
 class UserOut(BaseModel):
     id: int
@@ -19,9 +24,14 @@ class UserOut(BaseModel):
     username: str
     is_active: bool
     created_at: datetime
+    roles: list[RoleOut]
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    locationLabel: Optional[str] = None
+    accountType: Optional[str] = None
 
     class Config:
-        from_attributes = True # this is used as database does not return data in the form of a dictionary, but rather as an object, so we need to tell Pydantic to read the data as an object and not a dictionary, this allows us to use the same schema for both input and output data. As, pydantic by default expects data to be in the form of a dictionary, but when we get data from the database, it is in the form of an object, so we need to tell Pydantic to read the data as an object and not a dictionary. This allows us to use the same schema for both input and output data.
+        from_attributes = True
         
 
 class Token(BaseModel):
@@ -44,3 +54,10 @@ class CustomerProblemSchema(BaseModel):
     urgency_level: Literal["low", "medium", "high"] = Field(
         description="The priority of the issue based on damage risk or safety issues."
     )
+    
+# 1. Schema for a single Role
+class UserRolesOut(BaseModel):
+    roles: list[str]
+    
+    
+    
