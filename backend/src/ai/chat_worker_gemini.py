@@ -39,10 +39,6 @@ genai.configure(api_key=api_key)
 # ─────────────────────────────────────────────────────────────
 
 class WorkerProfile(BaseModel):
-    full_name: Optional[str] = Field(
-        default=None,
-        description="Worker's name if mentioned during interview. Null if not given."
-    )
     job_category: str = Field(
         description=(
             "The broad job type in plain English. "
@@ -51,14 +47,16 @@ class WorkerProfile(BaseModel):
             "cleaner, tutor, photographer, IT technician, beautician, etc."
         )
     )
-    verified_specialty: str = Field(
+    specialities: List[str] = Field(
         description=(
-            "The ONE specific advanced sub-skill that was TESTED and PASSED "
-            "in the scenario step. Must be precise. "
-            "Examples: 'solar water heater installation and fault diagnosis', "
-            "'motorcycle carburetor rebuild and tuning', "
-            "'traditional Newari woodcarving and restoration', "
-            "'hydraulic brake system overhaul on heavy trucks'."
+            "Slug-style tags for the worker's verified advanced sub-skills. "
+            "Each tag must be lowercase, hyphen-separated, and machine-readable. "
+            "Examples: ['leak-detection', 'sewer-inspection', 'camera-survey'], "
+            "['carburetor-rebuild', 'fuel-system-tuning'], "
+            "['solar-water-heater', 'pressurised-system-commissioning'], "
+            "['three-phase-panel', 'load-balancing'], "
+            "['tig-welding', 'stainless-steel-fabrication']. "
+            "Derive 2–4 tags from the tested specialty — one tag per distinct concept."
         )
     )
     years_experience: int = Field(
@@ -80,24 +78,10 @@ class WorkerProfile(BaseModel):
             "DSLR camera kit, industrial sewing machine, angle grinder, etc."
         )
     )
-    service_area: Optional[str] = Field(
-        default=None,
-        description=(
-            "Where they work: district, city, or area in Nepal. "
-            "Examples: 'Kathmandu Valley', 'Pokhara', 'Biratnagar', "
-            "'willing to travel across Nepal'. Null if not mentioned."
-        )
-    )
     emergency_available: bool = Field(
         description=(
             "True ONLY if they explicitly said they are available for "
             "urgent/emergency/after-hours calls. False if not stated."
-        )
-    )
-    background_check_consent: bool = Field(
-        description=(
-            "True ONLY if they explicitly agreed to a background check. "
-            "False if not stated."
         )
     )
     scenario_passed: bool = Field(
@@ -154,6 +138,7 @@ Respond in the same language the worker uses.
 If they write in Nepali, reply in Nepali.
 If they write in English, reply in English.
 If they mix both, follow their lead.
+Use simple, everyday language — avoid jargon the worker may not know.
 ────────────────────────────────────────────────────
 
 ────────────────────────────────────────────────────
@@ -163,9 +148,7 @@ RULE 3 — INFORMATION TO COLLECT (collect in this order)
   c) Do they have any license, certificate, or formal training?
   d) What is their ONE advanced specialty? (see Rule 5)
   e) What specialized tools or equipment do they own?
-  f) Which area in Nepal do they work in?
-  g) Are they available for emergency/urgent calls?
-  h) Do they consent to a background check?
+  f) Are they available for emergency/urgent calls?
 
 Collect these strictly one at a time. Do not skip ahead.
 Do not ask about equipment until you have the specialty.
@@ -195,16 +178,20 @@ RULE 5 — SUB-SKILL PROBING (most critical rule)
 Goal: Find ONE genuine advanced niche — not a basic task
 that any person with that job title can do.
 
-STEP A — First, ask for their primary focus:
-  "What type of [job] work do you do most often?"
-  OR
-  "What is your main speciality within [job]?"
+Use plain, friendly language. Workers may not know the word "speciality."
+Ask like this instead:
+  "What kind of [job] jobs do customers usually call YOU for, not others?"
+  "What is the hardest type of [job] work you do regularly?"
+  "What is one job you have done that not many [job] workers can do?"
+
+STEP A — First, ask for their primary focus using simple words:
+  "What type of [job] work do you do most?"
 
 STEP B — If the answer is vague, probe deeper with ONE of:
-  "Do you work on residential or commercial projects?"
-  "What is the most complex job you have completed recently?"
-  "What specific technique or equipment do you specialise in?"
-  "Give me one example of a job only an expert in your field could do."
+  "Do you work in houses or big buildings?"
+  "What is the hardest job you finished recently?"
+  "What special machine or tool do you use that others don't?"
+  "Give one example of a job that only someone very experienced can do."
 
 STEP C — Reject generic answers.
   Generic means: any basic task that comes with the job title.
@@ -223,9 +210,9 @@ STEP C — Reject generic answers.
 
   These are what ANY person in that job can do. They do NOT qualify.
 
-  If the worker claims something too basic, push back ONCE:
-  "That is common for most [job] workers. What advanced or specialist
-   work do you do that requires specific skill or training?"
+  If the worker claims something too basic, push back ONCE with simple words:
+  "Most [job] workers do that. What harder or more special work do you do
+   that needs extra training or skill?"
 
   If after TWO push-backs they still cannot name anything advanced
   → output {REJECTION_TOKEN}.
@@ -261,6 +248,7 @@ The system will inject a message telling you the test result.
 ────────────────────────────────────────────────────
 TONE
 Professional and respectful. Not warm, not cold.
+Use plain, simple words — many workers are not highly educated.
 No greetings after the opening. No compliments.
 No filler like "Great!" or "Thank you for sharing."
 Just direct, clear questions.
@@ -288,6 +276,7 @@ The scenario MUST:
      "Walk me through your exact steps."
   5. Be 45–65 words. No longer.
   6. Sound like a supervisor speaking to a worker, not a textbook.
+  7. Use simple, clear language — avoid technical jargon in the question itself.
 
 Write ONLY the scenario. No title, no label, no introduction."""
 
@@ -355,20 +344,42 @@ Follow every rule below precisely.
 
 FIELD RULES:
 
-full_name:
-  Extract only if the worker gave their name during the interview.
-  If not mentioned, output null.
-
 job_category:
   The broad job title in plain English.
   Normalise to a standard label: "plumber", "electrician", "mechanic",
   "carpenter", "tailor", "cook", "welder", "painter", "mason",
   "cleaner", "driver", "photographer", "IT technician", etc.
 
-verified_specialty:
-  Copy the EXACT sub-skill name from the [TEST_REQUIRED: ...] token
-  in the transcript. Do not rewrite, summarise, or shorten it.
-  This must match exactly what was tested.
+specialities:
+  Generate 2–4 slug-style tags derived from the EXACT sub-skill name
+  in the [TEST_REQUIRED: ...] token in the transcript.
+  Rules for tags:
+    - Lowercase only
+    - Hyphen-separated words (no spaces, no underscores)
+    - Each tag = one distinct concept or skill from the specialty
+    - Do not repeat the job_category as a tag
+    - Tags must be specific enough to be used as database search filters
+
+  Conversion examples:
+    "solar water heater installation and pressurised system commissioning"
+    → ["solar-water-heater", "pressurised-system", "heater-installation"]
+
+    "motorcycle carburetor rebuilding and fuel system tuning"
+    → ["carburetor-rebuild", "fuel-system-tuning", "motorcycle-engine"]
+
+    "three-phase industrial panel installation and load balancing"
+    → ["three-phase-panel", "load-balancing", "industrial-wiring"]
+
+    "traditional Newari wood carving and antique furniture restoration"
+    → ["newari-woodcarving", "antique-restoration", "traditional-carving"]
+
+    "advanced leak detection using electronic equipment and camera inspections for main sewer lines"
+    → ["leak-detection", "sewer-inspection", "camera-survey", "electronic-testing"]
+
+    "CCTV and access control system installation and networking"
+    → ["cctv-installation", "access-control", "network-setup"]
+
+  Always output as a JSON array of strings.
 
 years_experience:
   Integer only. If a range was given (e.g. "8 to 10 years"), use the lower number.
@@ -389,17 +400,9 @@ specialized_tools_or_equipment:
   motorcycle lift, commercial mixer, etc.
   If nothing specialized was mentioned, output an empty list [].
 
-service_area:
-  District, city, or region in Nepal where they work.
-  If not mentioned, output null.
-
 emergency_available:
   True ONLY if they explicitly said yes to emergency/urgent/after-hours calls.
-  Any ambiguous answer → False.
-
-background_check_consent:
-  True ONLY if they explicitly agreed to a background check.
-  Any ambiguous answer → False.
+  Any ambiguous answer → false.
 
 scenario_passed:
   Always output true. The worker only reaches extraction after passing.
@@ -408,7 +411,12 @@ scenario_score:
   The integer score from the SCORE: line in the evaluator report
   that was injected into the transcript. Extract it exactly.
 
-Output ONLY valid JSON. No markdown fences. No explanation. No extra keys."""
+Output ONLY valid JSON. No markdown fences. No explanation. No extra keys.
+
+The output JSON must always have EXACTLY these keys in this order:
+  job_category, specialities, years_experience, license_or_certification,
+  specialized_tools_or_equipment, emergency_available,
+  scenario_passed, scenario_score"""
 
 
 # ─────────────────────────────────────────────────────────────
