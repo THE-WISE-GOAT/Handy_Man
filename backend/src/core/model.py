@@ -1,10 +1,9 @@
 # This file defines the database schema for the User model using SQLAlchemy. This is use for components of database components
 
-from dataclasses import Field
 from typing import List, Optional
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.database.database import Base
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY
@@ -71,7 +70,7 @@ class JobStatus(str, enum.Enum):
     MATCHED = "matched"
     COMPLETED = "completed"
     
-
+ 
 class Service_tasks(Base):
     __tablename__ = "service_tasks"
 
@@ -100,11 +99,6 @@ class Chat_logs(Base):
     timestamp: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default="now()")
     
     
-class BidStatus(str, enum.Enum):
-    SUBMITTED = "submitted"
-    SELECTED = "selected"
-    REJECTED = "rejected"
-
 
 class BidStatus(str, enum.Enum):
     SUBMITTED = "submitted"
@@ -128,12 +122,11 @@ class Bids(Base):
     
     
     
-    
 class WorkerSkillsSchema(BaseModel):
-    primary_trades: List[str] = Field(description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
-    specific_skills: List[str] = Field(description="Specific tasks they can do, e.g., fixing leaks, installing ceiling fans, drywall patching")
-    years_of_experience: int = Field(description="Total years of experience as an integer")
-    special_tools: List[str] = Field(description="Key tools they own, e.g., ladders, power drills, welding gear, snakes")
-    certifications: List[str] = Field(description="Any professional licenses or certifications mentioned")
+    primary_trades: List[str] = Field(default_factory=list, description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
+    specific_skills: List[str] = Field(default_factory=list, description="Specific tasks they can do, e.g., fixing leaks, installing ceiling fans, drywall patching")
+    years_of_experience: int = Field(default=0, description="Total years of experience as an integer")
+    special_tools: List[str] = Field(default_factory=list, description="Key tools they own, e.g., ladders, power drills, welding gear, snakes")
+    certifications: List[str] = Field(default_factory=list, description="Any professional licenses or certifications mentioned")
     estimated_hourly_rate: Optional[float] = Field(None, description="Their preferred hourly rate if mentioned, otherwise null")
-    ai_confidence_summary: str = Field(description="A brief paragraph summarizing their professional background and reliability based on the chat")
+    ai_confidence_summary: str = Field(default="", description="A brief paragraph summarizing their professional background and reliability based on the chat")

@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware # allows frontend to make requests to our backend
-from src.core.router import user, login, auth, worker
+from fastapi.middleware.cors import CORSMiddleware
+from src.core.router import user, login, auth, worker, service_task, chat
 
-app = FastAPI() # creates a new FastAPI application instance
+app = FastAPI()
 
 origins = ["*"] # allows all origins to access our API, lets keep this access for development, but in production we should specify the allowed origins for security reasons
   # eg: origins = ["http://localhost:3000"] if our frontend is running on localhost:3000

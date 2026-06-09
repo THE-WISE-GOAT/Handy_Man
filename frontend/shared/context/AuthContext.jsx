@@ -48,17 +48,22 @@ const normalizeUserProfile = (profile, fallbackUsername = '') => {
      return null;
    }
 
-   // Extract role names from the roles array if present (expected from backend)
    const roleNames = Array.isArray(profile.roles)
      ? profile.roles.map((role) => role.name)
      : [];
 
+   const primaryRole = roleNames.length > 0 ? roleNames[0] : null;
+
    return {
      ...profile,
-     roles: roleNames, // array of role names (strings)
-     role: profile.role || profile.primary_role || profile.account_type || profile.user_role || (roleNames.length > 0 ? roleNames[0] : null),
+     roles: roleNames,
+     role: primaryRole,
      username: profile.username || fallbackUsername,
-     email: profile.email || ''
+     email: profile.email || '',
+     firstName: profile.firstName || profile.first_name || profile.username?.split(' ')?.[0] || fallbackUsername,
+     lastName: profile.lastName || profile.last_name || profile.username?.split(' ')?.[1] || '',
+     locationLabel: profile.locationLabel || profile.location_label || 'System Location Active',
+     accountType: primaryRole === 'worker' ? 'Service Specialist' : primaryRole === 'technician' ? 'Service Specialist' : primaryRole === 'provider' ? 'Service Specialist' : 'Customer'
    };
  };
 
@@ -72,7 +77,6 @@ export function AuthProvider({ children }) {
     const bootstrapUserSession = async ({ token, type = 'bearer', usernameValue = '' }) => {
      let profile = null;
 
-     // Always fetch the current user profile using /users/me
      const responseBody = await apiClient.get(`/users/me`, {
        token,
        tokenType: type
@@ -135,6 +139,15 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const logout = async () => {
+    try {
+      await apiClient.post('/service-tasks/logout', {}, { skipAuth: false });
+    } catch (error) {
+      console.warn('Logout API call failed:', error);
+    }
+    logoutLocal();
+  };
+
   const isAuthenticated = Boolean(accessToken) && !hasTokenExpired(accessToken);
 
   const value = useMemo(() => ({
@@ -145,7 +158,7 @@ export function AuthProvider({ children }) {
     isLoading,
     isAuthenticated,
     login,
-    logoutLocal
+    logout
   }), [accessToken, tokenType, username, user, isLoading, isAuthenticated]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

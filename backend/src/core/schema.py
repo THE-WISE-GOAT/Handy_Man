@@ -1,10 +1,8 @@
 # this page is for the validation of data that is sent to database
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 from pydantic import Field
 from pydantic import BaseModel, Field, EmailStr
-
-
 
 # we put value through this schema before it goes to the database, so we can validate that the data is in the correct format and that all required fields are present, this is also used for the API endpoints to validate the data that is sent to the API
 class UserCreate(BaseModel):
@@ -18,7 +16,7 @@ class RoleOut(BaseModel):
 
     class Config:
         from_attributes = True
-           
+            
 # this is the schema for the data that is sent back to the frontend, we don't want to send the password back to the frontend, so we create a separate schema for that   
 class UserOut(BaseModel):
     id: int
@@ -27,9 +25,13 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: datetime
     roles: list[RoleOut]
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    locationLabel: Optional[str] = None
+    accountType: Optional[str] = None
 
     class Config:
-        from_attributes = True # this is used as database does not return data in the form of a dictionary, but rather as an object, so we need to tell Pydantic to read the data as an object and not a dictionary, this allows us to use the same schema for both input and output data. As, pydantic by default expects data to be in the form of a dictionary, but when we get data from the database, it is in the form of an object, so we need to tell Pydantic to read the data as an object and not a dictionary. This allows us to use the same schema for both input and output data.
+        from_attributes = True
         
 
 class Token(BaseModel):
@@ -58,4 +60,20 @@ class UserRolesOut(BaseModel):
     roles: list[str]
     
     
+class WorkerOnboardIn(BaseModel):
+    latitude: float
+    longitude: float
+    ai_assessed_skills_json: dict 
     
+    class Config:
+        json_schema_extra = {    # this use to provide example data in the docs swagger as an example of how the data should look like when sent to the API, this is very useful for the frontend developers to understand what data they need to send to the API and in what format, it also helps to catch any errors in the data format before it goes to the database, and it also serves as documentation for the API.
+            "example": {
+                "latitude": 27.7172,
+                "longitude": 85.3240,
+                "ai_assessed_skills_json": {
+                    "primary_skill": "plumbing",
+                    "experience_years": 5,
+                    "tools_owned": ["wrench", "pipe cutter"]
+                }
+            }
+        }
