@@ -63,18 +63,19 @@ export default function LoginPage({ initialMode = 'login', onNavigate }) {
          }
        });
 
-       const profile = await login({
-         token: data.access_token,
-         type: data.token_type,
-         usernameValue: trimmedIdentity
-       });
+const profile = await login({
+          token: data.access_token,
+          type: data.token_type,
+          usernameValue: trimmedIdentity
+        });
 
-       // Redirect based on role
-       if (profile.roles?.includes('WORKER')) {
-         onNavigate?.('worker_dashboard', { replace: true });
-       } else {
-         onNavigate?.('customer_dashboard', { replace: true });
-       }
+        // Redirect based on role (worker/technician/provider/service specialis -> worker dashboard)
+        const hasWorkerRole = profile.roles?.some(r => ['worker', 'technician', 'provider'].includes(r.toLowerCase()));
+        if (hasWorkerRole) {
+          onNavigate?.('worker_dashboard', { replace: true });
+        } else {
+          onNavigate?.('customer_dashboard', { replace: true });
+        }
 
        setStatusType('success');
        setStatusMessage('Login successful. Loading your profile...');
