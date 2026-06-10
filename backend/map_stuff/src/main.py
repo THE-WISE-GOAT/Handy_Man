@@ -2,7 +2,7 @@ import os
 from typing import List, Dict, Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from . schemas import JobCreate
 import asyncpg
 
 app_config = {"title": "Handyman Matching Engine"}
@@ -17,30 +17,16 @@ app.add_middleware(
 )
 
 TARGET_DB_URI = os.getenv(
-    "DATABASE_URL", 
     "postgresql://postgres:password@localhost:5432/handyman_db"
 )
 
-
-class JobCreate(BaseModel):
-    title: str
-    tag: str
-    latitude: float
-    longitude: float
-
-
 @app.get("/")
-async def get_server_health() -> Dict[str, str]:
-    """Simple status check route to verify engine execution."""
+async def get_server_health():
     return {"status": "Server running successfully"}
 
 
 @app.post("/api/jobs/match")
-async def match_job(job: JobCreate) -> Dict[str, Any]:
-    """
-    Executes a high-velocity spatial query against the worker index.
-    Matches availability across category tags and geographic radius bounds.
-    """
+async def match_job(job: JobCreate):
     
     db_connection = await asyncpg.connect(TARGET_DB_URI)
     
