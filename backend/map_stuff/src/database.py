@@ -4,7 +4,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql+asyncpg://postgres:password@localhost:5432/handyman_db"
+    "postgresql+asyncpg://postgres:password@localhost:5432/kamigoDB"
 )
 
 engine = create_async_engine(DATABASE_URL, echo=True)
