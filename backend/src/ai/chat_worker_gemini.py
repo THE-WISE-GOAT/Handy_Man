@@ -23,6 +23,7 @@ import google.generativeai as genai
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
+
 load_dotenv()
 
 api_key = os.environ.get("GEMINI_API_KEY")
