@@ -1,13 +1,15 @@
-import os
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from geoalchemy2.functions import ST_DWithin
 
+# Import your clean schemas, managed database tools, and ORM blueprints
 from .schemas import JobCreate
-from .database import get_db  
+from .database import get_db
+from .models import Worker
 
-app_config = {"title": "Handyman Matching Engine"}
+app_config = {"title": "kamigo"}
 app = FastAPI(**app_config)
 
 app.add_middleware(
@@ -25,31 +27,27 @@ async def get_server_health():
 
 @app.post("/api/jobs/match")
 async def match_job(job: JobCreate, db: AsyncSession = Depends(get_db)):
-
-    geospatial_matching_sql = text("""
-        SELECT w.user_id, w.radius
-        FROM workers w
-        WHERE :tag = ANY(w.tags)
-          AND ST_DWithin(
-            w.location, 
-            ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography, 
-            w.radius
-          );
-    """)
+    """
+    Finds nearby matching handymen using full SQLAlchemy ORM 
+    instead of raw text-based SQL.
+    """
     
-    query_result = await db.execute(
-        geospatial_matching_sql, 
-        {
-            "tag": job.tag, 
-            "longitude": job.longitude, 
-            "latitude": job.latitude
-        }
+    user_location = func.ST_SetSRID(
+        func.ST_MakePoint(job.longitude, job.latitude), 
+        4326
     )
+    
+    query = select(Worker.id, Worker.operating_radius).where(
+        Worker.tags.contains([job.tag]),
+        ST_DWithin(Worker.location, user_location, Worker.operating_radius)
+    )
+    
+    query_result = await db.execute(query)
     
     formatted_matches = [
         {
-            "worker_id": row.user_id, 
-            "radius": row.radius
+            "id": row.id, 
+            "operating_radius": row.operating_radius
         }
         for row in query_result.all()
     ]
