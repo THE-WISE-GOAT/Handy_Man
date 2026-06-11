@@ -1,9 +1,11 @@
 import os
-from typing import List, Dict, Any
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from . schemas import JobCreate
-import asyncpg
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .schemas import JobCreate
+from .database import get_db  
 
 app_config = {"title": "Handyman Matching Engine"}
 app = FastAPI(**app_config)
@@ -16,56 +18,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-TARGET_DB_URI = os.getenv(
-    "postgresql://postgres:password@localhost:5432/handyman_db"
-)
-
 @app.get("/")
 async def get_server_health():
     return {"status": "Server running successfully"}
 
 
 @app.post("/api/jobs/match")
-async def match_job(job: JobCreate):
+async def match_job(job: JobCreate, db: AsyncSession = Depends(get_db)):
+
+    geospatial_matching_sql = text("""
+        SELECT w.user_id, w.radius
+        FROM workers w
+        WHERE :tag = ANY(w.tags)
+          AND ST_DWithin(
+            w.location, 
+            ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography, 
+            w.radius
+          );
+    """)
     
-    db_connection = await asyncpg.connect(TARGET_DB_URI)
-    
-    try:
-       
-        geospatial_matching_sql = """
-            SELECT w.user_id, w.radius
-            FROM workers w
-            WHERE $1 = ANY(w.tags)
-              AND ST_DWithin(
-                w.location, 
-                ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, 
-                w.radius
-              );
-        """
-        
-       
-        query_records = await db_connection.fetch(
-            geospatial_matching_sql, 
-            job.tag, 
-            job.longitude, 
-            job.latitude
-        )
-        
-      
-        formatted_matches = [
-            {
-                "worker_id": record["user_id"], 
-                "radius": record["radius"]
-            }
-            for record in query_records
-        ]
-        
-        return {
-            "status": "success",
-            "total_matches": len(formatted_matches),
-            "matches": formatted_matches
+    query_result = await db.execute(
+        geospatial_matching_sql, 
+        {
+            "tag": job.tag, 
+            "longitude": job.longitude, 
+            "latitude": job.latitude
         }
-        
-    finally:
-     
-        await db_connection.close()
+    )
+    
+    formatted_matches = [
+        {
+            "worker_id": row.user_id, 
+            "radius": row.radius
+        }
+        for row in query_result.all()
+    ]
+    
+    return {
+        "status": "success",
+        "total_matches": len(formatted_matches),
+        "matches": formatted_matches
+    }
