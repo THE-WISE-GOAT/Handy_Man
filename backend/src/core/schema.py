@@ -1,7 +1,7 @@
 # this page is for the validation of data that is sent to database
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, List, Literal, Optional, Dict
 from pydantic import Field
 from pydantic import BaseModel, Field, EmailStr
 
@@ -64,17 +64,9 @@ class UserRolesOut(BaseModel):
 class WorkerOnboardIn(BaseModel):
     latitude: float
     longitude: float
-    ai_assessed_skills_json: dict 
-    
-    class Config:
-        json_schema_extra = {    # this use to provide example data in the docs swagger as an example of how the data should look like when sent to the API, this is very useful for the frontend developers to understand what data they need to send to the API and in what format, it also helps to catch any errors in the data format before it goes to the database, and it also serves as documentation for the API.
-            "example": {
-                "latitude": 27.7172,
-                "longitude": 85.3240,
-                "ai_assessed_skills_json": {
-                    "primary_skill": "plumbing",
-                    "experience_years": 5,
-                    "tools_owned": ["wrench", "pipe cutter"]
-                }
-            }
-        }
+    job_category: str
+    tag: List[str]
+    years_experience: int
+    operating_radius: float
+    additional_metadata: Dict[str, Any]
+    ai_assessed_skills_json: Optional[List[str]] = [] 

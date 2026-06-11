@@ -6,7 +6,7 @@ import uuid
 from pydantic import BaseModel, Field
 
 from src.database.database import Base
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float
 from sqlalchemy.sql.sqltypes import TIMESTAMP, UUID, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
@@ -14,6 +14,8 @@ import enum
 from datetime import datetime
 from geoalchemy2 import Geography
 from geoalchemy2.elements import WKBElement
+import sqlalchemy as sa 
+
 
 
 class User(Base):
@@ -57,12 +59,17 @@ class UserRole(Base):
 
 class Worker(Base):
     __tablename__ = "workers"
+
+
+    id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    location: Mapped[WKBElement] = mapped_column(Geography(geometry_type='POINT', srid=4326), nullable=False)   
+    category: Mapped[str] = mapped_column(String, index=True, nullable=False) # this is the worker's main trade category,   
+    tags: Mapped[list[str]] = mapped_column(ARRAY(String), index=True, nullable=False) # this is a list of specific skills or services   
+    years_experience: Mapped[int] = mapped_column(nullable=False)  # this is the total years of experience the worker has in their trade
+    additional_metadata: Mapped[dict] = mapped_column(JSONB, nullable=True)  # put extra info that can be use for future
+    operating_radius: Mapped[float] = mapped_column(nullable=False) # this is the maximum distance in kilometers that the worker is willing to travel for a job
     
-    id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
-    location: Mapped[WKBElement] = mapped_column(Geography(geometry_type='POINT', srid=4326), nullable=False)
-    ai_accessed_skills_json: Mapped[dict] = mapped_column(JSONB, nullable=True)
-    operating_radius: Mapped[float] = mapped_column(nullable=False)
-    tags: Mapped[List[str]] = mapped_column(ARRAY(String), nullable=False)
+    
 
 
 class JobStatus(str, enum.Enum):
