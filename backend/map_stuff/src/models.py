@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float
 from sqlalchemy.dialects.postgresql import ARRAY 
 from geoalchemy2 import Geography
-from src.database import Base
+from backend.map_stuff.src.database import Base
 
 class Worker(Base):
     __tablename__ = "workers"
