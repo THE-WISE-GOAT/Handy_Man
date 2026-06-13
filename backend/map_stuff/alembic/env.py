@@ -22,8 +22,8 @@ if config.config_file_name is not None:
 # target_metadata = None
 
 # To exactly this:
-from src.database import Base
-import src.models  # Crucial: imports models so alembic can auto-detect tables
+from backend.map_stuff.src.database import Base
+import backend.map_stuff.src.models  # Crucial: imports models so alembic can auto-detect tables
 target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
