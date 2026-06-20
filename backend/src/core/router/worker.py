@@ -1,3 +1,5 @@
+from select import select
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from src.core import model
@@ -18,7 +20,7 @@ def apply_worker_role(current_user: model.User = Depends(get_current_user), db: 
     if not worker_role:
         worker_role = model.Role(name="worker")
         db.add(worker_role)
-        db.flush()
+        db.flush() 
     
     if worker_role not in current_user.roles:
         current_user.roles.append(worker_role)

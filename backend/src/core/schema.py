@@ -1,4 +1,5 @@
 # this page is for the validation of data that is sent to database
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Any, List, Literal, Optional, Dict
 from pydantic import Field
