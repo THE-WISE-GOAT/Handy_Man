@@ -1,8 +1,28 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from src.database.database import engine
+from src.core import model
 from src.core.router import user, login, auth, worker, service_task, chat
 
-app = FastAPI()
+# 1. Define the startup logic using lifespan
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # This runs BEFORE the server starts accepting requests
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+        conn.commit()
+    
+    # Create all tables safely now that PostGIS is active
+    model.Base.metadata.create_all(bind=engine)
+    
+    yield
+    # This runs when the server shuts down (leave empty)
+    pass
+
+# 2. Pass the lifespan to FastAPI
+app = FastAPI(lifespan=lifespan)
 
 origins = ["*"] # allows all origins to access our API, lets keep this access for development, but in production we should specify the allowed origins for security reasons
   # eg: origins = ["http://localhost:3000"] if our frontend is running on localhost:3000
