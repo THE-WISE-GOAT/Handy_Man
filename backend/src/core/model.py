@@ -6,7 +6,7 @@ import uuid
 from pydantic import BaseModel, Field
 
 from src.database.database import Base
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float, text
 from sqlalchemy.sql.sqltypes import TIMESTAMP, UUID, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
@@ -25,6 +25,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     password: Mapped[str] = mapped_column(String, nullable=False)
     username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    firstName: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    lastName: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default='TRUE')
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default="now()")
     
@@ -88,10 +90,10 @@ class Service_tasks(Base):
     location: Mapped[WKBElement] = mapped_column(Geography(geometry_type='POINT', srid=4326), nullable=False)
     ai_extracted_json: Mapped[dict] = mapped_column(JSONB, nullable=True)
     status: Mapped[JobStatus] = mapped_column(
-        Enum(JobStatus, name="job_status_enum"), 
-        nullable=False, 
-        server_default=JobStatus.OPEN.value
-    )
+    Enum(JobStatus, name="job_status_enum"), 
+    nullable=False, 
+    default=JobStatus.OPEN # Python handles the default assignment smoothly
+)
     
     
 class Chat_logs(Base):
@@ -122,10 +124,10 @@ class Bids(Base):
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True) 
     status: Mapped[BidStatus] = mapped_column(
-        Enum(BidStatus, name="bid_status_enum"),
-        nullable=False,
-        server_default=BidStatus.SUBMITTED.value
-    )
+    Enum(BidStatus, name="bid_status_enum"), 
+    nullable=False, 
+    default=BidStatus.SUBMITTED # Python handles the default assignment smoothly
+)
     
     
     

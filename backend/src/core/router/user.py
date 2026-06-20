@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from src.database.database import get_db
 from src.core import model, schema
 from src.core.utils import hash_password
+from src.core.oauth2 import get_current_user
 
 
 router = APIRouter(

@@ -698,4 +698,4 @@ def run_interview(model_name: str = "qwen2.5:3b") -> Optional[WorkerProfile]:
 # ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    run_interview(model_name="qwen2.5:7b")
+    run_interview(model_name="qwen2.5:14b")
