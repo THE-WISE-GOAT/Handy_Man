@@ -1,4 +1,5 @@
 # this page is for the validation of data that is sent to database
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Any, List, Literal, Optional, Dict
 from pydantic import Field
@@ -9,6 +10,8 @@ class UserCreate(BaseModel):
     username: str
     email: str
     password: str
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
 
 class RoleOut(BaseModel):
     id: int
@@ -27,8 +30,6 @@ class UserOut(BaseModel):
     roles: list[RoleOut]
     firstName: Optional[str] = None
     lastName: Optional[str] = None
-    locationLabel: Optional[str] = None
-    accountType: Optional[str] = None
 
     class Config:
         from_attributes = True
