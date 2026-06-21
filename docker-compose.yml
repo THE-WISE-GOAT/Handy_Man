@@ -1,0 +1,72 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: handy_man_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-handy_man_db}
+      POSTGRES_USER: ${DATABASE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_EXPOSE_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DATABASE_USERNAME:-postgres} -d ${DATABASE_NAME:-handy_man_db}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: handy_man_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_HOSTNAME: db
+      DATABASE_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+  customer_app:
+    build:
+      context: ./frontend2
+      dockerfile: ./customer_app/Dockerfile
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        VITE_WORKER_URL: ${WORKER_APP_URL:-http://localhost:5174}
+        VITE_MAP_STANDALONE_URL: ${MAP_STANDALONE_URL:-http://localhost:5174}
+    container_name: handy_man_customer_app
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${CUSTOMER_APP_PORT:-5173}:80"
+
+  worker_app:
+    build:
+      context: ./frontend2
+      dockerfile: ./worker_app/Dockerfile
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        VITE_CUSTOMER_URL: ${CUSTOMER_APP_URL:-http://localhost:5173}
+        VITE_MAP_STANDALONE_URL: ${MAP_STANDALONE_URL:-http://localhost:5174}
+    container_name: handy_man_worker_app
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${WORKER_APP_PORT:-5174}:80"
+
+volumes:
+  postgres_data:
