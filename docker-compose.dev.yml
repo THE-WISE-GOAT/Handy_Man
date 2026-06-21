@@ -19,7 +19,7 @@ services:
       - ./frontend2/shared:/app/shared
       - customer_node_modules:/app/customer_app/node_modules
     ports:
-      - "${CUSTOMER_APP_PORT:-5173}:5173"
+      - "5173:5173"
 
   worker_app:
     build:
@@ -41,7 +41,7 @@ services:
       - ./frontend2/shared:/app/shared
       - worker_node_modules:/app/worker_app/node_modules
     ports:
-      - "${WORKER_APP_PORT:-5174}:5174"
+      - "5174:5174"
 
 volumes:
   customer_node_modules:
