@@ -63,3 +63,7 @@ Handy_Man is a location-aware gig marketplace that connects local customers with
 ## Summary
 
 The repository currently has a strong scaffolded implementation for user onboarding, worker role activation, service task creation, and customer/worker frontend shells. The next key work is to wire the frontend to the backend, complete worker profile and bidding flows, add chat/notification support, and make the geospatial matching features fully operational.
+
+Discuss the extent to which you believe that you have a motivation problem as a software engineer.
+Given what you have learned in this chapter, design a plan to increase motivation of employees to provide prompt service to customers working in a software development company.
+Design a plan to increase the motivation of the system administrator even when the supervisor is not monitoring your work.
