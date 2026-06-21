@@ -1,0 +1,48 @@
+services:
+  customer_app:
+    build:
+      context: ./frontend2
+      dockerfile: ./customer_app/Dockerfile
+      target: dev
+    environment:
+      VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      VITE_WORKER_URL: ${WORKER_APP_URL:-http://localhost:5174}
+      VITE_MAP_STANDALONE_URL: ${MAP_STANDALONE_URL:-http://localhost:5174}
+      VITE_PORT: 5173
+      VITE_HMR_HOST: localhost
+      VITE_HMR_CLIENT_PORT: 5173
+      VITE_HMR_PROTOCOL: ws
+      VITE_USE_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./frontend2/customer_app:/app/customer_app
+      - ./frontend2/shared:/app/shared
+      - customer_node_modules:/app/customer_app/node_modules
+    ports:
+      - "${CUSTOMER_APP_PORT:-5173}:5173"
+
+  worker_app:
+    build:
+      context: ./frontend2
+      dockerfile: ./worker_app/Dockerfile
+      target: dev
+    environment:
+      VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      VITE_CUSTOMER_URL: ${CUSTOMER_APP_URL:-http://localhost:5173}
+      VITE_MAP_STANDALONE_URL: ${MAP_STANDALONE_URL:-http://localhost:5174}
+      VITE_PORT: 5174
+      VITE_HMR_HOST: localhost
+      VITE_HMR_CLIENT_PORT: 5174
+      VITE_HMR_PROTOCOL: ws
+      VITE_USE_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./frontend2/worker_app:/app/worker_app
+      - ./frontend2/shared:/app/shared
+      - worker_node_modules:/app/worker_app/node_modules
+    ports:
+      - "${WORKER_APP_PORT:-5174}:5174"
+
+volumes:
+  customer_node_modules:
+  worker_node_modules:
