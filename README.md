@@ -135,8 +135,10 @@ JWT_SECRET=your_secure_authentication_secret_string
 Navigate into the backend target folder, fetch dependencies, and start the development engine:
 
 ```bash
+
 cd backend
 npm install   # or pip install -r requirements.txt
 npm start     # or uvicorn src.core.main:app --reload
 
 ```
+end.

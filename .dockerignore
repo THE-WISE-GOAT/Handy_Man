@@ -1,0 +1,17 @@
+.git
+.gitignore
+frontend2/
+frontend2.zip
+docs/
+TODO/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+*.pyc
+*.pyo
+*.pyd
+.env
+node_modules/
+dist/
+build/
