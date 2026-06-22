@@ -23,6 +23,11 @@ const PANEL_META = {
     subtitle: "AI dispatch terminal",
     meta: "Chat + tags",
   },
+  posts: {
+    icon: "💬",
+    title: "Your Posts",
+    subtitle: "No jobs posted",
+  },
   biddings: {
     icon: "💼",
     title: "Biddings",
@@ -322,6 +327,8 @@ function HistoryPanel({ history, chatMessages }) {
   );
 }
 
+
+
 function CalendarPanel() {
   return (
     <div className="fixfast-panel">
@@ -452,8 +459,9 @@ export default function CustomerDashboardView({ onNavigate }) {
     }, 90);
   };
 
-  const navItems = [
+  const navItems = [ 
     { id: "booking", label: "New Booking" },
+    { id: "posts", label: "Your Posts" },
     { id: "biddings", label: "Biddings" },
     { id: "history", label: "History" },
     { id: "around", label: "Who is Around" },
@@ -618,9 +626,9 @@ export default function CustomerDashboardView({ onNavigate }) {
 
   return (
     <div className="fixfast-page">
-      <FixFastNavbar
-        brandTitle="Handy Man"
-        brandEyebrow="FixFast Customer"
+      <FixFastNavbar //navigation bar here
+        // brandTitle="Handy Man"
+        // brandEyebrow="FixFast Customer"
         navItems={navItems}
         activePanel={activeWindow}
         onSelectPanel={handleWindowSwap}
