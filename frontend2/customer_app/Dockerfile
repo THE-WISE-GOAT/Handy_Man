@@ -3,7 +3,7 @@ FROM node:22-alpine AS dev
 WORKDIR /app
 
 COPY customer_app/package*.json ./customer_app/
-RUN npm ci --prefix ./customer_app
+RUN npm install --prefix ./customer_app
 
 WORKDIR /app/customer_app
 
