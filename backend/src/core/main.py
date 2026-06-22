@@ -39,3 +39,4 @@ app.include_router(user.router) # includes the user router, which contains all t
 app.include_router(auth.router) # includes the auth router, which contains the API endpoint for user registration and role assignment
 app.include_router(login.router) # includes the login router, which contains the API endpoint for user login and token generation
 app.include_router(worker.router) # includes the worker router, which contains the API endpoint for worker role application
+app.include_router(chat.router) # includes the chat router, which contains the API endpoints for the customer support chat functionality
