@@ -1,663 +1,184 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import { useAuth } from "@shared/context/AuthContext";
-import {
-  FixFastNavbar,
-  FixFastProfile,
-  PreviewDeck,
-  TheaterStage,
-} from "@shared/components/dashboard-stage/DashboardStage";
-import { NAV_ITEMS, TAG_LIBRARY, CALENDAR_STUB_MESSAGE } from "./constants";
-import { formatTimestamp } from "./helpers";
-import { useCustomerDashboardData } from "./useCustomerDashboardData";
+import { FixFastNavbar, FixFastProfile } from "@shared/components/dashboard-stage/DashboardStage";
+import Dash1board from "./dash1board"; 
+import Dash2board from "./dash2board"; 
+import Dash3board from "./dash3board"; // Imported the new dashboard layer
 
-const PANEL_META = {
-  around: {
-    icon: "📍",
-    title: "Who is Around",
-    subtitle: "Live worker radius",
-    meta: "Nearby workforce",
+import "./customer-dashboard.css"; 
+import "./dash1board.css";         
+import "./dash2board.css";         
+import "./dash3board.css"; // Applied dimensional layout sheet
+
+const DASHBOARD_CONFIG = {
+  bookings: {
+    label: "Bookings",
+    modules: [
+      { id: "ai-chat", title: "AI Chat Terminal", subtitle: "Interactive dispatch manager", previewText: "Live Dispatch — Active Session" },
+      { id: "job-description", title: "Job Description Workspace", subtitle: "Review and refine auto-generated details", previewText: "Description Live Glance — Draft Mode" },
+      { id: "my-posts", title: "Your Active Posts", subtitle: "Overview of tasks deployed to network", previewText: "Active Posts — 0 live requests trackable" },
+    ],
   },
-  booking: {
-    icon: "💬",
-    title: "New Booking",
-    subtitle: "AI dispatch terminal",
-    meta: "Chat + tags",
+  postings: {
+    label: "Postings",
+    modules: [
+      { id: "biddings", title: "Active Biddings Engine", subtitle: "COMPETITIVE MARKETPLACE METRICS", previewText: "Bids Portal — Active incoming traffic" },
+      { id: "map", title: "Geospatial Live Map", subtitle: "REALTIME FIELD LOCATION MATRIX", previewText: "GPS Coordinates — Tracking Active Feed" },
+      { id: "active-post-v2", title: "Active Posts Dashboard", subtitle: "DEPLOYED TASKS RADAR", previewText: "Post Network Pipeline Monitor Active" },
+      { id: "ratings-review", title: "Ratings & Review Logs", subtitle: "REPUTATION QUALITY VERIFICATION", previewText: "Verified Feedback — 5.0 Star Average" },
+    ],
   },
-  posts: {
-    icon: "💬",
-    title: "Your Posts",
-    subtitle: "No jobs posted",
-  },
-  biddings: {
-    icon: "💼",
-    title: "Biddings",
-    subtitle: "Task and matching activity",
-    meta: "Quotes + matches",
-  },
-  history: {
-    icon: "🧾",
-    title: "History",
-    subtitle: "Completed jobs and chat history",
-    meta: "Past records",
-  },
-  calendar: {
-    icon: "🗓",
-    title: "Calendar",
-    subtitle: "Prepared frontend stub",
-    meta: "Future scheduling",
+  misc: {
+    label: "Misc",
+    modules: [
+      { id: "calendar", title: "System Calendar", subtitle: "SCHEDULE PLATFORM PLANNERS", previewText: "Calendar Feeds — Fully Synced Status" },
+      { id: "account", title: "Account Profiles", subtitle: "USER REGISTRATION SYSTEM UTILS", previewText: "Profile Security Node Standby" },
+      { id: "history", title: "Historical Records Logs", subtitle: "COMPLETED ENGINE TRANSCRIPTS", previewText: "Archived Deployments Index Stream" },
+      { id: "settings", title: "System Settings", subtitle: "CONFIGURATIONS CORE ADJUSTMENTS", previewText: "System Parameters Modification Portal" },
+    ],
   },
 };
 
-function AroundPanel({
-  location,
-  workersAround,
-  loading,
-  errors,
-  refreshWorkers,
-}) {
-  return (
-    <div className="fixfast-grid fixfast-grid--two">
-      <div className="fixfast-panel">
-        <div className="fixfast-panel__topline">
-          <span>Coverage radius</span>
-          <button
-            type="button"
-            className="fixfast-mini-button"
-            onClick={refreshWorkers}
-          >
-            Refresh
-          </button>
-        </div>
-        <div className="fixfast-map-box">
-          <div>
-            <strong>Worker coverage preview</strong>
-            <p className="fixfast-muted">
-              Backend source: GET /service-tasks/available-workers around{" "}
-              {location.lat}, {location.lng}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="fixfast-panel">
-        <div className="fixfast-panel__topline">
-          <span>Nearby workers</span>
-          <span>{workersAround.length} found</span>
-        </div>
-        {loading.workers ? (
-          <p className="fixfast-empty">Loading nearby workers…</p>
-        ) : null}
-        {errors.workers ? (
-          <p className="fixfast-error">{errors.workers}</p>
-        ) : null}
-        <div className="fixfast-list">
-          {workersAround.map((worker, index) => (
-            <article
-              key={`${worker.id || "worker"}-${index}`}
-              className="fixfast-card"
-            >
-              <div className="fixfast-panel__topline">
-                <span>Worker #{worker.id || index + 1}</span>
-                <span>
-                  {worker.operating_radius
-                    ? `${worker.operating_radius} km`
-                    : "N/A"}
-                </span>
-              </div>
-              <p className="fixfast-muted">
-                {Array.isArray(worker.skills) && worker.skills.length > 0
-                  ? worker.skills.join(", ")
-                  : "Skills metadata unavailable"}
-              </p>
-              <div className="fixfast-chip-row">
-                {(Array.isArray(worker.tags) ? worker.tags : []).map((tag) => (
-                  <span key={tag} className="fixfast-chip">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </article>
-          ))}
-          {!loading.workers && !errors.workers && workersAround.length === 0 ? (
-            <p className="fixfast-empty">
-              No workers returned for the current query.
-            </p>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BookingPanel({
-  activeTags,
-  activeTask,
-  workerApplicationStatus,
-  applyForWorkerRole,
-  chatMessages,
-  chatInput,
-  setChatInput,
-  handleChatSubmit,
-  loading,
-  errors,
-  chatLogRef,
-}) {
-  return (
-    <div className="fixfast-grid fixfast-grid--booking">
-      <aside className="fixfast-panel">
-        <div className="fixfast-panel__topline">
-          <span>Active filters / tags</span>
-          <span>AI synced</span>
-        </div>
-        <div className="fixfast-tag-cloud">
-          {TAG_LIBRARY.map((tag) => (
-            <span
-              key={tag}
-              className={`fixfast-chip ${activeTags.includes(tag) ? "is-active" : ""}`}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        <div className="fixfast-subpanel" style={{ marginTop: "1rem" }}>
-          <div className="fixfast-panel__topline">
-            <span>Booking state</span>
-          </div>
-          <p>
-            {activeTask ? activeTask.title : "No open booking detected yet."}
-          </p>
-          <div className="fixfast-list fixfast-muted">
-            <span>Status: {activeTask?.status || "open draft"}</span>
-            <span>
-              Assigned: {activeTask?.assignedWorker || "Awaiting dispatch"}
-            </span>
-            <span>ETA: {activeTask?.eta || "Pending"}</span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className="fixfast-button"
-          style={{ width: "100%", marginTop: "1rem" }}
-          onClick={applyForWorkerRole}
-        >
-          Join as worker
-        </button>
-        {workerApplicationStatus ? (
-          <p className="fixfast-muted">{workerApplicationStatus}</p>
-        ) : null}
-      </aside>
-
-      <div className="fixfast-panel fixfast-chat-shell">
-        <div className="fixfast-panel__topline">
-          <span>AI dispatch chat terminal</span>
-          <span>POST /chat/message</span>
-        </div>
-
-        <div ref={chatLogRef} className="fixfast-chat-log">
-          {chatMessages.map((message) => (
-            <div
-              key={message.id}
-              className={`fixfast-chat-row ${message.sender === "user" ? "is-user" : ""}`}
-            >
-              <div className="fixfast-chat-bubble">
-                <p>{message.text}</p>
-                <span>{message.timestamp || "Just now"}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {errors.chat ? <p className="fixfast-error">{errors.chat}</p> : null}
-
-        <form className="fixfast-chat-form" onSubmit={handleChatSubmit}>
-          <input
-            className="fixfast-input"
-            type="text"
-            value={chatInput}
-            onChange={(event) => setChatInput(event.target.value)}
-            placeholder="Describe emergency or attach photo..."
-            disabled={loading.chat}
-          />
-          <button
-            type="submit"
-            className="fixfast-button"
-            disabled={!chatInput.trim() || loading.chat}
-          >
-            {loading.chat ? "Sending…" : "Send"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function BiddingsPanel({ biddings, loading, errors }) {
-  return (
-    <div className="fixfast-panel">
-      <div className="fixfast-panel__topline">
-        <span>Available backend data</span>
-        <span>Derived from service tasks</span>
-      </div>
-      <p className="fixfast-muted">
-        The backend currently exposes service tasks but not a dedicated customer
-        bidding endpoint. This panel derives bidding-style cards from GET
-        /service-tasks/ without changing backend logic.
-      </p>
-      {loading.tasks ? (
-        <p className="fixfast-empty">Loading biddings…</p>
-      ) : null}
-      {errors.tasks ? <p className="fixfast-error">{errors.tasks}</p> : null}
-      <div className="fixfast-list">
-        {biddings.map((item) => (
-          <article key={item.id} className="fixfast-card">
-            <div className="fixfast-panel__topline">
-              <span>{item.title}</span>
-              <span>{item.status}</span>
-            </div>
-            <p className="fixfast-muted">Worker: {item.worker}</p>
-            <div className="fixfast-stat-row fixfast-muted">
-              <span>{item.amount}</span>
-              <span>{item.submittedAt}</span>
-            </div>
-          </article>
-        ))}
-        {!loading.tasks && biddings.length === 0 ? (
-          <p className="fixfast-empty">No bidding activity yet.</p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function HistoryPanel({ history, chatMessages }) {
-  return (
-    <div className="fixfast-grid fixfast-grid--two">
-      <div className="fixfast-panel">
-        <div className="fixfast-panel__topline">
-          <span>Completed jobs</span>
-          <span>GET /service-tasks/</span>
-        </div>
-        <div className="fixfast-table-wrap">
-          <table className="fixfast-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Service</th>
-                <th>Worker</th>
-                <th>Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.date}</td>
-                  <td>{item.serviceType}</td>
-                  <td>{item.providerName}</td>
-                  <td>{item.cost}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {history.length === 0 ? (
-          <p className="fixfast-empty">No completed jobs returned yet.</p>
-        ) : null}
-      </div>
-
-      <div className="fixfast-panel">
-        <div className="fixfast-panel__topline">
-          <span>Chat history snapshot</span>
-          <span>GET /chat/history</span>
-        </div>
-        <div className="fixfast-list">
-          {chatMessages.slice(-8).map((message) => (
-            <article key={message.id} className="fixfast-card">
-              <div className="fixfast-panel__topline">
-                <span>{message.sender === "user" ? "You" : "AI Dispatch"}</span>
-                <span>{message.timestamp || formatTimestamp()}</span>
-              </div>
-              <p className="fixfast-muted">{message.text}</p>
-            </article>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-
-function CalendarPanel() {
-  return (
-    <div className="fixfast-panel">
-      <div className="fixfast-panel__topline">
-        <span>Scheduling placeholder</span>
-        <span>Frontend stub</span>
-      </div>
-      <div className="fixfast-table-wrap">
-        <table className="fixfast-table">
-          <thead>
-            <tr>
-              <th>Mon</th>
-              <th>Tue</th>
-              <th>Wed</th>
-              <th>Thu</th>
-              <th>Fri</th>
-              <th>Sat</th>
-              <th>Sun</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>1</td>
-              <td>2</td>
-              <td>3</td>
-              <td>4</td>
-              <td>5</td>
-              <td>6</td>
-              <td>7</td>
-            </tr>
-            <tr>
-              <td>8</td>
-              <td>9</td>
-              <td>10</td>
-              <td>11</td>
-              <td>12</td>
-              <td>13</td>
-              <td>14</td>
-            </tr>
-            <tr>
-              <td>15</td>
-              <td>16</td>
-              <td>17</td>
-              <td>18</td>
-              <td>19</td>
-              <td>20</td>
-              <td>21</td>
-            </tr>
-            <tr>
-              <td>22</td>
-              <td>23</td>
-              <td>24</td>
-              <td>25</td>
-              <td>26</td>
-              <td>27</td>
-              <td>28</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p className="fixfast-muted">{CALENDAR_STUB_MESSAGE}</p>
-    </div>
-  );
-}
-
-function CustomerWindowPreview({ title, lines = [], emphasis }) {
-  return (
-    <div className="fixfast-window__summary">
-      <div className="fixfast-window__summary-block">
-        <div className="fixfast-window__summary-title">{title}</div>
-        {emphasis ? (
-          <div className="fixfast-window__summary-line">
-            <strong>{emphasis}</strong>
-          </div>
-        ) : null}
-      </div>
-      {lines.map((line, index) => (
-        <div key={`${title}-${index}`} className="fixfast-window__summary-line">
-          <span>{line.label}</span>
-          <strong>{line.value}</strong>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function CustomerDashboardView({ onNavigate }) {
   const { user, logout } = useAuth();
-  const {
-    location,
-    chatMessages,
-    chatInput,
-    setChatInput,
-    sendChatMessage,
-    activeTags,
-    workersAround,
-    activeTask,
-    biddings,
-    history,
-    loading,
-    errors,
-    workerApplicationStatus,
-    applyForWorkerRole,
-    refreshWorkers,
-  } = useCustomerDashboardData(user);
+  const [currentCategory, setCurrentCategory] = useState("bookings");
+  const [moduleOrder, setModuleOrder] = useState(["ai-chat", "job-description", "my-posts"]);
 
-  const [activeWindow, setActiveWindow] = useState("around");
-  const [transitioningTo, setTransitioningTo] = useState(null);
-  const chatLogRef = useRef(null);
-
-  useEffect(() => {
-    if (chatLogRef.current) {
-      chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
-    }
-  }, [chatMessages, activeWindow]);
-
-  const handleChatSubmit = async (event) => {
-    event.preventDefault();
-    await sendChatMessage();
+  const handleCategoryChange = (categoryKey) => {
+    setCurrentCategory(categoryKey);
+    const newModuleIds = DASHBOARD_CONFIG[categoryKey].modules.map(m => m.id);
+    setModuleOrder(newModuleIds);
   };
 
-  const handleWindowSwap = (nextWindow) => {
-    if (nextWindow === activeWindow) return;
-    setTransitioningTo(nextWindow);
-    window.setTimeout(() => {
-      setActiveWindow(nextWindow);
-      window.setTimeout(() => setTransitioningTo(null), 460);
-    }, 90);
+  const handleModuleSwap = (clickedModuleId) => {
+    const clickedIndex = moduleOrder.indexOf(clickedModuleId);
+    if (clickedIndex === -1) return;
+
+    const updatedOrder = [...moduleOrder];
+    const currentMainStageId = updatedOrder[0];
+
+    updatedOrder[0] = clickedModuleId;
+    updatedOrder[clickedIndex] = currentMainStageId;
+
+    setModuleOrder(updatedOrder);
   };
 
-  const navItems = [ 
-    { id: "booking", label: "New Booking" },
-    { id: "posts", label: "Your Posts" },
-    { id: "biddings", label: "Biddings" },
-    { id: "history", label: "History" },
-    { id: "around", label: "Who is Around" },
-    { id: "calendar", label: "Calendar" },
-  ];
+  const activeModulesList = DASHBOARD_CONFIG[currentCategory].modules;
+  const mainStageModule = activeModulesList.find(m => m.id === moduleOrder[0]) || activeModulesList[0];
 
-  const previewItems = NAV_ITEMS.map((item) => {
-    if (item.id === "around") {
-      return {
-        ...item,
-        icon: PANEL_META[item.id].icon,
-        meta: PANEL_META[item.id].meta,
-        windowClass: "fixfast-window--around",
-        preview: (
-          <CustomerWindowPreview
-            title="Workers Around"
-            emphasis={`${workersAround.length} active`}
-            lines={workersAround.slice(0, 2).map((worker, index) => ({
-              label: `Worker ${worker.id || index + 1}`,
-              value: worker.operating_radius
-                ? `${worker.operating_radius} km`
-                : "Radius N/A",
-            }))}
-          />
-        ),
-      };
-    }
+  const headerNavItems = Object.keys(DASHBOARD_CONFIG).map((key) => ({
+    id: key,
+    label: DASHBOARD_CONFIG[key].label,
+  }));
 
-    if (item.id === "booking") {
-      return {
-        ...item,
-        icon: PANEL_META[item.id].icon,
-        meta: PANEL_META[item.id].meta,
-        windowClass: "fixfast-window--chat",
-        preview: (
-          <CustomerWindowPreview
-            title="Dispatch Chat"
-            emphasis={activeTask?.title || "No active booking"}
-            lines={chatMessages.slice(-2).map((message, index) => ({
-              label:
-                message.sender === "user"
-                  ? `You ${index + 1}`
-                  : `AI ${index + 1}`,
-              value:
-                message.text.slice(0, 36) +
-                (message.text.length > 36 ? "…" : ""),
-            }))}
-          />
-        ),
-      };
-    }
-
-    if (item.id === "biddings") {
-      return {
-        ...item,
-        icon: PANEL_META[item.id].icon,
-        meta: PANEL_META[item.id].meta,
-        windowClass: "fixfast-window--bids",
-        preview: (
-          <CustomerWindowPreview
-            title="Top Quotes"
-            emphasis={
-              biddings.length
-                ? `${biddings.length} open items`
-                : "No quotes yet"
-            }
-            lines={biddings.slice(0, 2).map((bid) => ({
-              label: bid.worker,
-              value: bid.amount,
-            }))}
-          />
-        ),
-      };
-    }
-
-    if (item.id === "history") {
-      return {
-        ...item,
-        icon: PANEL_META[item.id].icon,
-        meta: PANEL_META[item.id].meta,
-        windowClass: "fixfast-window--history",
-        preview: (
-          <CustomerWindowPreview
-            title="Recent History"
-            emphasis={
-              history.length ? `${history.length} completed` : "No history"
-            }
-            lines={history.slice(0, 2).map((entry) => ({
-              label: entry.serviceType.slice(0, 18),
-              value: entry.cost,
-            }))}
-          />
-        ),
-      };
-    }
-
-    return {
-      ...item,
-      icon: PANEL_META[item.id].icon,
-      meta: PANEL_META[item.id].meta,
-      windowClass: "fixfast-window--calendar",
-      preview: (
-        <CustomerWindowPreview
-          title="Calendar"
-          emphasis="Schedule stub"
-          lines={[
-            { label: "Status", value: "Ready" },
-            { label: "Backend", value: "Pending" },
-          ]}
-        />
-      ),
-    };
-  });
-
-  const profileActions = [
-    {
-      label: "Open worker app",
-      onClick: () => onNavigate?.("worker_dashboard"),
-    },
-    {
-      label: "Log out",
-      onClick: async () => {
-        await logout();
-        onNavigate?.("login", { replace: true });
-      },
-    },
-  ];
-
-  const activeMeta = PANEL_META[activeWindow];
-
-  const stageContent = {
-    around: (
-      <AroundPanel
-        location={location}
-        workersAround={workersAround}
-        loading={loading}
-        errors={errors}
-        refreshWorkers={refreshWorkers}
-      />
-    ),
-    booking: (
-      <BookingPanel
-        activeTags={activeTags}
-        activeTask={activeTask}
-        workerApplicationStatus={workerApplicationStatus}
-        applyForWorkerRole={applyForWorkerRole}
-        chatMessages={chatMessages}
-        chatInput={chatInput}
-        setChatInput={setChatInput}
-        handleChatSubmit={handleChatSubmit}
-        loading={loading}
-        errors={errors}
-        chatLogRef={chatLogRef}
-      />
-    ),
-    biddings: (
-      <BiddingsPanel biddings={biddings} loading={loading} errors={errors} />
-    ),
-    history: <HistoryPanel history={history} chatMessages={chatMessages} />,
-    calendar: <CalendarPanel />,
+  const RenderSleepingModule = ({ targetModule }) => {
+    if (!targetModule) return null;
+    return (
+      <div className="fixfast-sleep-card" onClick={() => handleModuleSwap(targetModule.id)}>
+        <div className="fixfast-sleep-card__topbar">
+          <div className="fixfast-sleep-card__traffic"><i></i><i></i><i></i></div>
+          <div className="fixfast-sleep-card__title">{targetModule.title}</div>
+        </div>
+        <div className="fixfast-sleep-card__body">
+          <div className="fixfast-preview-content">
+            <div className="fixfast-preview-pill">
+              <strong>{targetModule.previewText}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
     <div className="fixfast-page">
-      <FixFastNavbar //navigation bar here
-        // brandTitle="Handy Man"
-        // brandEyebrow="FixFast Customer"
-        navItems={navItems}
-        activePanel={activeWindow}
-        onSelectPanel={handleWindowSwap}
+      <FixFastNavbar
+        navItems={headerNavItems}
+        activePanel={currentCategory}
+        onSelectPanel={handleCategoryChange}
         profileSlot={
           <FixFastProfile
             label={user?.firstName || user?.username || "Customer"}
             sublabel={user?.email || "Signed-in user"}
-            actions={profileActions}
+            actions={[{ label: "Log out", onClick: async () => { await logout(); onNavigate?.("login"); } }]}
           />
         }
       />
 
-      <main className="fixfast-shell">
-        <TheaterStage
-          title={activeMeta.title}
-          subtitle={activeMeta.subtitle}
-          activeKey={activeWindow}
-          isTransitioning={Boolean(transitioningTo)}
-        >
-          {stageContent[activeWindow]}
-        </TheaterStage>
+      {/* RENDER SYSTEM CATEGORY DECK SWITCHES */}
+      {currentCategory === "bookings" && (
+        <main className="db1-shell">
+          <section className="db1-stage-zone fixfast-stage">
+            <div className="fixfast-stage__header">
+              <span style={{ fontSize: "0.72rem", color: "var(--fixfast-muted)", fontWeight: 800, textTransform: "uppercase" }}>
+                {mainStageModule.subtitle}
+              </span>
+              <h1>{mainStageModule.title}</h1>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <Dash1board activeModuleId={mainStageModule.id} />
+            </div>
+          </section>
+          <section className="db1-sidebar-zone">
+            <RenderSleepingModule targetModule={activeModulesList.find(m => m.id === moduleOrder[1])} />
+          </section>
+          <section className="db1-deck-zone">
+            {moduleOrder.slice(2).map((modId) => (
+              <RenderSleepingModule key={modId} targetModule={activeModulesList.find(m => m.id === modId)} />
+            ))}
+          </section>
+        </main>
+      )}
 
-        <PreviewDeck
-          items={previewItems}
-          activePanel={activeWindow}
-          onSelectPanel={handleWindowSwap}
-          transitioningTo={transitioningTo}
-        />
-      </main>
+      {currentCategory === "postings" && (
+        <main className="db2-shell">
+          <section className="db2-stage-zone fixfast-stage">
+            <div className="fixfast-stage__header">
+              <span style={{ fontSize: "0.72rem", color: "var(--fixfast-muted)", fontWeight: 800, textTransform: "uppercase" }}>
+                {mainStageModule.subtitle}
+              </span>
+              <h1>{mainStageModule.title}</h1>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <Dash2board activeModuleId={mainStageModule.id} />
+            </div>
+          </section>
+          <section className="db2-sidebar-zone">
+            <RenderSleepingModule targetModule={activeModulesList.find(m => m.id === moduleOrder[1])} />
+          </section>
+          <section className="db2-deck-left-zone">
+            <RenderSleepingModule targetModule={activeModulesList.find(m => m.id === moduleOrder[2])} />
+          </section>
+          <section className="db2-deck-right-zone">
+            <RenderSleepingModule targetModule={activeModulesList.find(m => m.id === moduleOrder[3])} />
+          </section>
+        </main>
+      )}
+
+      {currentCategory === "misc" && (
+        <main className="db3-shell">
+          <section className="db3-stage-zone fixfast-stage">
+            <div className="fixfast-stage__header">
+              <span style={{ fontSize: "0.72rem", color: "var(--fixfast-muted)", fontWeight: 800, textTransform: "uppercase" }}>
+                {mainStageModule.subtitle}
+              </span>
+              <h1>{mainStageModule.title}</h1>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <Dash3board activeModuleId={mainStageModule.id} />
+            </div>
+          </section>
+          <section className="db3-account-zone">
+            <RenderSleepingModule targetModule={activeModulesList.find(m => m.id === moduleOrder[1])} />
+          </section>
+          <section className="db3-history-zone">
+            <RenderSleepingModule targetModule={activeModulesList.find(m => m.id === moduleOrder[2])} />
+          </section>
+          <section className="db3-settings-zone">
+            <RenderSleepingModule targetModule={activeModulesList.find(m => m.id === moduleOrder[3])} />
+          </section>
+        </main>
+      )}
     </div>
   );
 }

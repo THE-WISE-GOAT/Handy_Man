@@ -1,0 +1,17 @@
+/* Dashboard 2 Layout Grid Mapping Matrix (from 1000028219.jpg) */
+.db2-shell {
+    flex: 1;
+    margin: 0px 5px 5px;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(20, 1fr); 
+    grid-template-rows: 67fr 33fr;          
+    gap: 16px;
+    height: calc(100vh - 114px);
+    overflow: hidden;
+}
+
+.db2-stage-zone { grid-column: span 12; grid-row: 1; height: 100%; }
+.db2-sidebar-zone { grid-column: span 8; grid-row: 1; height: 100%; overflow: hidden; }
+.db2-deck-left-zone { grid-column: span 5; grid-row: 2; height: 100%; overflow: hidden; }
+.db2-deck-right-zone { grid-column: span 15; grid-row: 2; height: 100%; overflow: hidden; }
