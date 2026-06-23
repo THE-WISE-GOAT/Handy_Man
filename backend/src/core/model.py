@@ -58,7 +58,39 @@ class UserRole(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
 
+"""
+SQLAlchemy model for a single dispatch chat session.
 
+NOTE: the only thing src/routers/dispatch.py relies on here is the
+`user_id` foreign key column below. The router previously referenced a
+`customer_id` column that doesn't exist on this model — see dispatch.py
+for the fix.
+"""
+
+from typing import List
+
+from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.orm import Mapped, mapped_column
+
+from src.database import Base  # adjust to match your project's declarative base import
+
+
+class BookingChat(Base):
+    __tablename__ = "booking_chats"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    history: Mapped[List[dict]] = mapped_column(JSONB, nullable=False)  # Store the  chat history as a JSON array of message objects
+    is_complete: Mapped[bool] = mapped_column(Boolean, server_default='FALSE', nullable=False)  # Flag to indicate if the chat has concluded and the data is ready for extraction
+    is_job_request: Mapped[bool] = mapped_column(Boolean, server_default='FALSE', nullable=False) # Flag to indicate if the user has confirmed that they want to submit a job request after the chat, this is used to trigger the extraction process in the backend, and it will be set to true when the user clicks the "Submit Job Request" button in the frontend after the chat is complete.
+    is_custom_category: Mapped[bool] = mapped_column(Boolean, server_default='FALSE', nullable=False) # Flag to indicate if the problem category is a custom category that is not in the predefined list, this is used to trigger a different extraction process in the backend that allows for more free-form input from the user, and it will be set to true when the user selects "Other" as the problem category in the frontend and enters a custom category.
+    # extract the data after [COMPLETE] flag is true, then store the extracted data in the service_tasks table, and link it with a foreign key to this booking_chat entry for traceability.
+    problem_category: Mapped[str] = mapped_column(String, nullable=True)
+    service_tags: Mapped[List[str]] = mapped_column(ARRAY(String), nullable=True)
+    problem_description: Mapped[str] = mapped_column(Text, nullable=True)
+    
+    
 class Worker(Base):
     __tablename__ = "workers"
 
@@ -139,3 +171,6 @@ class WorkerSkillsSchema(BaseModel):
     certifications: List[str] = Field(default_factory=list, description="Any professional licenses or certifications mentioned")
     estimated_hourly_rate: Optional[float] = Field(None, description="Their preferred hourly rate if mentioned, otherwise null")
     ai_confidence_summary: str = Field(default="", description="A brief paragraph summarizing their professional background and reliability based on the chat")
+
+
+
