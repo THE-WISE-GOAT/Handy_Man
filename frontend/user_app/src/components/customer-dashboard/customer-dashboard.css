@@ -1,0 +1,110 @@
+/* Core Shared System Tokens */
+:root {
+    --fixfast-bg: #f3f4f6;
+    --fixfast-yellow: #ffd700;
+    --fixfast-black: #000000;
+    --fixfast-white: #ffffff;
+    --fixfast-muted: #5b6068;
+    --fixfast-stage-radius: 24px;
+    --fixfast-border: 2px solid #000000;
+    --fixfast-shadow: 0 12px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Base App Page View Setup */
+.fixfast-page {
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    background: var(--fixfast-bg);
+    color: var(--fixfast-black);
+    font-family: "JetBrains Mono", "SFMono-Regular", "Menlo", monospace;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Standard Panel Layout Structural Box Styling Defaults */
+.fixfast-stage {
+    background: var(--fixfast-white);
+    border: var(--fixfast-border) !important;
+    border-radius: var(--fixfast-stage-radius) !important;
+    box-shadow: var(--fixfast-shadow);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.fixfast-stage__header h1 {
+    margin: 0 0 0.5rem 0 !important;
+    font-size: 2.2rem;
+    text-transform: uppercase;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+}
+
+/* Shared Sleeping Module UI Cards */
+.fixfast-sleep-card {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    background: var(--fixfast-white);
+    border: var(--fixfast-border) !important;
+    border-radius: 20px !important;
+    box-shadow: var(--fixfast-shadow);
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    cursor: pointer;
+}
+
+.fixfast-sleep-card__topbar {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    border-bottom: var(--fixfast-border) !important;
+    background: #fafafa;
+}
+
+.fixfast-sleep-card__traffic {
+    display: inline-flex;
+    gap: 0.3rem;
+}
+
+.fixfast-sleep-card__traffic i {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 999px;
+    border: 1.5px solid #000;
+    background: var(--fixfast-yellow);
+}
+
+.fixfast-sleep-card__title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 800;
+    color: var(--fixfast-muted);
+}
+
+.fixfast-sleep-card__body {
+    padding: 1rem;
+    overflow-y: auto;
+    background: var(--fixfast-white);
+    display: flex;
+    flex-direction: column;
+}
+
+.fixfast-preview-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.fixfast-preview-pill {
+    border: var(--fixfast-border);
+    border-radius: 12px;
+    padding: 0.5rem;
+    background: #fffef8;
+    font-size: 0.8rem;
+}

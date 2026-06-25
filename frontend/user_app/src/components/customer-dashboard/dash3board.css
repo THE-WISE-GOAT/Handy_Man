@@ -1,0 +1,44 @@
+/* Dashboard 3 Layout Grid Mapping Matrix (from image_291727.jpg) */
+.db3-shell {
+    flex: 1;
+    margin: 0px 5px 5px;
+    padding: 0;
+    display: grid;
+    /* Precise 65% and 35% dimension distributions */
+    grid-template-columns: 65fr 35fr; 
+    grid-template-rows: 65fr 35fr;          
+    gap: 16px;
+    height: calc(100vh - 114px);
+    overflow: hidden;
+}
+
+/* Quadrant 1: Calendar Main Stage Area (Top-Left) */
+.db3-stage-zone { 
+    grid-column: 1; 
+    grid-row: 1; 
+    height: 100%; 
+}
+
+/* Quadrant 2: Account Area Slot (Top-Right) */
+.db3-account-zone { 
+    grid-column: 2; 
+    grid-row: 1; 
+    height: 100%; 
+    overflow: hidden; 
+}
+
+/* Quadrant 3: History Area Slot (Bottom-Left) */
+.db3-history-zone { 
+    grid-column: 1; 
+    grid-row: 2; 
+    height: 100%; 
+    overflow: hidden; 
+}
+
+/* Quadrant 4: Settings Area Slot (Bottom-Right) */
+.db3-settings-zone { 
+    grid-column: 2; 
+    grid-row: 2; 
+    height: 100%; 
+    overflow: hidden; 
+}
