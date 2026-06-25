@@ -84,10 +84,9 @@ The architecture follows an decoupled, event-driven Monorepo layout using a stan
 │   │   └── 📁 services/        # Geospatial lookup tables and recommendation algorithms
 │   └── 📄 Dockerfile           # Elastic Container configuration for AWS deployment
 │
-├── 📁 frontend/                # Cross-platform Client Workspaces
-│   ├── 📁 customer_app/        # Job deployment panels and worker list views
-│   ├── 📁 worker_app/          # Interactive map-view workspace with service perimeter tools
-│   └── 📁 shared/              # Common UI design atomic modules and API networking clients
+├── 📁 frontend/                # Cross-platform client workspace
+│   ├── 📁 user_app/            # Unified customer + worker React application
+│   └── 📁 shared/              # Common UI design atomic modules, routes, and API clients
 │
 ├── 📁 database/                # Database configurations
 │   └── 📄 schema.sql           # PostGIS geographical initialization script

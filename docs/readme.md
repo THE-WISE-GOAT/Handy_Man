@@ -2,7 +2,7 @@
 
 ## Overview
 
-Handy_Man is a location-aware gig marketplace that connects local customers with independent service workers through a map-centric experience. The current repository contains a backend API, two React-based frontend applications (customer and worker), shared UI and API utilities, and database models for geospatial worker matching.
+Handy_Man is a location-aware gig marketplace that connects local customers with independent service workers through a map-centric experience. The current repository contains a backend API, a unified React frontend, shared UI and API utilities, and database models for geospatial worker matching.
 
 ## What is implemented
 
@@ -21,14 +21,15 @@ Handy_Man is a location-aware gig marketplace that connects local customers with
   - `backend/src/database/database.py`: database engine, session factory, and dependency generator using environment configuration.
 
 ### Frontend
-- `frontend/customer_app`:
-  - `src/App.jsx`: routes for home, login, signup, and protected customer dashboard.
-  - `src/pages/Customer_Dashboard.jsx`: customer-facing dashboard with tabbed booking UI, chat-style problem capture, AI-style tag extraction, task loading, and a worker role application button.
-- `frontend/worker_app`:
-  - `src/App.jsx`: protected worker route and cross-app navigation to the customer application.
-  - `src/pages/Worker_Dashboard.jsx`: worker dashboard UI with online/offline toggle, live dispatch mockup, schedule queue, and link to a map sandbox.
+- `frontend/user_app`:
+  - `src/App.jsx`: unified route tree for public, customer, and worker experiences.
+  - `src/app/AppLayout.jsx`: shared role-aware layout and centralized navigation shell.
+  - `src/pages/customer/*`: customer route adapters for section redirects and deep-linked views.
+  - `src/pages/worker/*`: worker route adapters for section redirects and deep-linked views.
 - Shared frontend utilities:
   - `frontend/shared/api/client.js`: reusable API client with auth header injection, JSON parsing, and normalized errors.
+  - `frontend/shared/context/AuthContext.jsx`: global auth/session state and role-aware default redirects.
+  - `frontend/shared/config/viewRoutes.js`: single source of truth for customer/worker view slugs, labels, and path helpers.
   - `frontend/shared/components` and route wrappers for protected and anonymous routes.
 
 ### Project documentation and structure
@@ -51,7 +52,7 @@ Handy_Man is a location-aware gig marketplace that connects local customers with
 - Implement the customer service request submission flow and worker matching UI.
 - Add real map integration for worker radius, task pinning, and geospatial visual overlays.
 - Build chat and negotiation UI for customer-worker conversations and bid exchange.
-- Align environment variables across `frontend/customer_app`, `frontend/worker_app`, and shared config.
+- Continue tightening environment variable management across `frontend/user_app` and shared config.
 
 ### Database and deployment
 - Create or migrate PostgreSQL/PostGIS schema for the application models.
@@ -62,7 +63,7 @@ Handy_Man is a location-aware gig marketplace that connects local customers with
 
 ## Summary
 
-The repository currently has a strong scaffolded implementation for user onboarding, worker role activation, service task creation, and customer/worker frontend shells. The next key work is to wire the frontend to the backend, complete worker profile and bidding flows, add chat/notification support, and make the geospatial matching features fully operational.
+The repository currently has a strong scaffolded implementation for user onboarding, worker role activation, service task creation, and a unified customer/worker frontend shell. The next key work is to wire the frontend to the backend more completely, complete worker profile and bidding flows, add chat/notification support, and make the geospatial matching features fully operational.
 
 Discuss the extent to which you believe that you have a motivation problem as a software engineer.
 Given what you have learned in this chapter, design a plan to increase motivation of employees to provide prompt service to customers working in a software development company.
