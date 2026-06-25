@@ -38,35 +38,18 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
 
-  customer_app:
+  user_app:
     build:
-      context: ./frontend2
-      dockerfile: ./customer_app/Dockerfile
+      context: ./frontend
+      dockerfile: ./user_app/Dockerfile
       args:
         VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
-        VITE_WORKER_URL: ${WORKER_APP_URL:-http://localhost:5174}
-        VITE_MAP_STANDALONE_URL: ${MAP_STANDALONE_URL:-http://localhost:5174}
-    container_name: handy_man_customer_app
+    container_name: handy_man_user_app
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "${CUSTOMER_APP_PROD_PORT:-4173}:80"
-
-  worker_app:
-    build:
-      context: ./frontend2
-      dockerfile: ./worker_app/Dockerfile
-      args:
-        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
-        VITE_CUSTOMER_URL: ${CUSTOMER_APP_URL:-http://localhost:5173}
-        VITE_MAP_STANDALONE_URL: ${MAP_STANDALONE_URL:-http://localhost:5174}
-    container_name: handy_man_worker_app
-    restart: unless-stopped
-    depends_on:
-      - backend
-    ports:
-      - "${WORKER_APP_PROD_PORT:-4174}:80"
+      - "${USER_APP_PROD_PORT:-4173}:80"
 
 volumes:
   postgres_data:

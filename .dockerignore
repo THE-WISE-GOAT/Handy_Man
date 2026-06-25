@@ -1,7 +1,7 @@
 .git
 .gitignore
-frontend2/
-frontend2.zip
+frontend/
+frontend.zip
 docs/
 TODO/
 **/__pycache__/
