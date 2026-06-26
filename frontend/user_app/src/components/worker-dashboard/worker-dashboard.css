@@ -1,216 +1,191 @@
-.worker-map-layout {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr);
+/* ==========================================================================
+   GLOBAL CONTAINER TOKENS & CANVAS BASICS
+   ========================================================================== */
+.worker-dashboard-shell {
+    display: grid;
+    gap: 16px;
+    padding: 16px;
+    height: calc(100vh - 90px);
+    box-sizing: border-box;
+    background: #f3f4f6;
 }
 
-.worker-map-stage {
-  min-height: 560px;
+.worker-page {
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    background: #f3f4f6;
+    color: #000000;
+    display: flex;
+    flex-direction: column;
 }
 
-.worker-map-surface {
-  position: relative;
-  min-height: 480px;
-  border: var(--fixfast-border);
-  border-radius: 20px;
-  overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(255, 215, 0, 0.1), rgba(255, 255, 255, 0.92)),
-    #f7f7f7;
+/* ==========================================================================
+   NEO-BRUTALIST CONTAINER FRAMES (STAGE & SLEEP STATES)
+   ========================================================================== */
+.fixfast-stage, .worker-sleep-card {
+    background: #ffffff;
+    border: 2px solid #000000;
+    border-radius: 20px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 8px 0 rgba(0,0,0,0.05);
+    box-sizing: border-box;
+    height: 100%;
+    width: 100%;
 }
 
-.worker-map-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
-  background-size: 56px 56px;
+.worker-sleep-card { 
+    cursor: pointer; 
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.worker-map-overlay {
-  position: absolute;
-  left: 1rem;
-  right: 1rem;
-  bottom: 1rem;
-  padding: 1rem;
-  border: var(--fixfast-border);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(8px);
+.worker-sleep-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 0 rgba(0,0,0,0.08);
 }
 
-.worker-map-flag {
-  position: absolute;
-  display: grid;
-  gap: 0.15rem;
-  justify-items: center;
-  min-width: 100px;
-  padding: 0.5rem 0.65rem;
-  border: var(--fixfast-border);
-  border-radius: 16px;
-  background: #fffdf1;
-  box-shadow: var(--fixfast-shadow);
-  font-family: inherit;
+.worker-card-header { 
+    margin-bottom: 0.75rem; 
 }
 
-.worker-map-flag span {
-  color: var(--fixfast-black);
-  font-size: 1.1rem;
+.worker-card-subtitle { 
+    font-size: 0.65rem; 
+    color: #5b6068; 
+    font-weight: 800; 
+    letter-spacing: 0.05em; 
+    text-transform: uppercase; 
 }
 
-.worker-map-flag small {
-  font-size: 0.68rem;
-  line-height: 1.35;
-  text-align: center;
-  text-transform: uppercase;
+.worker-card-title { 
+    font-size: 1.1rem; 
+    margin: 2px 0 0 0; 
+    font-weight: 800; 
 }
 
-.worker-map-flag--1 { top: 16%; left: 14%; }
-.worker-map-flag--2 { top: 29%; right: 12%; }
-.worker-map-flag--3 { bottom: 24%; left: 30%; }
-.worker-map-flag--4 { bottom: 16%; right: 22%; }
-
-.worker-metric-stack,
-.worker-stats-grid,
-.worker-calendar-grid {
-  display: grid;
-  gap: 1rem;
+.worker-card-body { 
+    flex: 1; 
+    overflow-y: auto; 
 }
 
-.worker-metric-card,
-.worker-plugin-slot,
-.worker-calendar-tile,
-.worker-stat-tile {
-  padding: 1rem;
-  border: var(--fixfast-border);
-  border-radius: 18px;
-  background: #fffef8;
+.worker-preview-pill { 
+    background: #fffef0; 
+    border: 2px solid #000; 
+    padding: 0.5rem; 
+    border-radius: 10px; 
+    font-size: 0.8rem; 
 }
 
-.worker-metric-card strong,
-.worker-plugin-slot strong,
-.worker-calendar-tile strong,
-.worker-stat-tile strong {
-  display: block;
-  margin-bottom: 0.35rem;
+/* ==========================================================================
+   BLUEPRINT LAYOUT GENERATION - PERCENTAGE TRACKS (image_e6d1e3.jpg)
+   ========================================================================== */
+
+/* 1. Workspace Layout: Map(65%x70%), Details(65%x30%), Biddings(35%x100%) */
+.wk-layout-workspace {
+    grid-template-columns: 65fr 35fr;
+    grid-template-rows: 70fr 30fr;
 }
+.wk1-area-map     { grid-column: 1; grid-row: 1; }
+.wk1-area-details { grid-column: 1; grid-row: 2; }
+.wk1-area-bids    { grid-column: 2; grid-row: 1 / span 2; }
 
-.worker-bid-card {
-  gap: 0.85rem;
+/* 2. Scheduled Layout: Map(60%x63%), Job(40%[37]x63%), Query(43%x37%), Calendar(57%x37%) */
+.wk-layout-scheduled {
+    grid-template-columns: 60fr 40fr;
+    grid-template-rows: 63fr 37fr;
 }
+.wk2-area-map { grid-column: 1; grid-row: 1; }
+.wk2-area-job { grid-column: 2; grid-row: 1; }
+.wk2-area-query, .wk2-area-calendar { grid-row: 2; }
+.wk2-area-query { grid-column: 1; max-width: 90%; }
+.wk2-area-calendar { grid-column: 2; width: 110%; margin-left: -10%; }
 
-.worker-bid-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+/* 3. Me Layout: Interview(67%x70%), Config(67%x30%), Profile(33%x75%), Tags(33%x25%) */
+.wk-layout-me {
+    grid-template-columns: 67fr 33fr;
+    grid-template-rows: 70fr 30fr;
 }
+.wk3-area-interview { grid-column: 1; grid-row: 1; }
+.wk3-area-config    { grid-column: 1; grid-row: 2; }
+.wk3-area-profile   { grid-column: 2; grid-row: 1; height: 105%; }
+.wk3-area-tags      { grid-column: 2; grid-row: 2; top: 5%; position: relative; }
 
-.worker-status-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.2rem;
-  padding: 0.3rem 0.8rem;
-  border: var(--fixfast-border);
-  border-radius: 999px;
-  background: #efefef;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.worker-status-pill--under-review { background: #fff7bf; }
-.worker-status-pill--shortlisted { background: #e7ffd1; }
-.worker-status-pill--rejected { background: #ffe1dc; }
-.worker-status-pill--completed { background: #dfffe2; }
-.worker-status-pill--awaiting-endpoint { background: #f1f1f1; }
-
-.worker-progress-track {
-  height: 10px;
-  border: var(--fixfast-border);
-  border-radius: 999px;
-  overflow: hidden;
-  background: #f1f1f1;
-}
-
-.worker-progress-track__fill {
-  display: block;
-  height: 100%;
-  background: var(--fixfast-yellow);
-}
-
-.worker-calendar-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.worker-calendar-tile {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 1rem;
-  align-items: start;
-}
-
-.worker-calendar-tile__date {
-  min-width: 72px;
-  display: grid;
-  gap: 0.15rem;
-  justify-items: center;
-  padding: 0.65rem;
-  border: var(--fixfast-border);
-  border-radius: 16px;
-  background: var(--fixfast-yellow);
-}
-
-.worker-calendar-tile__date span {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.worker-calendar-tile__date strong {
-  margin: 0;
-  font-size: 1.4rem;
-}
-
-.worker-stats-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.worker-stat-tile {
-  min-height: 132px;
-  display: grid;
-  align-content: end;
-  gap: 0.35rem;
-}
-
-.worker-stat-tile strong {
-  font-size: 2rem;
-  line-height: 1;
-}
-
-.worker-notice {
-  padding: 0.85rem 1rem;
-  border: var(--fixfast-border);
-  border-radius: 16px;
-  background: #fff7bf;
-}
-
-@media (max-width: 1024px) {
-  .worker-map-layout,
-  .worker-calendar-grid,
-  .worker-stats-grid {
+/* 4. Mics Layout: Empty Slate Slot */
+.wk-layout-mics {
     grid-template-columns: 1fr;
-  }
+    grid-template-rows: 1fr;
+}
+.wk4-area-empty { 
+    grid-column: 1; 
+    grid-row: 1; 
+    background: #ffffff; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+}
+.worker-empty-slate { 
+    font-weight: 900; 
+    font-size: 2rem; 
+    color: #bbb; 
+}
 
-  .worker-map-stage {
-    min-height: auto;
-  }
+/* ==========================================================================
+   FILE SPECIFIC CONTENT MODULE CSS SCOPES
+   ========================================================================== */
 
-  .worker-map-surface {
-    min-height: 360px;
-  }
+/* Dash 1: Workspace Content Scopes */
+.dash1-worker-root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.dash1-worker-root .wk-module-frame {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.dash1-worker-root .wk-map-canvas {
+    background: #e5e7eb;
+    border-radius: 12px;
+    position: relative;
+    justify-content: center;
+    align-items: center;
+    min-height: 150px;
+}
+.dash1-worker-root .mock-gps-feed {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 0.85rem;
+}
+.dash1-worker-root .ping-beacon {
+    width: 10px;
+    height: 10px;
+    background: #00ff00;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #00ff00;
+}
+
+/* Dash 2: Scheduled Content Scopes */
+.dash2-worker-root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.dash2-worker-root .wk-module-frame {
+    flex: 1;
+    padding: 0.25rem 0;
+}
+
+/* Dash 3: Me/Profile Content Scopes */
+.dash3-worker-root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.dash3-worker-root .wk-module-frame {
+    flex: 1;
 }
