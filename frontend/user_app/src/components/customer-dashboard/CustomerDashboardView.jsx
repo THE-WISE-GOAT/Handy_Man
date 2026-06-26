@@ -1,132 +1,95 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Dash1board from "./dash1board";
-import Dash2board from "./dash2board";
-import Dash3board from "./dash3board";
-import {
-  CUSTOMER_VIEWS,
-  buildCustomerViewPath,
-  getCustomerViewForModule,
-} from "@shared/config/viewRoutes";
+import Dash1board from "./dash1board"; 
+import Dash2board from "./dash2board"; 
+import Dash3board from "./dash3board"; 
+import { CUSTOMER_VIEWS, buildCustomerViewPath, getCustomerViewForModule } from "@shared/config/viewRoutes";
 
-import "./customer-dashboard.css";
-import "./dash1board.css";
-import "./dash2board.css";
-import "./dash3board.css";
+import "./customer-dashboard.css"; 
+import "./dash1board.css";         
+import "./dash2board.css";         
+import "./dash3board.css"; 
 
 const CATEGORY_LAYOUTS = {
-  bookings: {
-    modules: [
-      { id: "ai-chat", fallbackTitle: "AI Chat Terminal" },
-      { id: "job-description", fallbackTitle: "Job Description Workspace" },
-      { id: "my-posts", fallbackTitle: "Your Active Posts" },
-    ],
-  },
-  postings: {
-    modules: [
-      { id: "biddings", fallbackTitle: "Active Biddings Engine" },
-      { id: "map", fallbackTitle: "Geospatial Live Map" },
-      { id: "active-post-v2", fallbackTitle: "Active Posts Dashboard" },
-      { id: "ratings-review", fallbackTitle: "Ratings & Review Logs" },
-    ],
-  },
-  misc: {
-    modules: [
-      { id: "calendar", fallbackTitle: "System Calendar" },
-      { id: "account", fallbackTitle: "Account Profiles" },
-      { id: "history", fallbackTitle: "Historical Records Logs" },
-      { id: "settings", fallbackTitle: "System Settings" },
-    ],
-  },
+  bookings: { modules: [{ id: "ai-chat" }, { id: "job-description" }, { id: "my-posts" }] },
+  postings: { modules: [{ id: "biddings" }, { id: "map" }, { id: "active-post-v2" }, { id: "ratings-review" }] },
+  more: { modules: [{ id: "calendar" }, { id: "account" }, { id: "history" }, { id: "settings" }] }
 };
 
-function buildModuleOrder(categoryKey, preferredModuleId = null) {
-  const modules = CATEGORY_LAYOUTS[categoryKey]?.modules || [];
-  const defaultIds = modules.map((module) => module.id);
-
-  if (!preferredModuleId || !defaultIds.includes(preferredModuleId)) {
-    return defaultIds;
-  }
-
-  return [
-    preferredModuleId,
-    ...defaultIds.filter((moduleId) => moduleId !== preferredModuleId),
-  ];
-}
-
-function getRenderableModules(categoryKey) {
-  const modules = CATEGORY_LAYOUTS[categoryKey]?.modules || [];
-  return modules.map((module) => {
-    const linkedView = getCustomerViewForModule(categoryKey, module.id);
-    return {
-      ...module,
-      title: linkedView?.label || module.fallbackTitle,
-      subtitle: linkedView?.subtitle || "Workspace panel",
-      previewText: linkedView?.previewText || module.fallbackTitle,
-      linkedView,
-    };
-  });
-}
-
-function StageHeader({ view }) {
-  return (
-    <div className="fixfast-stage__header">
-      <span
-        style={{
-          fontSize: "0.72rem",
-          color: "var(--fixfast-muted)",
-          fontWeight: 800,
-          textTransform: "uppercase",
-        }}
-      >
-        {view.subtitle}
-      </span>
-      <h1>{view.label}</h1>
-    </div>
-  );
-}
-
-export default function CustomerDashboardView({
-  embedded = false,
-  activeView = CUSTOMER_VIEWS.ACTIVE_POSTS,
-  onViewSelect,
-}) {
+export default function CustomerDashboardView({ embedded = false, activeView = CUSTOMER_VIEWS.AI_CHAT, onViewSelect }) {
   const navigate = useNavigate();
   const currentCategory = activeView.categoryKey;
-  const moduleOrder = buildModuleOrder(currentCategory, activeView.moduleId);
-  const activeModulesList = getRenderableModules(currentCategory);
-  const mainStageModule =
-    activeModulesList.find((module) => module.id === moduleOrder[0]) ||
-    activeModulesList[0];
 
-  const handleModuleSelect = (moduleId) => {
-    const nextView = getCustomerViewForModule(currentCategory, moduleId);
-    if (!nextView) {
-      return;
+  const [moduleOrder, setModuleOrder] = useState([]);
+  const [lastCategory, setLastCategory] = useState("");
+
+  // Sync state module order when category changes or external route adjustments occur
+  useEffect(() => {
+    const defaultIds = (CATEGORY_LAYOUTS[currentCategory]?.modules || []).map(m => m.id);
+    const activeId = activeView.moduleId;
+
+    if (currentCategory !== lastCategory) {
+      let initialOrder = [...defaultIds];
+      if (activeId && initialOrder.includes(activeId)) {
+        const idx = initialOrder.indexOf(activeId);
+        if (idx > 0) {
+          initialOrder[idx] = initialOrder[0];
+          initialOrder[0] = activeId;
+        }
+      }
+      setModuleOrder(initialOrder);
+      setLastCategory(currentCategory);
+    } else if (activeId && moduleOrder.length > 0 && moduleOrder[0] !== activeId) {
+      const idx = moduleOrder.indexOf(activeId);
+      if (idx !== -1) {
+        const updated = [...moduleOrder];
+        updated[idx] = updated[0];
+        updated[0] = activeId;
+        setModuleOrder(updated);
+      }
     }
+  }, [currentCategory, activeView.moduleId, lastCategory, moduleOrder]);
 
+  const handleModuleSwap = (clickedModuleId) => {
+    const clickedIndex = moduleOrder.indexOf(clickedModuleId);
+    if (clickedIndex === -1) return;
+
+    const updatedOrder = [...moduleOrder];
+    const currentMainStageId = updatedOrder[0];
+
+    // Core Exchange: Swap item directly into Slot 0, sending old main stage back to its visual slot
+    updatedOrder[0] = clickedModuleId;
+    updatedOrder[clickedIndex] = currentMainStageId;
+    setModuleOrder(updatedOrder);
+
+    // Sync route mapping state change
+    const nextView = getCustomerViewForModule(currentCategory, clickedModuleId);
+    if (!nextView) return;
     if (onViewSelect) {
       onViewSelect(nextView);
-      return;
+    } else {
+      navigate(buildCustomerViewPath(nextView));
     }
-
-    navigate(buildCustomerViewPath(nextView));
   };
 
-  const RenderSleepingModule = ({ targetModule }) => {
-    if (!targetModule) return null;
+  const getModuleData = (moduleId) => {
+    const linkedView = getCustomerViewForModule(currentCategory, moduleId);
+    return {
+      id: moduleId,
+      title: linkedView?.label || "Workspace Panel",
+      subtitle: linkedView?.subtitle || "",
+      previewText: linkedView?.previewText || "",
+    };
+  };
+
+  const RenderSleepingModule = ({ targetModuleId }) => {
+    if (!targetModuleId) return null;
+    const targetModule = getModuleData(targetModuleId);
 
     return (
-      <div
-        className="fixfast-sleep-card"
-        onClick={() => handleModuleSelect(targetModule.id)}
-      >
+      <div className="fixfast-sleep-card" onClick={() => handleModuleSwap(targetModule.id)}>
         <div className="fixfast-sleep-card__topbar">
-          <div className="fixfast-sleep-card__traffic">
-            <i></i>
-            <i></i>
-            <i></i>
-          </div>
+          <div className="fixfast-sleep-card__traffic"><i></i><i></i><i></i></div>
           <div className="fixfast-sleep-card__title">{targetModule.title}</div>
         </div>
         <div className="fixfast-sleep-card__body">
@@ -140,31 +103,31 @@ export default function CustomerDashboardView({
     );
   };
 
+  if (moduleOrder.length === 0) return null;
+
+  const mainStageModule = getModuleData(moduleOrder[0]);
+
   const content = (
     <>
       {currentCategory === "bookings" && (
         <main className="db1-shell">
           <section className="db1-stage-zone fixfast-stage">
-            <StageHeader view={activeView} />
+            <div className="fixfast-stage__header">
+              <span style={{ fontSize: "0.72rem", color: "var(--fixfast-muted)", fontWeight: 800, textTransform: "uppercase" }}>
+                {mainStageModule.subtitle}
+              </span>
+              <h1>{mainStageModule.title}</h1>
+            </div>
             <div style={{ flex: 1, overflowY: "auto" }}>
               <Dash1board activeModuleId={mainStageModule.id} />
             </div>
           </section>
           <section className="db1-sidebar-zone">
-            <RenderSleepingModule
-              targetModule={activeModulesList.find(
-                (module) => module.id === moduleOrder[1],
-              )}
-            />
+            <RenderSleepingModule targetModuleId={moduleOrder[1]} />
           </section>
           <section className="db1-deck-zone">
-            {moduleOrder.slice(2).map((moduleId) => (
-              <RenderSleepingModule
-                key={moduleId}
-                targetModule={activeModulesList.find(
-                  (module) => module.id === moduleId,
-                )}
-              />
+            {moduleOrder.slice(2).map((modId) => (
+              <RenderSleepingModule key={modId} targetModuleId={modId} />
             ))}
           </section>
         </main>
@@ -173,72 +136,54 @@ export default function CustomerDashboardView({
       {currentCategory === "postings" && (
         <main className="db2-shell">
           <section className="db2-stage-zone fixfast-stage">
-            <StageHeader view={activeView} />
+            <div className="fixfast-stage__header">
+              <span style={{ fontSize: "0.72rem", color: "var(--fixfast-muted)", fontWeight: 800, textTransform: "uppercase" }}>
+                {mainStageModule.subtitle}
+              </span>
+              <h1>{mainStageModule.title}</h1>
+            </div>
             <div style={{ flex: 1, overflowY: "auto" }}>
               <Dash2board activeModuleId={mainStageModule.id} />
             </div>
           </section>
           <section className="db2-sidebar-zone">
-            <RenderSleepingModule
-              targetModule={activeModulesList.find(
-                (module) => module.id === moduleOrder[1],
-              )}
-            />
+            <RenderSleepingModule targetModuleId={moduleOrder[1]} />
           </section>
           <section className="db2-deck-left-zone">
-            <RenderSleepingModule
-              targetModule={activeModulesList.find(
-                (module) => module.id === moduleOrder[2],
-              )}
-            />
+            <RenderSleepingModule targetModuleId={moduleOrder[2]} />
           </section>
           <section className="db2-deck-right-zone">
-            <RenderSleepingModule
-              targetModule={activeModulesList.find(
-                (module) => module.id === moduleOrder[3],
-              )}
-            />
+            <RenderSleepingModule targetModuleId={moduleOrder[3]} />
           </section>
         </main>
       )}
 
-      {currentCategory === "misc" && (
+      {currentCategory === "more" && (
         <main className="db3-shell">
           <section className="db3-stage-zone fixfast-stage">
-            <StageHeader view={activeView} />
+            <div className="fixfast-stage__header">
+              <span style={{ fontSize: "0.72rem", color: "var(--fixfast-muted)", fontWeight: 800, textTransform: "uppercase" }}>
+                {mainStageModule.subtitle}
+              </span>
+              <h1>{mainStageModule.title}</h1>
+            </div>
             <div style={{ flex: 1, overflowY: "auto" }}>
               <Dash3board activeModuleId={mainStageModule.id} />
             </div>
           </section>
           <section className="db3-account-zone">
-            <RenderSleepingModule
-              targetModule={activeModulesList.find(
-                (module) => module.id === moduleOrder[1],
-              )}
-            />
+            <RenderSleepingModule targetModuleId={moduleOrder[1]} />
           </section>
           <section className="db3-history-zone">
-            <RenderSleepingModule
-              targetModule={activeModulesList.find(
-                (module) => module.id === moduleOrder[2],
-              )}
-            />
+            <RenderSleepingModule targetModuleId={moduleOrder[2]} />
           </section>
           <section className="db3-settings-zone">
-            <RenderSleepingModule
-              targetModule={activeModulesList.find(
-                (module) => module.id === moduleOrder[3],
-              )}
-            />
+            <RenderSleepingModule targetModuleId={moduleOrder[3]} />
           </section>
         </main>
       )}
     </>
   );
 
-  if (embedded) {
-    return content;
-  }
-
-  return <div className="fixfast-page">{content}</div>;
+  return embedded ? content : <div className="fixfast-page">{content}</div>;
 }

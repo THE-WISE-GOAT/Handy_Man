@@ -12,7 +12,8 @@ export default function WorkerViewRoute() {
   const { section, viewSlug } = useParams();
   const activeView = getWorkerViewBySlug(viewSlug || "");
 
-  if (section !== "dashboard" || !activeView) {
+  // FIX: Validate against the actual dynamic section name from viewRoutes.js
+  if (!activeView || activeView.section !== section?.toLowerCase()) {
     return <Navigate to={getDefaultWorkerPath()} replace />;
   }
 
