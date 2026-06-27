@@ -1,0 +1,126 @@
+/* ==========================================================================
+   1. PHYSICAL SCREEN CANVAS GRID STRUCTURE
+   ========================================================================== */
+.worker-workspace-wireframe-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-rows: 1fr auto;
+  gap: 16px;
+  width: 100%;
+  height: calc(100vh - 72px);
+  padding: 16px;
+  box-sizing: border-box;
+  background-color: #e5e5e5;
+}
+
+/* Slot Placements */
+.worker-slot-main {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+}
+
+.worker-slot-sidebar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+}
+
+.worker-slot-bottom {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+}
+
+/* ==========================================================================
+   2. CARD STRUCTURES
+   ========================================================================== */
+.worker-section-card {
+  background-color: #ffffff;
+  border: 2px solid #1a1a1a;
+  border-radius: 24px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  box-sizing: border-box;
+  transition: transform 0.15s ease;
+}
+
+.worker-clickable-node {
+  cursor: pointer;
+}
+
+.worker-clickable-node:hover {
+  transform: scale(0.995);
+  background-color: #fafafa;
+}
+
+.worker-card-header {
+  font-family: 'Courier New', monospace;
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: #888888;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.view-main h2 {
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  font-size: 1.6rem;
+  margin: 0 0 16px 0;
+  color: #1a1a1a;
+}
+
+.worker-panel-desc {
+  font-size: 0.95rem;
+  color: #555555;
+}
+
+/* ==========================================================================
+   3. INTERNAL SPECIFIC MOCK COMPONENT ELEMENTS
+   ========================================================================== */
+.worker-sleeping-box {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.worker-pill-outline {
+  display: inline-block;
+  padding: 10px 18px;
+  border: 2px solid #1a1a1a;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  background-color: #fffbeb; /* Soft tint for preview highlights */
+}
+
+/* Map Canvas Box Container */
+.worker-map-canvas-mock {
+  flex: 1;
+  background-color: #f1f3f5;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 200px;
+}
+
+.live-status-dot {
+  width: 12px;
+  height: 12px;
+  background-color: #00ff66;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #00ff66;
+}
+
+.live-status-text {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #1a1a1a;
+}
