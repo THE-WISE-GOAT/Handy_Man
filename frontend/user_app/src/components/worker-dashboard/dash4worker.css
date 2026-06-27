@@ -1,0 +1,36 @@
+/* ==========================================================================
+   1. SCREEN SHAPE CANVAS GRID (MICS COMPASS)
+   ========================================================================== */
+.worker-mics-canvas-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr;
+  gap: 16px;
+  width: 100%;
+  height: calc(100vh - 72px);
+  padding: 16px;
+  box-sizing: border-box;
+  background-color: #e5e5e5;
+}
+
+.grid-area-main {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+}
+
+/* Centering Layout Utilities */
+.unified-center-content {
+  justify-content: flex-start;
+  align-items: center;
+  text-align: center;
+}
+
+.mics-massive-fallback-text {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: #cccccc;
+  font-family: Arial, sans-serif;
+  letter-spacing: 0.1em;
+  margin-top: 60px;
+}

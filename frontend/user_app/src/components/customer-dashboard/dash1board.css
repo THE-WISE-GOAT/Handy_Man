@@ -1,24 +1,193 @@
-/* Dashboard 1 Custom Layout Structure */
-.db1-shell {
-    flex: 1;
-    margin: 0px 5px 5px; 
-    padding: 0;
-    display: grid;
-    grid-template-columns: 3.2fr 1fr; 
-    grid-template-rows: 2.2fr 1fr;
-    grid-template-areas: 
-        "stage sidebar"
-        "deck sidebar";
-    gap: 16px;
-    overflow: hidden;
-    height: calc(100vh - 114px);
+/* ==========================================================================
+   1. CORE DASHBOARD WIREFRAME GRID
+   ========================================================================== */
+.dashboard-layout-wireframe-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px; /* Left content area + fixed sidebar width */
+  grid-template-rows: 1fr auto;     /* Main area scales + bottom row tightly hugs content */
+  gap: 16px;                        /* Consistent structural spacing gap */
+  width: 100%;
+  height: calc(100vh - 120px);      /* Adapts dynamically below the top navbar */
+  padding: 16px;
+  box-sizing: border-box;
+  background-color: #e5e5e5;        /* Light grey background canvas */
 }
 
-.db1-stage-zone { grid-area: stage; height: 100%; }
-.db1-sidebar-zone { grid-area: sidebar; height: 100%; overflow: hidden; }
-.db1-deck-zone { 
-    grid-area: deck; 
-    display: grid;
-    gap: 16px;
-    overflow: hidden;
+/* Structural Placement Mappings */
+.wireframe-slot-main {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+}
+
+.wireframe-slot-bottom {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+}
+
+.wireframe-slot-sidebar {
+  grid-column: 2;
+  grid-row: 1 / span 2;             /* Sidebar stretches completely top-to-bottom */
+  display: flex;
+}
+
+/* ==========================================================================
+   2. GENERIC CARD DECORATIONS (Wireframe Style)
+   ========================================================================== */
+.section-card {
+  background-color: #ffffff;
+  border: 2px solid #1a1a1a;        /* Solid dark border outlines */
+  border-radius: 24px;              /* High curvature profile matching design frames */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  box-sizing: border-box;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Sleeping Modules Click Node Interaction States */
+.clickable-swap-node {
+  cursor: pointer;
+}
+
+.clickable-swap-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* ==========================================================================
+   3. LOCATION-SPECIFIC STYLING INJECTIONS
+   ========================================================================== */
+
+/* SLOT A: MAIN STAGE VIEW (Top-Left Active) */
+.slot-view-main {
+  height: 100%;
+}
+
+.slot-view-main h2 {
+  font-family: 'Courier New', monospace; /* Monospace typography matching system look */
+  font-weight: 900;
+  font-size: 2rem;
+  margin: 0 0 16px 0;
+  letter-spacing: -0.05em;
+  color: #000000;
+}
+
+.subtitle-flag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #888888;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+/* SLOT B: SIDEBAR PANEL VIEW (Right Column Sleeping) */
+.slot-view-sidebar {
+  height: 100%;
+  background-color: #ffffff;
+}
+
+/* SLOT C: BOTTOM STRIP VIEW (Horizontal Sleeping) */
+.slot-view-bottom {
+  min-height: 100px;
+  padding: 16px 24px;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   4. INTERNAL MODULE INNER COMPONENTS
+   ========================================================================== */
+
+/* Uniform Card Tiny Header Indicator */
+.module-title-bar {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #888888;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+}
+
+/* Pill Badges (Custom layout labels) */
+.pill-badge, .pill-badge-highlight {
+  display: inline-block;
+  padding: 10px 16px;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.pill-badge {
+  background-color: #ffffff;
+  color: #1a1a1a;
+}
+
+.pill-badge-highlight {
+  background-color: #fcfcfc;
+  color: #000000;
+}
+
+/* Micro Summaries & Text Snippets Inside Preview Modes */
+.micro-summary, .micro-summary-text {
+  font-size: 0.85rem;
+  color: #555555;
+  margin: 12px 0 0 4px;
+}
+
+/* Job Description Editor Textarea Control */
+.workspace-textarea-box {
+  flex: 1;
+  width: 100%;
+  min-height: 200px;
+  border: none;
+  resize: none;
+  font-family: inherit;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #1a1a1a;
+  outline: none;
+  margin-top: 12px;
+}
+
+/* AI Chat Logs Terminal Container */
+.chat-logs-display {
+  flex: 1;
+  overflow-y: auto;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 16px;
+  padding: 16px;
+  background-color: #fafafa;
+  margin-bottom: 16px;
+  max-height: 350px;
+}
+
+.chat-entry-form {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-entry-form input {
+  flex: 1;
+  width: 100%;
+  padding: 14px 20px;
+  border: 2px solid #1a1a1a;
+  border-radius: 16px;
+  font-size: 1rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.chat-send-btn {
+  padding: 0 24px;
+  background-color: #1a1a1a;
+  color: #ffffff;
+  border: 2px solid #1a1a1a;
+  border-radius: 16px;
+  font-weight: bold;
+  cursor: pointer;
 }

@@ -1,49 +1,41 @@
 /* ==========================================================================
-   1. MULTI-PANE STRUCTURAL LAYOUT CANVAS (MISC HUB)
+   1. PHYSICAL SCREEN CANVAS GRID STRUCTURE
    ========================================================================== */
-.misc-dashboard-canvas-grid {
+.worker-workspace-wireframe-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
   grid-template-rows: 1fr auto;
   gap: 16px;
   width: 100%;
-  height: calc(100vh - 120px);
+  height: calc(100vh - 72px);
   padding: 16px;
   box-sizing: border-box;
   background-color: #e5e5e5;
 }
 
-/* Explicit Area Placements */
-.grid-area-main {
+/* Slot Placements */
+.worker-slot-main {
   grid-column: 1;
   grid-row: 1;
   display: flex;
 }
 
-.grid-area-sidebar {
+.worker-slot-sidebar {
   grid-column: 2;
   grid-row: 1 / span 2;
   display: flex;
 }
 
-.grid-area-bottom-left {
+.worker-slot-bottom {
   grid-column: 1;
   grid-row: 2;
   display: flex;
-  margin-right: 50%;
-}
-
-.grid-area-bottom-right {
-  grid-column: 1;
-  grid-row: 2;
-  display: flex;
-  margin-left: 50%;
 }
 
 /* ==========================================================================
-   2. CARD CORES
+   2. CARD STRUCTURES
    ========================================================================== */
-.section-card {
+.worker-section-card {
   background-color: #ffffff;
   border: 2px solid #1a1a1a;
   border-radius: 24px;
@@ -55,59 +47,80 @@
   transition: transform 0.15s ease;
 }
 
-.clickable-swap-node {
+.worker-clickable-node {
   cursor: pointer;
 }
 
-.clickable-swap-node:hover {
+.worker-clickable-node:hover {
   transform: scale(0.995);
   background-color: #fafafa;
 }
 
-.misc-card-header {
+.worker-card-header {
   font-family: 'Courier New', monospace;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: bold;
   color: #888888;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.view-main h2 {
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  font-size: 1.6rem;
+  margin: 0 0 16px 0;
+  color: #1a1a1a;
+}
+
+.worker-panel-desc {
+  font-size: 0.95rem;
+  color: #555555;
 }
 
 /* ==========================================================================
-   3. INNER ELEMENT PRESENTATION ELEMENTS
+   3. INTERNAL SPECIFIC MOCK COMPONENT ELEMENTS
    ========================================================================== */
-.view-main h2 {
-  font-family: 'Courier New', monospace;
-  font-weight: 900;
-  font-size: 1.8rem;
-  margin: 0 0 8px 0;
-}
-
-.description-text {
-  font-size: 0.95rem;
-  color: #333333;
-  margin-bottom: 16px;
-}
-
-.sleeping-preview-box {
+.worker-sleeping-box {
   display: flex;
   align-items: center;
   height: 100%;
 }
 
-.pill-outline {
+.worker-pill-outline {
   display: inline-block;
   padding: 10px 18px;
   border: 2px solid #1a1a1a;
   border-radius: 14px;
   font-size: 0.85rem;
   font-weight: bold;
-  background-color: #ffffff;
+  background-color: #fffbeb; /* Soft tint for preview highlights */
 }
 
-.calendar-dummy-canvas {
-  margin-top: 16px;
-  padding: 20px;
-  border: 2px dashed #1a1a1a;
+/* Map Canvas Box Container */
+.worker-map-canvas-mock {
+  flex: 1;
+  background-color: #f1f3f5;
   border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 200px;
+}
+
+.live-status-dot {
+  width: 12px;
+  height: 12px;
+  background-color: #00ff66;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #00ff66;
+}
+
+.live-status-text {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #1a1a1a;
 }

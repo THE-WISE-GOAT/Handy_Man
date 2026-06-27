@@ -37,7 +37,7 @@ export default function AppLayout({ role = "customer" }) {
       ? [
           {
             label: "Switch to customer",
-            onClick: () => navigate(getDefaultCustomerPath("dashboard")),
+            onClick: () => navigate(getDefaultCustomerPath("bookings")),
           },
         ]
       : []),
