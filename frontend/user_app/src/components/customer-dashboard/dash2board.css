@@ -1,17 +1,111 @@
-/* Dashboard 2 Layout Grid Mapping Matrix (from 1000028219.jpg) */
-.db2-shell {
-    flex: 1;
-    margin: 0px 5px 5px;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(20, 1fr); 
-    grid-template-rows: 67fr 33fr;          
-    gap: 16px;
-    height: calc(100vh - 114px);
-    overflow: hidden;
+/* ==========================================================================
+   1. 4-PANE STRUCTURAL LAYOUT CANVAS
+   ========================================================================== */
+.postings-dashboard-canvas-grid {
+  display: grid;
+  /* Columns: Main Section stretches, Sidebar is a fixed width column */
+  grid-template-columns: minmax(0, 1fr) 380px;
+  /* Rows: Top Main/Sidebar stretch, Bottom row automatically holds cards */
+  grid-template-rows: 1fr auto;
+  gap: 16px;
+  width: 100%;
+  height: calc(100vh - 120px);
+  padding: 16px;
+  box-sizing: border-box;
+  background-color: #e5e5e5;
 }
 
-.db2-stage-zone { grid-column: span 12; grid-row: 1; height: 100%; }
-.db2-sidebar-zone { grid-column: span 8; grid-row: 1; height: 100%; overflow: hidden; }
-.db2-deck-left-zone { grid-column: span 5; grid-row: 2; height: 100%; overflow: hidden; }
-.db2-deck-right-zone { grid-column: span 15; grid-row: 2; height: 100%; overflow: hidden; }
+/* Explicit Area Placements */
+.grid-area-main {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+}
+
+.grid-area-sidebar {
+  grid-column: 2;
+  grid-row: 1 / span 2; /* Spans top to bottom along the right side column */
+  display: flex;
+}
+
+/* Bottom elements sit side-by-side inside the bottom row space */
+.grid-area-bottom-left {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  margin-right: 50%; /* Cuts width cleanly in half to give row parity */
+}
+
+.grid-area-bottom-right {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  margin-left: 50%; /* Offsets cleanly to form the right-side box perfectly */
+}
+
+/* ==========================================================================
+   2. CARD SHELL DESIGNS
+   ========================================================================== */
+.postings-card {
+  background-color: #ffffff;
+  border: 2px solid #1a1a1a;
+  border-radius: 24px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  box-sizing: border-box;
+  transition: transform 0.15s ease;
+}
+
+.clickable-swap-target {
+  cursor: pointer;
+}
+
+.clickable-swap-target:hover {
+  transform: scale(0.995);
+  background-color: #fafafa;
+}
+
+/* Header Text Labels */
+.postings-card-header {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #888888;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   3. INTERNAL PRESENTATION FIELDS
+   ========================================================================== */
+.active-view-panel h2 {
+  font-family: 'Courier New', monospace;
+  font-weight: 900;
+  font-size: 1.8rem;
+  margin: 0 0 8px 0;
+}
+
+.description-text {
+  font-size: 0.95rem;
+  color: #333333;
+  margin-bottom: 16px;
+}
+
+/* Horizontal pill containers for sleeping cards */
+.sleeping-preview-box {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.pill-outline {
+  display: inline-block;
+  padding: 10px 18px;
+  border: 2px solid #1a1a1a;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  background-color: #ffffff;
+}
