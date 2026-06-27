@@ -1,44 +1,113 @@
-/* Dashboard 3 Layout Grid Mapping Matrix (from image_291727.jpg) */
-.db3-shell {
-    flex: 1;
-    margin: 0px 5px 5px;
-    padding: 0;
-    display: grid;
-    /* Precise 65% and 35% dimension distributions */
-    grid-template-columns: 65fr 35fr; 
-    grid-template-rows: 65fr 35fr;          
-    gap: 16px;
-    height: calc(100vh - 114px);
-    overflow: hidden;
+/* ==========================================================================
+   1. MULTI-PANE STRUCTURAL LAYOUT CANVAS (MISC HUB)
+   ========================================================================== */
+.misc-dashboard-canvas-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-rows: 1fr auto;
+  gap: 16px;
+  width: 100%;
+  height: calc(100vh - 120px);
+  padding: 16px;
+  box-sizing: border-box;
+  background-color: #e5e5e5;
 }
 
-/* Quadrant 1: Calendar Main Stage Area (Top-Left) */
-.db3-stage-zone { 
-    grid-column: 1; 
-    grid-row: 1; 
-    height: 100%; 
+/* Explicit Area Placements */
+.grid-area-main {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
 }
 
-/* Quadrant 2: Account Area Slot (Top-Right) */
-.db3-account-zone { 
-    grid-column: 2; 
-    grid-row: 1; 
-    height: 100%; 
-    overflow: hidden; 
+.grid-area-sidebar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
 }
 
-/* Quadrant 3: History Area Slot (Bottom-Left) */
-.db3-history-zone { 
-    grid-column: 1; 
-    grid-row: 2; 
-    height: 100%; 
-    overflow: hidden; 
+.grid-area-bottom-left {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  margin-right: 50%;
 }
 
-/* Quadrant 4: Settings Area Slot (Bottom-Right) */
-.db3-settings-zone { 
-    grid-column: 2; 
-    grid-row: 2; 
-    height: 100%; 
-    overflow: hidden; 
+.grid-area-bottom-right {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  margin-left: 50%;
+}
+
+/* ==========================================================================
+   2. CARD CORES
+   ========================================================================== */
+.section-card {
+  background-color: #ffffff;
+  border: 2px solid #1a1a1a;
+  border-radius: 24px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  box-sizing: border-box;
+  transition: transform 0.15s ease;
+}
+
+.clickable-swap-node {
+  cursor: pointer;
+}
+
+.clickable-swap-node:hover {
+  transform: scale(0.995);
+  background-color: #fafafa;
+}
+
+.misc-card-header {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #888888;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   3. INNER ELEMENT PRESENTATION ELEMENTS
+   ========================================================================== */
+.view-main h2 {
+  font-family: 'Courier New', monospace;
+  font-weight: 900;
+  font-size: 1.8rem;
+  margin: 0 0 8px 0;
+}
+
+.description-text {
+  font-size: 0.95rem;
+  color: #333333;
+  margin-bottom: 16px;
+}
+
+.sleeping-preview-box {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.pill-outline {
+  display: inline-block;
+  padding: 10px 18px;
+  border: 2px solid #1a1a1a;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  background-color: #ffffff;
+}
+
+.calendar-dummy-canvas {
+  margin-top: 16px;
+  padding: 20px;
+  border: 2px dashed #1a1a1a;
+  border-radius: 16px;
 }
