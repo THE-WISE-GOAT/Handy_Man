@@ -1,0 +1,41 @@
+/* ==========================================================================
+   1. SCREEN SHAPE CANVAS GRID (SCHEDULED COMPASS)
+   ========================================================================== */
+.worker-scheduled-canvas-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-rows: 1fr auto;
+  gap: 16px;
+  width: 100%;
+  height: calc(100vh - 72px);
+  padding: 16px;
+  box-sizing: border-box;
+  background-color: #e5e5e5;
+}
+
+/* Explicit Grid Mapping Area Coordinates */
+.grid-area-main {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+}
+
+.grid-area-sidebar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+}
+
+.grid-area-bottom-left {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  margin-right: 50%;
+}
+
+.grid-area-bottom-right {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  margin-left: 50%;
+}
