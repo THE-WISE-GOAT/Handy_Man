@@ -1,9 +1,11 @@
 // components/worker-dashboard/dash2worker.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWorkerDashboardData } from './useWorkerDashboardData';
 import './dash2worker.css';
 
-export default function Dash2Worker() {
+export default function Dash2Worker({ viewSlug }) {
+  const navigate = useNavigate();
   const {
     scheduledSlots,
     swapScheduledSlots,
@@ -13,105 +15,124 @@ export default function Dash2Worker() {
     routeMatrixStatus
   } = useWorkerDashboardData();
 
-  // ====================================================
-  // SUB-MODULE 1: SYSTEM PLANNER CALENDAR
-  // ====================================================
-  const renderCalendar = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">SCHEDULE PLATFORM PLANNERS</div>
-          <h2>System Planner Calendar</h2>
-          <p className="worker-panel-desc">{calendarDescText}</p>
-        </div>
-      );
+  // Route state synchronization layer
+  useEffect(() => {
+    if (!viewSlug) return;
+    if (scheduledSlots.main !== viewSlug) {
+      const targetSlot = Object.keys(scheduledSlots).find((key) => scheduledSlots[key] === viewSlug);
+      if (targetSlot) swapScheduledSlots(targetSlot);
     }
+  }, [viewSlug, scheduledSlots, swapScheduledSlots]);
 
+  const handleModuleSelect = (targetSlug) => {
+    navigate(`/worker/scheduled/${targetSlug}`);
+  };
+
+  // Shared generic card framework for preview vs active stages
+  const Card = ({ slug, title, position, children }) => {
+    const isMain = position === "main";
     return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapScheduledSlots(position)}>
-        <div className="worker-card-header">SCHEDULE PLATFORM PLANNERS</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">Calendar Open</span>
-        </div>
+      <div 
+        className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
+        onClick={!isMain ? () => handleModuleSelect(slug) : undefined}
+      >
+        <div className="card-header">••• {title}</div>
+        {children}
       </div>
     );
   };
 
   // ====================================================
-  // SUB-MODULE 2: SCHEDULED JOBS REGISTRY
+  // SUB-MODULE RENDERS
   // ====================================================
-  const renderJobRegistry = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">UPCOMING DEPLOYMENT NODES</div>
+
+  const renderCalendar = (position) => (
+    <Card slug="ScheduledCalendar" title="SCHEDULE PLATFORM PLANNERS" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
+          <h2>System Planner Calendar</h2>
+          <p className="panel-desc">{calendarDescText}</p>
+        </div>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Planner Context</span>
+              <p className="card-summary">{calendarDescText}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Calendar Monitor Live</span>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+
+  const renderJobRegistry = (position) => (
+    <Card slug="ScheduledJobCard" title="UPCOMING DEPLOYMENT NODES" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>Scheduled Jobs Registry</h2>
         </div>
-      );
-    }
-
-    return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapScheduledSlots(position)}>
-        <div className="worker-card-header">UPCOMING DEPLOYMENT NODES</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">{jobsRegistryStatus}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Job Matrix</span>
+              <p className="card-summary">Status: {jobsRegistryStatus}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Registry — {jobsRegistryStatus}</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SUB-MODULE 3: CLIENT COMMUNICATIONS TERMINAL
-  // ====================================================
-  const renderClientQueries = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">ACTIVE MESSAGING CORRIDOR</div>
+  const renderClientQueries = (position) => (
+    <Card slug="ClientQueries" title="ACTIVE MESSAGING CORRIDOR" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>Client Communications Terminal</h2>
         </div>
-      );
-    }
-
-    return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapScheduledSlots(position)}>
-        <div className="worker-card-header">ACTIVE MESSAGING CORRIDOR</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">{clientQueryStatus}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Inbox Comms</span>
+              <p className="card-summary">Queue: {clientQueryStatus}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Comms Feed ({clientQueryStatus})</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SUB-MODULE 4: ROUTE MATRIX OVERVIEW
-  // ====================================================
-  const renderRouteMatrix = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">APPOINTMENT LOCATION INDEX</div>
+  const renderRouteMatrix = (position) => (
+    <Card slug="ScheduledMap" title="APPOINTMENT LOCATION INDEX" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>Route Matrix Overview</h2>
         </div>
-      );
-    }
-
-    return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapScheduledSlots(position)}>
-        <div className="worker-card-header">APPOINTMENT LOCATION INDEX</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">{routeMatrixStatus}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Matrix Node</span>
+              <p className="card-summary">Routing: {routeMatrixStatus}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Routing Stream [{routeMatrixStatus}]</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // TRANSLATION DISPATCHER
-  // ====================================================
   const resolveModuleBySlot = (slotKey) => {
-    const moduleName = scheduledSlots[slotKey];
-    switch (moduleName) {
+    switch (scheduledSlots[slotKey]) {
       case "ScheduledCalendar": return renderCalendar(slotKey);
       case "ScheduledJobCard":  return renderJobRegistry(slotKey);
       case "ClientQueries":     return renderClientQueries(slotKey);
@@ -120,15 +141,12 @@ export default function Dash2Worker() {
     }
   };
 
-  // ====================================================
-  // 4-PANEL LAYOUT ARCHITECTURE CANVAS GRID
-  // ====================================================
   return (
-    <div className="worker-scheduled-canvas-grid">
-      <div className="grid-area-main">{resolveModuleBySlot("main")}</div>
-      <div className="grid-area-sidebar">{resolveModuleBySlot("sidebar")}</div>
-      <div className="grid-area-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
-      <div className="grid-area-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
+    <div className="dashboard-grid-4pane">
+      <div className="grid-main">{resolveModuleBySlot("main")}</div>
+      <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
+      <div className="grid-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
+      <div className="grid-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
     </div>
   );
 }
