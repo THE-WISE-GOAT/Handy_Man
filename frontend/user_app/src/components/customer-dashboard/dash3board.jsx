@@ -1,10 +1,11 @@
 // components/customer-dashboard/dash3board.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCustomerDashboardData } from './useCustomerDashboardData';
-import './dash3board.css'; //
+import './dash3board.css';
 
-export default function Dash3Board() {
-  // Pull positions and content variables directly from your Zustand store
+export default function Dash3Board({ viewSlug }) {
+  const navigate = useNavigate();
   const {
     miscSlots,
     swapMiscSlots,
@@ -14,109 +15,128 @@ export default function Dash3Board() {
     systemPortalStatus
   } = useCustomerDashboardData();
 
+  // Route state synchronization layer
+  useEffect(() => {
+    if (!viewSlug) return;
+    if (miscSlots.main !== viewSlug) {
+      const targetSlot = Object.keys(miscSlots).find((key) => miscSlots[key] === viewSlug);
+      if (targetSlot) swapMiscSlots(targetSlot);
+    }
+  }, [viewSlug, miscSlots, swapMiscSlots]);
+
+  const handleModuleSelect = (targetSlug) => {
+    navigate(`/customer/more/${targetSlug}`);
+  };
+
+  // Shared component template for preview/sleeping or active panels
+  const Card = ({ slug, title, position, children }) => {
+    const isMain = position === "main";
+    return (
+      <div 
+        className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
+        onClick={!isMain ? () => handleModuleSelect(slug) : undefined}
+      >
+        <div className="card-header">••• {title}</div>
+        {children}
+      </div>
+    );
+  };
+
   // ====================================================
-  // SUB-MODULE 1: SYSTEM CALENDAR
+  // SUB-MODULE RENDERS
   // ====================================================
-  const renderSystemCalendar = (position) => {
-    if (position === "main") {
-      return (
-        <div className="section-card view-main">
-          <div className="misc-card-header">••• SCHEDULE PLATFORM PLANNERS</div>
+
+  const renderSystemCalendar = (position) => (
+    <Card slug="SystemCalendar" title="SCHEDULE PLATFORM PLANNERS" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>SYSTEM CALENDAR</h2>
-          <p className="description-text">Calendar Workspace Terminal Primary Schedule Router.</p>
-          <div className="calendar-dummy-canvas">
+          <p className="panel-desc">Calendar Workspace Terminal Primary Schedule Router.</p>
+          <div className="calendar-box">
             <p>Active Planned Tasks: {calendarEventsCount}</p>
           </div>
         </div>
-      );
-    }
-
-    return (
-      <div className={`section-card view-${position} clickable-swap-node`} onClick={() => swapMiscSlots(position)}>
-        <div className="misc-card-header">••• SCHEDULE PLATFORM PLANNERS</div>
-        <div className="sleeping-preview-box">
-          <span className="pill-outline">Calendar Active — {calendarEventsCount} Events</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Planner Overview</span>
+              <p className="card-summary">Events Loaded: {calendarEventsCount}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): {calendarEventsCount} Scheduled Tasks</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SUB-MODULE 2: ACCOUNT PROFILES
-  // ====================================================
-  const renderAccountProfiles = (position) => {
-    if (position === "main") {
-      return (
-        <div className="section-card view-main">
-          <div className="misc-card-header">••• ACCOUNT PROFILES</div>
+  const renderAccountProfiles = (position) => (
+    <Card slug="AccountProfiles" title="ACCOUNT PROFILES" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>ACCOUNT PROFILE MANAGER</h2>
           <p>Configure client accounts, authentication layers, and permissions records details.</p>
         </div>
-      );
-    }
-
-    return (
-      <div className={`section-card view-${position} clickable-swap-node`} onClick={() => swapMiscSlots(position)}>
-        <div className="misc-card-header">••• ACCOUNT PROFILES</div>
-        <div className="sleeping-preview-box">
-          <span className="pill-outline">{profileSecurityStatus}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Security Node</span>
+              <p className="card-summary">Status: {profileSecurityStatus}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Profile Status [{profileSecurityStatus}]</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SUB-MODULE 3: HISTORICAL RECORDS LOGS
-  // ====================================================
-  const renderHistoricalLogs = (position) => {
-    if (position === "main") {
-      return (
-        <div className="section-card view-main">
-          <div className="misc-card-header">••• HISTORICAL RECORDS LOGS</div>
+  const renderHistoricalLogs = (position) => (
+    <Card slug="HistoricalRecordsLogs" title="HISTORICAL RECORDS LOGS" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>HISTORICAL SYSTEM LOGS TERMINAL</h2>
         </div>
-      );
-    }
-
-    return (
-      <div className={`section-card view-${position} clickable-swap-node`} onClick={() => swapMiscSlots(position)}>
-        <div className="misc-card-header">••• HISTORICAL RECORDS LOGS</div>
-        <div className="sleeping-preview-box">
-          <span className="pill-outline">{archivePipelineStatus}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Archive System</span>
+              <p className="card-summary">Pipeline: {archivePipelineStatus}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Logs Stream {archivePipelineStatus}</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SUB-MODULE 4: SYSTEM SETTINGS
-  // ====================================================
-  const renderSystemSettings = (position) => {
-    if (position === "main") {
-      return (
-        <div className="section-card view-main">
-          <div className="misc-card-header">••• SYSTEM SETTINGS</div>
+  const renderSystemSettings = (position) => (
+    <Card slug="SystemSettings" title="SYSTEM SETTINGS" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>SYSTEM PREFERENCES PORTAL</h2>
         </div>
-      );
-    }
-
-    return (
-      <div className={`section-card view-${position} clickable-swap-node`} onClick={() => swapMiscSlots(position)}>
-        <div className="misc-card-header">••• SYSTEM SETTINGS</div>
-        <div className="sleeping-preview-box">
-          <span className="pill-outline">{systemPortalStatus}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Configuration Environment</span>
+              <p className="card-summary">Status: {systemPortalStatus}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Environment Config {systemPortalStatus}</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SLOTS ROUTING LOGIC
-  // ====================================================
   const resolveModuleBySlot = (slotKey) => {
-    const targetModuleName = miscSlots[slotKey];
-    switch (targetModuleName) {
+    switch (miscSlots[slotKey]) {
       case "SystemCalendar":        return renderSystemCalendar(slotKey);
       case "AccountProfiles":       return renderAccountProfiles(slotKey);
       case "HistoricalRecordsLogs": return renderHistoricalLogs(slotKey);
@@ -125,15 +145,12 @@ export default function Dash3Board() {
     }
   };
 
-  // ====================================================
-  // MULTI-PANE STRUCTURAL MISC GRID SYSTEM
-  // ====================================================
   return (
-    <div className="misc-dashboard-canvas-grid">
-      <div className="grid-area-main">{resolveModuleBySlot("main")}</div>
-      <div className="grid-area-sidebar">{resolveModuleBySlot("sidebar")}</div>
-      <div className="grid-area-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
-      <div className="grid-area-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
+    <div className="dashboard-grid-4pane">
+      <div className="grid-main">{resolveModuleBySlot("main")}</div>
+      <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
+      <div className="grid-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
+      <div className="grid-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
     </div>
   );
 }
