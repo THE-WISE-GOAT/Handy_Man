@@ -1,29 +1,42 @@
 // components/customer-dashboard/dash1board.jsx
-import React, { useState } from 'react';
-import { useCustomerDashboardData } from './useCustomerDashboardData';
-import './dash1board.css';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCustomerDashboardData } from "./useCustomerDashboardData";
+import "./dash1board.css";
 
-export default function Dash1Board() {
-  // 1. Hook straight into the central Zustand Bookings state slice
-  const { 
-    slots, 
-    swapSlots,
-    jobDescriptionDraft, 
-    setJobDescription, 
-    chatMessages, 
-    addChatMessage, 
-    activePostsCount 
-  } = useCustomerDashboardData();
-
+export default function Dash1Board({ viewSlug }) {
+  const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
 
+  const {
+    slots,
+    swapSlots,
+    jobDescriptionDraft,
+    setJobDescription,
+    chatMessages,
+    addChatMessage,
+    activePostsCount,
+  } = useCustomerDashboardData();
+
+  // Route state synchronization layer
+  useEffect(() => {
+    if (!viewSlug) return;
+    if (slots.main !== viewSlug) {
+      const targetSlot = Object.keys(slots).find((key) => slots[key] === viewSlug);
+      if (targetSlot) swapSlots(targetSlot);
+    }
+  }, [viewSlug, slots, swapSlots]);
+
+  const handleModuleSelect = (targetSlug) => {
+    navigate(`/customer/bookings/${targetSlug}`);
+  };
+
   // ====================================================
-  // LOCATION-AWARE DISPLAY MATRIX FOR EACH SUB-MODULE
+  // SUB-MODULE RENDERS
   // ====================================================
-  
-  // A. AI Chat Sub-Module View Generator
-  const renderAiChat = (locationLabel) => {
-    if (locationLabel === "main") {
+
+  const renderAiChat = (slotKey) => {
+    if (slotKey === "main") {
       const handleSend = (e) => {
         e.preventDefault();
         if (!chatInput.trim()) return;
@@ -32,136 +45,122 @@ export default function Dash1Board() {
       };
 
       return (
-        <div className="section-card slot-view-main">
-          <span className="subtitle-flag">INTERACTIVE DISPATCH MANAGER</span>
+        <div className="dashboard-card main-view">
+          <span className="card-flag">INTERACTIVE DISPATCH MANAGER</span>
           <h2>AI CHAT TERMINAL</h2>
-          <div className="chat-logs-display">
-            {chatMessages.map(m => <p key={m.id}><strong>{m.sender.toUpperCase()}:</strong> {m.text}</p>)}
+          <div className="chat-box">
+            {chatMessages.map((m) => (
+              <p key={m.id}>
+                <strong>{m.sender.toUpperCase()}:</strong> {m.text}
+              </p>
+            ))}
           </div>
-          <form onSubmit={handleSend} className="chat-entry-form">
-            <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Instruct AI..." />
-            <button type="submit" className="chat-send-btn">Send</button>
+          <form onSubmit={handleSend} className="chat-form">
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Instruct AI..."
+            />
+            <button type="submit" className="chat-btn">Send</button>
           </form>
         </div>
       );
     }
 
-    if (locationLabel === "sidebar") {
-      return (
-        <div className="section-card slot-view-sidebar clickable-swap-node" onClick={() => swapSlots("sidebar")}>
-          <div className="module-title-bar">••• AI CHAT TERMINAL</div>
-          <span className="pill-badge-highlight">Live Dispatch — Active Session</span>
-          <p className="micro-summary">Logs Captured: {chatMessages.length}</p>
-        </div>
-      );
-    }
-
-    // Default: 'bottom' layout rendering logic
     return (
-      <div className="section-card slot-view-bottom clickable-swap-node" onClick={() => swapSlots("bottom")}>
-        <div className="module-title-bar">••• AI CHAT TERMINAL</div>
-        <span className="pill-badge">AI Dispatch running asleep below...</span>
+      <div
+        className={`dashboard-card asleep-view ${slotKey}-slot clickable`}
+        onClick={() => handleModuleSelect("AiChatTerminal")}
+      >
+        <div className="card-header">••• AI CHAT TERMINAL</div>
+        {slotKey === "sidebar" ? (
+          <>
+            <span className="badge badge-highlight">Live Dispatch — Active Session</span>
+            <p className="card-summary">Logs Captured: {chatMessages.length}</p>
+          </>
+        ) : (
+          <span className="badge">AI Dispatch running asleep below...</span>
+        )}
       </div>
     );
   };
 
-  // B. Job Description Workspace Sub-Module View Generator
-  const renderJobDescription = (locationLabel) => {
-    if (locationLabel === "main") {
+  const renderJobDescription = (slotKey) => {
+    if (slotKey === "main") {
       return (
-        <div className="section-card slot-view-main">
-          <span className="subtitle-flag">REVIEW AND REFINE AUTO-GENERATED DETAILS</span>
+        <div className="dashboard-card main-view">
+          <span className="card-flag">Main: REVIEW AND REFINE AUTO-GENERATED DETAILS</span>
           <h2>JOB DESCRIPTION WORKSPACE</h2>
-          <textarea 
-            className="workspace-textarea-box"
-            value={jobDescriptionDraft} 
-            onChange={(e) => setJobDescription(e.target.value)} 
+          <textarea
+            className="workspace-textarea"
+            value={jobDescriptionDraft}
+            onChange={(e) => setJobDescription(e.target.value)}
           />
         </div>
       );
     }
 
-    if (locationLabel === "sidebar") {
-      return (
-        <div className="section-card slot-view-sidebar clickable-swap-node" onClick={() => swapSlots("sidebar")}>
-          <div className="module-title-bar">••• JOB DESCRIPTION WORKSPACE</div>
-          <span className="pill-badge">Description Live Glance — Draft Mode</span>
-          <p className="micro-summary-text">{jobDescriptionDraft.substring(0, 35)}...</p>
-        </div>
-      );
-    }
-
-    // Default: 'bottom' layout rendering logic
     return (
-      <div className="section-card slot-view-bottom clickable-swap-node" onClick={() => swapSlots("bottom")}>
-        <div className="module-title-bar">••• JOB DESCRIPTION WORKSPACE</div>
-        <span className="pill-badge">Draft character footprint: {jobDescriptionDraft.length} chars</span>
+      <div
+        className={`dashboard-card asleep-view ${slotKey}-slot clickable`}
+        onClick={() => handleModuleSelect("JobDescriptionWorkspace")}
+      >
+        <div className="card-header">••• JOB DESCRIPTION WORKSPACE</div>
+        {slotKey === "sidebar" ? (
+          <>
+            <span className="badge">Sidebar: Description Live Glance — Draft Mode</span>
+            <p className="card-summary">{jobDescriptionDraft.substring(0, 35)}...</p>
+          </>
+        ) : (
+          <span className="badge">Footer: Draft character footprint: {jobDescriptionDraft.length} chars</span>
+        )}
       </div>
     );
   };
 
-  // C. Your Active Posts Sub-Module View Generator
-  const renderActivePosts = (locationLabel) => {
-    if (locationLabel === "main") {
+  const renderActivePosts = (slotKey) => {
+    if (slotKey === "main") {
       return (
-        <div className="section-card slot-view-main">
+        <div className="dashboard-card main-view">
           <h2>YOUR ACTIVE POSTS MAIN HUB</h2>
           <p>Full active dispatch control configuration deck view.</p>
         </div>
       );
     }
 
-    if (locationLabel === "sidebar") {
-      return (
-        <div className="section-card slot-view-sidebar clickable-swap-node" onClick={() => swapSlots("sidebar")}>
-          <div className="module-title-bar">••• YOUR ACTIVE POSTS</div>
-          <span className="pill-badge">Active Posts — {activePostsCount} live trackable</span>
-        </div> 
-      );
-    }
-
-    // Default: 'bottom' layout rendering logic
     return (
-      <div className="section-card slot-view-bottom clickable-swap-node" onClick={() => swapSlots("bottom")}>
-        <div className="module-title-bar">••• YOUR ACTIVE POSTS</div>
-        <span className="pill-badge">Active Posts — {activePostsCount} live requests trackable</span>
+      <div
+        className={`dashboard-card asleep-view ${slotKey}-slot clickable`}
+        onClick={() => handleModuleSelect("YourActivePosts")}
+      >
+        <div className="card-header">••• YOUR ACTIVE POSTS</div>
+        {slotKey === "sidebar" ? (
+          <>
+            <span className="badge badge-highlight">Network Pipeline Active</span>
+            <p className="card-summary">Live Trackable: {activePostsCount} Positions</p>
+          </>
+        ) : (
+          <span className="badge">Posts Monitor sleeping below — {activePostsCount} items queued</span>
+        )}
       </div>
     );
   };
 
-  // ====================================================
-  // ROUTING CONTENT COORDINATOR DISPATCHER
-  // ====================================================
-  const resolveAndRenderModule = (slotKey, moduleName) => {
+  const resolveAndRenderModule = (slotKey) => {
+    const moduleName = slots[slotKey];
     switch (moduleName) {
-      case "AiChatTerminal": return renderAiChat(slotKey);
+      case "AiChatTerminal":           return renderAiChat(slotKey);
       case "JobDescriptionWorkspace": return renderJobDescription(slotKey);
-      case "YourActivePosts": return renderActivePosts(slotKey);
-      default: return null;
+      case "YourActivePosts":          return renderActivePosts(slotKey);
+      default:                         return null;
     }
   };
 
-  // ====================================================
-  // VISUAL STRUCTURAL SLOTS GENERATION (The Wireframe Structure)
-  // ====================================================
   return (
-    <div className="dashboard-layout-wireframe-grid">
-      
-      {/* SLOT 1: Top Left Workspace Frame */}
-      <div className="wireframe-slot-main">
-        {resolveAndRenderModule("main", slots.main)}
-      </div>
-
-      {/* SLOT 2: Bottom Row Strip Frame */}
-      <div className="wireframe-slot-bottom">
-        {resolveAndRenderModule("bottom", slots.bottom)}
-      </div>
-
-      {/* SLOT 3: Right Side Column Sidebar Frame */}
-      <div className="wireframe-slot-sidebar">
-        {resolveAndRenderModule("sidebar", slots.sidebar)}
-      </div>
-
+    <div className="dashboard-grid">
+      <div className="grid-main">{resolveAndRenderModule("main")}</div>
+      <div className="grid-bottom">{resolveAndRenderModule("bottom")}</div>
+      <div className="grid-sidebar">{resolveAndRenderModule("sidebar")}</div>
     </div>
   );
 }

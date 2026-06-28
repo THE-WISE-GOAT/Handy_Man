@@ -1,7 +1,7 @@
 /* ==========================================================================
-   1. MULTI-PANE STRUCTURAL LAYOUT CANVAS (MISC HUB)
+   1. 4-PANE STRUCTURAL LAYOUT CANVAS
    ========================================================================== */
-.misc-dashboard-canvas-grid {
+.dashboard-grid-4pane {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
   grid-template-rows: 1fr auto;
@@ -13,27 +13,26 @@
   background-color: #e5e5e5;
 }
 
-/* Explicit Area Placements */
-.grid-area-main {
+.grid-main {
   grid-column: 1;
   grid-row: 1;
   display: flex;
 }
 
-.grid-area-sidebar {
+.grid-sidebar {
   grid-column: 2;
   grid-row: 1 / span 2;
   display: flex;
 }
 
-.grid-area-bottom-left {
+.grid-bottom-left {
   grid-column: 1;
   grid-row: 2;
   display: flex;
   margin-right: 50%;
 }
 
-.grid-area-bottom-right {
+.grid-bottom-right {
   grid-column: 1;
   grid-row: 2;
   display: flex;
@@ -41,9 +40,9 @@
 }
 
 /* ==========================================================================
-   2. CARD CORES
+   2. CARD SHELL DESIGNS
    ========================================================================== */
-.section-card {
+.dashboard-card {
   background-color: #ffffff;
   border: 2px solid #1a1a1a;
   border-radius: 24px;
@@ -55,16 +54,16 @@
   transition: transform 0.15s ease;
 }
 
-.clickable-swap-node {
+.clickable {
   cursor: pointer;
 }
 
-.clickable-swap-node:hover {
+.clickable:hover {
   transform: scale(0.995);
   background-color: #fafafa;
 }
 
-.misc-card-header {
+.card-header {
   font-family: 'Courier New', monospace;
   font-size: 0.75rem;
   font-weight: bold;
@@ -74,28 +73,29 @@
 }
 
 /* ==========================================================================
-   3. INNER ELEMENT PRESENTATION ELEMENTS
+   3. INTERNAL PRESENTATION FIELDS
    ========================================================================== */
-.view-main h2 {
+.main-panel h2 {
   font-family: 'Courier New', monospace;
   font-weight: 900;
   font-size: 1.8rem;
   margin: 0 0 8px 0;
 }
 
-.description-text {
+.panel-desc {
   font-size: 0.95rem;
   color: #333333;
   margin-bottom: 16px;
 }
 
-.sleeping-preview-box {
+.preview-panel {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
   height: 100%;
 }
 
-.pill-outline {
+.badge {
   display: inline-block;
   padding: 10px 18px;
   border: 2px solid #1a1a1a;
@@ -103,9 +103,20 @@
   font-size: 0.85rem;
   font-weight: bold;
   background-color: #ffffff;
+  width: fit-content;
 }
 
-.calendar-dummy-canvas {
+.badge-highlight {
+  background-color: #fcfcfc;
+}
+
+.card-summary {
+  font-size: 0.85rem;
+  color: #555555;
+  margin: 8px 0 0 4px;
+}
+
+.calendar-box {
   margin-top: 16px;
   padding: 20px;
   border: 2px dashed #1a1a1a;

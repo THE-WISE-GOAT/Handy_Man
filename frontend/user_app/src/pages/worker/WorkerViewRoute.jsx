@@ -1,3 +1,4 @@
+// routes/worker/WorkerViewRoute.jsx
 import React from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { getDefaultWorkerPath, getWorkerViewBySlug } from "@shared/config/viewRoutes";
@@ -17,12 +18,12 @@ export default function WorkerViewRoute() {
     return <Navigate to={getDefaultWorkerPath()} replace />;
   }
 
-  // Render the appropriate layout panel canvas directly by section string
+  // Render appropriate layout panel canvas directly by section, forwarding viewSlug
   switch (section?.toLowerCase()) {
-    case "workspace": return <Dash1Worker />;
-    case "scheduled": return <Dash2Worker />;
-    case "me":        return <Dash3Worker />;
-    case "mics":      return <Dash4Worker />;
-    default:          return <Dash1Worker />;
+    case "workspace": return <Dash1Worker viewSlug={viewSlug} />;
+    case "scheduled": return <Dash2Worker viewSlug={viewSlug} />;
+    case "me":        return <Dash3Worker viewSlug={viewSlug} />;
+    case "mics":      return <Dash4Worker viewSlug={viewSlug} />;
+    default:          return <Dash1Worker viewSlug={viewSlug} />;
   }
 }
