@@ -15,11 +15,11 @@ export default function CustomerViewRoute() {
     return <Navigate to={getDefaultCustomerPath(section)} replace />;
   }
 
-  // Render the appropriate layout panel canvas directly by section string
+  // Render the appropriate layout panel canvas directly by section string and pass the viewSlug down
   switch (section?.toLowerCase()) {
-    case "bookings": return <Dash1Board />;
-    case "postings": return <Dash2Board />;
-    case "more":     return <Dash3Board />;
-    default:         return <Dash1Board />;
+    case "bookings": return <Dash1Board viewSlug={viewSlug} />;
+    case "postings": return <Dash2Board viewSlug={viewSlug} />;
+    case "more":     return <Dash3Board viewSlug={viewSlug} />;
+    default:         return <Dash1Board viewSlug={viewSlug} />;
   }
 }
