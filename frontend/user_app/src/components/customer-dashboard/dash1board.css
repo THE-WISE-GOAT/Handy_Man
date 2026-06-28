@@ -1,44 +1,43 @@
 /* ==========================================================================
-   1. CORE DASHBOARD WIREFRAME GRID
+   1. CORE DASHBOARD LAYOUT GRID
    ========================================================================== */
-.dashboard-layout-wireframe-grid {
+.dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 380px; /* Left content area + fixed sidebar width */
-  grid-template-rows: 1fr auto;     /* Main area scales + bottom row tightly hugs content */
-  gap: 16px;                        /* Consistent structural spacing gap */
+  grid-template-columns: 1fr 380px;
+  grid-template-rows: 1fr auto;
+  gap: 16px;
   width: 100%;
-  height: calc(100vh - 120px);      /* Adapts dynamically below the top navbar */
+  height: calc(100vh - 120px);
   padding: 16px;
   box-sizing: border-box;
-  background-color: #e5e5e5;        /* Light grey background canvas */
+  background-color: #e5e5e5;
 }
 
-/* Structural Placement Mappings */
-.wireframe-slot-main {
+.grid-main {
   grid-column: 1;
   grid-row: 1;
   display: flex;
 }
 
-.wireframe-slot-bottom {
+.grid-bottom {
   grid-column: 1;
   grid-row: 2;
   display: flex;
 }
 
-.wireframe-slot-sidebar {
+.grid-sidebar {
   grid-column: 2;
-  grid-row: 1 / span 2;             /* Sidebar stretches completely top-to-bottom */
+  grid-row: 1 / span 2;
   display: flex;
 }
 
 /* ==========================================================================
-   2. GENERIC CARD DECORATIONS (Wireframe Style)
+   2. CARD SHELLS AND SLOTS
    ========================================================================== */
-.section-card {
+.dashboard-card {
   background-color: #ffffff;
-  border: 2px solid #1a1a1a;        /* Solid dark border outlines */
-  border-radius: 24px;              /* High curvature profile matching design frames */
+  border: 2px solid #1a1a1a;
+  border-radius: 24px;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -48,27 +47,21 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Sleeping Modules Click Node Interaction States */
-.clickable-swap-node {
+.clickable {
   cursor: pointer;
 }
 
-.clickable-swap-node:hover {
+.clickable:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
-/* ==========================================================================
-   3. LOCATION-SPECIFIC STYLING INJECTIONS
-   ========================================================================== */
-
-/* SLOT A: MAIN STAGE VIEW (Top-Left Active) */
-.slot-view-main {
+.main-view {
   height: 100%;
 }
 
-.slot-view-main h2 {
-  font-family: 'Courier New', monospace; /* Monospace typography matching system look */
+.main-view h2 {
+  font-family: 'Courier New', monospace;
   font-weight: 900;
   font-size: 2rem;
   margin: 0 0 16px 0;
@@ -76,33 +69,20 @@
   color: #000000;
 }
 
-.subtitle-flag {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #888888;
-  letter-spacing: 0.05em;
-  margin-bottom: 4px;
-}
-
-/* SLOT B: SIDEBAR PANEL VIEW (Right Column Sleeping) */
-.slot-view-sidebar {
+.sidebar-slot {
   height: 100%;
-  background-color: #ffffff;
 }
 
-/* SLOT C: BOTTOM STRIP VIEW (Horizontal Sleeping) */
-.slot-view-bottom {
+.bottom-slot {
   min-height: 100px;
   padding: 16px 24px;
   justify-content: center;
 }
 
 /* ==========================================================================
-   4. INTERNAL MODULE INNER COMPONENTS
+   3. INTERNAL COMMON UTILITIES
    ========================================================================== */
-
-/* Uniform Card Tiny Header Indicator */
-.module-title-bar {
+.card-header {
   font-family: 'Courier New', monospace;
   font-size: 0.8rem;
   font-weight: bold;
@@ -111,8 +91,15 @@
   text-transform: uppercase;
 }
 
-/* Pill Badges (Custom layout labels) */
-.pill-badge, .pill-badge-highlight {
+.card-flag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #888888;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.badge {
   display: inline-block;
   padding: 10px 16px;
   border: 1.5px solid #1a1a1a;
@@ -120,27 +107,25 @@
   font-size: 0.85rem;
   font-weight: 700;
   width: fit-content;
-}
-
-.pill-badge {
   background-color: #ffffff;
   color: #1a1a1a;
 }
 
-.pill-badge-highlight {
+.badge-highlight {
   background-color: #fcfcfc;
   color: #000000;
 }
 
-/* Micro Summaries & Text Snippets Inside Preview Modes */
-.micro-summary, .micro-summary-text {
+.card-summary {
   font-size: 0.85rem;
   color: #555555;
   margin: 12px 0 0 4px;
 }
 
-/* Job Description Editor Textarea Control */
-.workspace-textarea-box {
+/* ==========================================================================
+   4. COMPONENT FEATURES (TEXTAREA & CHAT)
+   ========================================================================== */
+.workspace-textarea {
   flex: 1;
   width: 100%;
   min-height: 200px;
@@ -154,8 +139,7 @@
   margin-top: 12px;
 }
 
-/* AI Chat Logs Terminal Container */
-.chat-logs-display {
+.chat-box {
   flex: 1;
   overflow-y: auto;
   border: 1.5px solid #1a1a1a;
@@ -166,12 +150,12 @@
   max-height: 350px;
 }
 
-.chat-entry-form {
+.chat-form {
   display: flex;
   gap: 8px;
 }
 
-.chat-entry-form input {
+.chat-form input {
   flex: 1;
   width: 100%;
   padding: 14px 20px;
@@ -182,7 +166,7 @@
   box-sizing: border-box;
 }
 
-.chat-send-btn {
+.chat-btn {
   padding: 0 24px;
   background-color: #1a1a1a;
   color: #ffffff;
