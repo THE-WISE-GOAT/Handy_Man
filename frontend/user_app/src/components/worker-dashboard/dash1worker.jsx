@@ -1,9 +1,11 @@
 // components/worker-dashboard/dash1worker.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWorkerDashboardData } from './useWorkerDashboardData';
 import './dash1worker.css';
 
-export default function Dash1Worker() {
+export default function Dash1Worker({ viewSlug }) {
+  const navigate = useNavigate();
   const {
     workspaceSlots,
     swapWorkspaceSlots,
@@ -12,87 +14,108 @@ export default function Dash1Worker() {
     jobSpecsText
   } = useWorkerDashboardData();
 
+  // Route state synchronization layer
+  useEffect(() => {
+    if (!viewSlug) return;
+    if (workspaceSlots.main !== viewSlug) {
+      const targetSlot = Object.keys(workspaceSlots).find((key) => workspaceSlots[key] === viewSlug);
+      if (targetSlot) swapWorkspaceSlots(targetSlot);
+    }
+  }, [viewSlug, workspaceSlots, swapWorkspaceSlots]);
+
+  const handleModuleSelect = (targetSlug) => {
+    navigate(`/worker/workspace/${targetSlug}`);
+  };
+
+  // Shared card component for previewing or main states
+  const Card = ({ slug, title, position, children }) => {
+    const isMain = position === "main";
+    return (
+      <div 
+        className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
+        onClick={!isMain ? () => handleModuleSelect(slug) : undefined}
+      >
+        <div className="card-header">••• {title}</div>
+        {children}
+      </div>
+    );
+  };
+
   // ====================================================
-  // SUB-MODULE 1: JOB ROUTE MAPPING
+  // SUB-MODULE RENDERS
   // ====================================================
-  const renderRouteMap = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">REALTIME FIELD DISPATCH MAP</div>
+
+  const renderRouteMap = (position) => (
+    <Card slug="WorkspaceMap" title="REALTIME FIELD DISPATCH MAP" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>Job Route Mapping</h2>
-          <div className="worker-map-canvas-mock">
-            <span className="live-status-dot"></span>
-            <span className="live-status-text">{mapStatus}</span>
+          <div className="map-mock">
+            <span className="status-dot"></span>
+            <span className="status-text">{mapStatus}</span>
           </div>
         </div>
-      );
-    }
-
-    return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapWorkspaceSlots(position)}>
-        <div className="worker-card-header">REALTIME FIELD DISPATCH MAP</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">Map Feed Active</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Live Telemetry</span>
+              <p className="card-summary">Status: {mapStatus}</p>
+            </>
+          ) : (
+            <span className="badge">Bottom: Map Feed Tracking Active ({mapStatus})</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SUB-MODULE 2: ACTIVE BIDDINGS PORTAL
-  // ====================================================
-  const renderBiddingsPortal = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">COMPETITIVE MARKETPLACE METRICS</div>
+  const renderBiddingsPortal = (position) => (
+    <Card slug="WorkspaceBids" title="COMPETITIVE MARKETPLACE METRICS" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>Active Biddings Portal</h2>
-          <p className="worker-panel-desc">Manage active incoming offers and customer pricing requests.</p>
+          <p className="panel-desc">Manage active incoming offers and customer pricing requests.</p>
         </div>
-      );
-    }
-
-    return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapWorkspaceSlots(position)}>
-        <div className="worker-card-header">COMPETITIVE MARKETPLACE METRICS</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">{bidsPipelineText}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Pipeline Tracker</span>
+              <p className="card-summary">{bidsPipelineText}</p>
+            </>
+          ) : (
+            <span className="badge">Bottom: Bids Pipeline Stream [{bidsPipelineText}]</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SUB-MODULE 3: JOB DETAILS MONITOR
-  // ====================================================
-  const renderJobDetails = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">DEPLOYED ASSIGNMENT SPECIFICATIONS</div>
+  const renderJobDetails = (position) => (
+    <Card slug="WorkspaceJobDetails" title="DEPLOYED ASSIGNMENT SPECIFICATIONS" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>Job Details Monitor</h2>
-          <p className="worker-panel-desc">Full breakdown of client structural parameters and requirements.</p>
+          <p className="panel-desc">Full breakdown of client structural parameters and requirements.</p>
         </div>
-      );
-    }
-
-    return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapWorkspaceSlots(position)}>
-        <div className="worker-card-header">DEPLOYED ASSIGNMENT SPECIFICATIONS</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">{jobSpecsText}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Requirements Desk</span>
+              <p className="card-summary">{jobSpecsText}</p>
+            </>
+          ) : (
+            <span className="badge">Bottom: Specs Monitor Active ({jobSpecsText})</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // TRANSLATION DISPATCHER
-  // ====================================================
   const resolveModuleBySlot = (slotKey) => {
-    const moduleName = workspaceSlots[slotKey];
-    switch (moduleName) {
+    switch (workspaceSlots[slotKey]) {
       case "WorkspaceMap":        return renderRouteMap(slotKey);
       case "WorkspaceBids":       return renderBiddingsPortal(slotKey);
       case "WorkspaceJobDetails": return renderJobDetails(slotKey);
@@ -100,14 +123,11 @@ export default function Dash1Worker() {
     }
   };
 
-  // ====================================================
-  // PHYSICAL WORKER WIREFRAME GRID LAYOUT
-  // ====================================================
   return (
-    <div className="worker-workspace-wireframe-grid">
-      <div className="worker-slot-main">{resolveModuleBySlot("main")}</div>
-      <div className="worker-slot-sidebar">{resolveModuleBySlot("sidebar")}</div>
-      <div className="worker-slot-bottom">{resolveModuleBySlot("bottom")}</div>
+    <div className="dashboard-grid">
+      <div className="grid-main">{resolveModuleBySlot("main")}</div>
+      <div className="grid-bottom">{resolveModuleBySlot("bottom")}</div>
+      <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
     </div>
   );
 }
