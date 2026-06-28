@@ -1,40 +1,11 @@
-// import React from "react";
-
-// export default function Dash2board({ activeModuleId }) {
-//   return (
-//     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-//       {activeModuleId === "biddings" && (
-//         <div>
-//           <p>Active incoming competitive service offers and rate valuation streams.</p>
-//         </div>
-//       )}
-//       {activeModuleId === "map" && (
-//         <div>
-//           <p>Live map layout tracking active field technician routing and dispatch updates.</p>
-//         </div>
-//       )}
-//       {activeModuleId === "ratings-review" && (
-//         <div>
-//           <p>Historical customer satisfaction indices, verification loops, and ratings logs.</p>
-//         </div>
-//       )}
-//       {activeModuleId === "active-post-v2" && (
-//         <div>
-//           <p>Extended logging metrics tracking jobs currently deployed out to network nodes.</p>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-
 // components/customer-dashboard/dash2board.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCustomerDashboardData } from './useCustomerDashboardData';
 import './dash2board.css';
 
-export default function Dash2Board() {
-  // Pulling positions and content states from our global state pool
+export default function Dash2Board({ viewSlug }) {
+  const navigate = useNavigate();
   const {
     postingsSlots,
     swapPostingsSlots,
@@ -44,120 +15,147 @@ export default function Dash2Board() {
     feedbackRating
   } = useCustomerDashboardData();
 
-  // ====================================================
-  // REUSABLE WIREFRAME LAYOUT WRAPPER COMPONENT
-  // ====================================================
-  // Optimization: Abstracting common card wrapper logic to keep code clean and optimal
-  const CardWrapper = ({ slotName, title, position, children }) => {
+  // Route state synchronization layer
+  useEffect(() => {
+    if (!viewSlug) return;
+    if (postingsSlots.main !== viewSlug) {
+      const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
+      if (targetSlot) swapPostingsSlots(targetSlot);
+    }
+  }, [viewSlug, postingsSlots, swapPostingsSlots]);
+
+  const handleModuleSelect = (targetSlug) => {
+    navigate(`/customer/postings/${targetSlug}`);
+  };
+
+  // Simplified shared card container component
+  const Card = ({ slug, title, position, children }) => {
     const isMain = position === "main";
     return (
       <div 
-        className={`postings-card slot-${position} ${!isMain ? 'clickable-swap-target' : ''}`}
-        onClick={!isMain ? () => swapPostingsSlots(slotName) : undefined}
+        className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
+        onClick={!isMain ? () => handleModuleSelect(slug) : undefined}
       >
-        <div className="postings-card-header">••• {title}</div>
+        <div className="card-header">••• {title}</div>
         {children}
       </div>
     );
   };
 
   // ====================================================
-  // SUB-MODULE RENDERING CONTROLLERS
+  // SUB-MODULE RENDERS
   // ====================================================
 
-  // MODULE 1: ACTIVE BIDDINGS ENGINE
   const renderBiddingsEngine = (position) => (
-    <CardWrapper slotName={position} title="COMPETITIVE MARKETPLACE METRICS" position={position}>
+    <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position}>
       {position === "main" ? (
-        <div className="active-view-panel">
+        <div className="main-panel">
           <h2>ACTIVE BIDDINGS ENGINE</h2>
-          <p className="description-text">Active incoming competitive service offers and rate valuation streams.</p>
-          <div className="bids-list-box">
+          <p className="panel-desc">Active incoming competitive service offers and rate valuation streams.</p>
+          <div className="bids-box">
             {biddingsStream.map(bid => (
-              <div key={bid.id} className="bid-row-item">
+              <div key={bid.id} className="bid-row">
                 <span><strong>{bid.provider}</strong>: {bid.offer}</span>
-                <span className="badge-status">{bid.status}</span>
+                <span className="status-badge">{bid.status}</span>
               </div>
             ))}
           </div>
         </div>
       ) : (
-        <div className="sleeping-preview-box">
-          <span className="pill-outline">Bids Incoming Feed Active</span>
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
+              <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
+            </>
+          ) : (
+            <span className="badge">Footer Slot: {biddingsStream.length} Active Valuations</span>
+          )}
         </div>
       )}
-    </CardWrapper>
+    </Card>
   );
 
-  // MODULE 2: GEOSPATIAL LIVE MAP
   const renderLiveMap = (position) => (
-    <CardWrapper slotName={position} title="GEOSPATIAL LIVE MAP" position={position}>
+    <Card slug="GeospatialLiveMap" title="GEOSPATIAL LIVE MAP" position={position}>
       {position === "main" ? (
-        <div className="active-view-panel">
+        <div className="main-panel">
           <h2>GEOSPATIAL ENGINE FULL DISPLAY</h2>
           <p>Coordinates: {gpsCoordinates.lat}, {gpsCoordinates.lng}</p>
         </div>
       ) : (
-        <div className="sleeping-preview-box">
-          <span className="pill-outline">GPS Coordinates — Tracking Active Feed</span>
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: GPS Map Node Tracker</span>
+              <p className="card-summary">Lat: {gpsCoordinates.lat} | Lng: {gpsCoordinates.lng}</p>
+            </>
+          ) : (
+            <span className="badge">Footer Slot: Map Tracking Active</span>
+          )}
         </div>
       )}
-    </CardWrapper>
+    </Card>
   );
 
-  // MODULE 3: ACTIVE POSTS DASHBOARD
   const renderPostsDashboard = (position) => (
-    <CardWrapper slotName={position} title="ACTIVE POSTS DASHBOARD" position={position}>
+    <Card slug="ActivePostsDashboard" title="ACTIVE POSTS DASHBOARD" position={position}>
       {position === "main" ? (
-        <div className="active-view-panel">
+        <div className="main-panel">
           <h2>ACTIVE POSTS PIPELINE NETWORK</h2>
         </div>
       ) : (
-        <div className="sleeping-preview-box">
-          <span className="pill-outline">{pipelineStatus}</span>
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Pipeline Stream</span>
+              <p className="card-summary">Status: {pipelineStatus}</p>
+            </>
+          ) : (
+            <span className="badge">Footer Slot: Pipeline Backgrounded ({pipelineStatus})</span>
+          )}
         </div>
       )}
-    </CardWrapper>
+    </Card>
   );
 
-  // MODULE 4: RATINGS & REVIEW LOGS
   const renderReviewLogs = (position) => (
-    <CardWrapper slotName={position} title="RATINGS & REVIEW LOGS" position={position}>
+    <Card slug="RatingsReviewLogs" title="RATINGS & REVIEW LOGS" position={position}>
       {position === "main" ? (
-        <div className="active-view-panel">
+        <div className="main-panel">
           <h2>VERIFIED FEEDBACK HISTORY LOGS</h2>
         </div>
       ) : (
-        <div className="sleeping-preview-box">
-          <span className="pill-outline">{feedbackRating}</span>
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Feedback Monitoring</span>
+              <p className="card-summary">Live Score Rating: {feedbackRating}</p>
+            </>
+          ) : (
+            <span className="badge">Footer Slot: Logs Idle — Score ({feedbackRating})</span>
+          )}
         </div>
       )}
-    </CardWrapper>
+    </Card>
   );
 
-  // ====================================================
-  // ROUTING ASSIGNMENT ENGINE
-  // ====================================================
   const resolveModuleBySlot = (slotKey) => {
-    const targetModuleName = postingsSlots[slotKey];
-    switch (targetModuleName) {
+    switch (postingsSlots[slotKey]) {
       case "ActiveBiddingsEngine": return renderBiddingsEngine(slotKey);
       case "GeospatialLiveMap":    return renderLiveMap(slotKey);
       case "ActivePostsDashboard": return renderPostsDashboard(slotKey);
       case "RatingsReviewLogs":    return renderReviewLogs(slotKey);
-      default: return null;
+      default:                     return null;
     }
   };
 
-  // ====================================================
-  // MULTI-PANE STRUCTURAL CANVAS GRID
-  // ====================================================
   return (
-    <div className="postings-dashboard-canvas-grid">
-      <div className="grid-area-main">{resolveModuleBySlot("main")}</div>
-      <div className="grid-area-sidebar">{resolveModuleBySlot("sidebar")}</div>
-      <div className="grid-area-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
-      <div className="grid-area-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
+    <div className="dashboard-grid-4pane">
+      <div className="grid-main">{resolveModuleBySlot("main")}</div>
+      <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
+      <div className="grid-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
+      <div className="grid-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
     </div>
   );
 }
