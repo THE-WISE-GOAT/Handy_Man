@@ -1,9 +1,11 @@
 // components/worker-dashboard/dash3worker.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWorkerDashboardData } from './useWorkerDashboardData';
 import './dash3worker.css';
 
-export default function Dash3Worker() {
+export default function Dash3Worker({ viewSlug }) {
+  const navigate = useNavigate();
   const {
     meSlots,
     swapMeSlots,
@@ -13,116 +15,132 @@ export default function Dash3Worker() {
     scrapedTagsMatchText
   } = useWorkerDashboardData();
 
-  // ====================================================
-  // SUB-MODULE 1: VERIFICATION INTERVENTIONS
-  // ====================================================
-  const renderInterview = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">ONBOARDING COMPLIANCE RUNTIME</div>
-          <h2>Verification Interventions</h2>
-          <p className="worker-panel-desc">{interviewStatusText}</p>
-        </div>
-      );
+  // Route state synchronization layer
+  useEffect(() => {
+    if (!viewSlug) return;
+    if (meSlots.main !== viewSlug) {
+      const targetSlot = Object.keys(meSlots).find((key) => meSlots[key] === viewSlug);
+      if (targetSlot) swapMeSlots(targetSlot);
     }
+  }, [viewSlug, meSlots, swapMeSlots]);
 
+  const handleModuleSelect = (targetSlug) => {
+    navigate(`/worker/me/${targetSlug}`);
+  };
+
+  // Shared reusable card frame template
+  const Card = ({ slug, title, position, children }) => {
+    const isMain = position === "main";
     return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapMeSlots(position)}>
-        <div className="worker-card-header">ONBOARDING COMPLIANCE RUNTIME</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">Interview Terminal</span>
-        </div>
+      <div 
+        className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
+        onClick={!isMain ? () => handleModuleSelect(slug) : undefined}
+      >
+        <div className="card-header">••• {title}</div>
+        {children}
       </div>
     );
   };
 
   // ====================================================
-  // SUB-MODULE 2: WORKER IDENTITY PROFILE
+  // SUB-MODULE RENDERS
   // ====================================================
-  const renderProfile = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">USER REGISTRATION INFRASTRUCTURE</div>
+
+  const renderInterview = (position) => (
+    <Card slug="MeInterview" title="ONBOARDING COMPLIANCE RUNTIME" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
+          <h2>Verification Interventions</h2>
+          <p className="panel-desc">{interviewStatusText}</p>
+        </div>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Compliance Node</span>
+              <p className="card-summary">{interviewStatusText}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Terminal Onboarding Feed</span>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+
+  const renderProfile = (position) => (
+    <Card slug="MeProfile" title="USER REGISTRATION INFRASTRUCTURE" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>Worker Identity Profile</h2>
         </div>
-      );
-    }
-
-    return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapMeSlots(position)}>
-        <div className="worker-card-header">USER REGISTRATION INFRASTRUCTURE</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">{profileCredentialsText}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Identity Profile</span>
+              <p className="card-summary">{profileCredentialsText}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Profile Token [{profileCredentialsText}]</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SUB-MODULE 3: ENVIRONMENT CONFIGURATIONS
-  // ====================================================
-  const renderConfig = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">SYSTEM CONFIGURATION METRICS</div>
+  const renderConfig = (position) => (
+    <Card slug="MeConfiguration" title="SYSTEM CONFIGURATION METRICS" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>Environment Configurations</h2>
         </div>
-      );
-    }
-
-    return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapMeSlots(position)}>
-        <div className="worker-card-header">SYSTEM CONFIGURATION METRICS</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">{envConfigParametersText}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Env Metrics</span>
+              <p className="card-summary">{envConfigParametersText}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Environment Context ({envConfigParametersText})</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // SUB-MODULE 4: COLLECTED TAGS ANALYZER
-  // ====================================================
-  const renderTagsAnalyzer = (position) => {
-    if (position === "main") {
-      return (
-        <div className="worker-section-card view-main">
-          <div className="worker-card-header">ITEM LABELING CLASSIFICATION LOGS</div>
+  const renderTagsAnalyzer = (position) => (
+    <Card slug="MeCollectedTags" title="ITEM LABELING CLASSIFICATION LOGS" position={position}>
+      {position === "main" ? (
+        <div className="main-panel">
           <h2>Collected Tags Analyzer</h2>
         </div>
-      );
-    }
-
-    return (
-      <div className={`worker-section-card view-${position} worker-clickable-node`} onClick={() => swapMeSlots(position)}>
-        <div className="worker-card-header">ITEM LABELING CLASSIFICATION LOGS</div>
-        <div className="worker-sleeping-box">
-          <span className="worker-pill-outline">{scrapedTagsMatchText}</span>
+      ) : (
+        <div className="preview-panel">
+          {position === "sidebar" ? (
+            <>
+              <span className="badge badge-highlight">Sidebar: Labels Engine</span>
+              <p className="card-summary">{scrapedTagsMatchText}</p>
+            </>
+          ) : (
+            <span className="badge">Footer ({position}): Scraped Logs Stream ({scrapedTagsMatchText})</span>
+          )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </Card>
+  );
 
-  // ====================================================
-  // TRANSLATION DISPATCHER
-  // ====================================================
   const resolveModuleBySlot = (slotKey) => {
-    const moduleName = meSlots[slotKey];
-    switch (moduleName) {
-      case "MeInterview":        return renderInterview(slotKey);
-      case "MeProfile":          return renderProfile(slotKey);
-      case "MeConfiguration":    return renderConfig(slotKey);
-      case "MeCollectedTags":    return renderTagsAnalyzer(slotKey);
-      default:                   return null;
+    switch (meSlots[slotKey]) {
+      case "MeInterview":     return renderInterview(slotKey);
+      case "MeProfile":       return renderProfile(slotKey);
+      case "MeConfiguration": return renderConfig(slotKey);
+      case "MeCollectedTags": return renderTagsAnalyzer(slotKey);
+      default:                return null;
     }
   };
 
-  // ====================================================
-  // 4-PANEL GRID INTERACTION CANVAS
-  // ====================================================
   return (
     <div className="worker-me-canvas-grid">
       <div className="grid-area-main">{resolveModuleBySlot("main")}</div>
