@@ -250,3 +250,109 @@ class WorkerOnboardIn(BaseModel):
     
     
     
+"""
+Schema additions needed in src/core/schema.py — worker interview pipeline
+============================================================================
+Copy WorkerProfileSchema and the four response models below into your
+existing src/core/schema.py.
+
+These are independent of CategoryMatch / CustomerProblemSchema from the
+dispatch pipeline — a worker profile describes a single occupation with a
+verified (or explicitly absent) speciality, not a multi-trade job. But
+category_tag reuses the EXACT same taxonomy strings as the customer
+pipeline's `category` field (both pull from
+chat_analyser_nvidia.SERVICE_REGISTRY), so the two are directly comparable
+for pre-filtering before any embedding match — that's why it's worth
+keeping the two schema files in sync rather than treating them as
+unrelated.
+"""
+
+from typing import List, Optional
+from pydantic import BaseModel, Field
+
+
+class WorkerProfileSchema(BaseModel):
+    """
+    Structured-output contract the extraction model fills in after a
+    worker passes their scenario test. Field meanings match exactly what's
+    described in worker_interview_nvidia._build_extraction_prompt().
+
+    job_description is the field the eventual customer<->worker matching
+    engine will embed and compare against a customer's problem_description
+    (see chat_analyser_nvidia.CustomerProblemSchema). It is deliberately
+    written in plain, task-oriented language rather than a biography, so
+    its embedding lands close to how customers phrase problems in the same
+    domain.
+
+    category_tag / is_custom_category mirror the CategoryMatch fields in
+    the customer pipeline's schema, using the same taxonomy, so dispatch
+    can pre-filter workers by category_tag == customer category before
+    doing any embedding work.
+
+    has_verified_specialty is false when the worker was tested on general
+    core-job competency rather than a claimed advanced niche. This is a
+    legitimate, expected outcome — not a lesser pass. Downstream matching
+    can use it to weight speciality-specific jobs toward
+    has_verified_specialty=True workers without excluding the rest.
+    """
+    job_category: str
+    category_tag: str
+    is_custom_category: bool
+    specialities: List[str] = Field(default_factory=list)
+    years_experience: int
+    license_or_certification: str
+    specialized_tools_or_equipment: List[str] = Field(default_factory=list)
+    job_description: str
+    emergency_available: bool
+    has_verified_specialty: bool
+    scenario_passed: bool
+    scenario_score: int
+
+
+# ---------------------------------------------------------------------------
+# Response models for src/routers/worker_interview.py
+# ---------------------------------------------------------------------------
+
+class WorkerSessionStartOut(BaseModel):
+    worker_chat_id: int
+    ai_response: str
+    stage: str
+
+
+class WorkerChatMessageIn(BaseModel):
+    worker_chat_id: int
+    message: str
+
+    # Apply the same non-empty / whitespace-stripped field_validator the
+    # customer pipeline's ChatMessageIn already uses, if you're copying
+    # this in fresh rather than reusing an existing validator/mixin.
+
+
+class WorkerChatMessageOut(BaseModel):
+    worker_chat_id: int
+    ai_response: str
+    stage: str                                 # "interviewing" | "awaiting_scenario_answer" | "complete"
+    is_complete: bool
+    is_rejected: bool
+    scenario_question: Optional[str] = None    # populated only on the turn
+                                                # that transitions to
+                                                # awaiting_scenario_answer
+    turns_used: int
+    turns_remaining: int
+
+
+class WorkerChatHistoryOut(BaseModel):
+    worker_chat_id: int
+    history: List[dict]
+    stage: str
+    is_complete: bool
+    turns_used: int
+    turns_remaining: int
+
+
+class WorkerSummaryOut(BaseModel):
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    rejection_reason: Optional[str] = None
+    profile: Optional[WorkerProfileSchema] = None   # None until a pass is extracted

@@ -31,7 +31,7 @@ from sqlalchemy import select
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema
-from src.ai.chat_analyser_nvidia import (
+from src.ai.customer_chat_analyser_nvidia import (
     _nvidia_client,          # shared NIM client — no second API key needed
     build_fresh_history,
     count_user_turns,

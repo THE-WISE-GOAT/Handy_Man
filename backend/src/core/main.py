@@ -4,15 +4,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from src.core.router import chat_customer, chat_worker
 from src.core import model, schema
-from src.core.router import auth, chat, login, service_task, user, worker
+from src.core.router import auth, login, service_task, user, worker
 from src.database.database import engine, get_db
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from src.database.database import engine
 from src.core import model
-from src.core.router import user, login, auth, worker, service_task, chat1
+from src.core.router import user, login, auth, worker, service_task
 
 # 1. Define the startup logic using lifespan
 @asynccontextmanager
@@ -98,5 +99,5 @@ app.include_router(user.router) # includes the user router, which contains all t
 app.include_router(auth.router) # includes the auth router, which contains the API endpoint for user registration and role assignment
 app.include_router(login.router) # includes the login router, which contains the API endpoint for user login and token generation
 app.include_router(worker.router) # includes the worker router, which contains the API endpoint for worker role application
-app.include_router(chat1.router) # includes the chat router, which contains the API endpoints for the customer support chat functionality
-
+app.include_router(chat_customer.router) # includes the chat router, which contains the API endpoints for the customer support chat functionality
+app.include_router(chat_worker.router) 
