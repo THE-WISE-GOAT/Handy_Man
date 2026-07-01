@@ -111,31 +111,128 @@ class ChatHistoryOut(BaseModel):
  
 class BookingSummaryOut(BaseModel):
     """Returned by GET /dispatch/{id}/summary once is_complete is True."""
-    problem_category:    str
-    service_tags:        List[str]
+    categories: List[CategoryMatch] = Field(default_factory=list)
     problem_description: str
-    is_complete:          bool
-    is_job_request:       bool   # False means: no real job was ever extracted — don't dispatch a worker
-    is_custom_category:   bool   # True means: AI-guessed category, route to manual review, not auto-match
+    is_complete: bool
+    is_job_request: bool
  
  
+"""
+Schema changes needed in src/core/schema.py
+=============================================
+
+This file has TWO parts:
+
+  1. A drop-in replacement for CustomerProblemSchema, plus the new
+     CategoryMatch model it's built on. Copy these two classes into your
+     actual src/core/schema.py, replacing the old CustomerProblemSchema.
+
+  2. A diff guide (bottom of this file, in comments) for the fields you
+     need to ADD to your existing ChatMessageOut and BookingSummaryOut
+     response models. I only have what dispatch.py reveals those classes
+     must already contain — not their actual source — so this is written
+     as instructions to apply against your real file, not a file to copy
+     wholesale.
+"""
+
+from typing import List
+from pydantic import BaseModel, Field
+
+
+class CategoryMatch(BaseModel):
+    """
+    One trade's contribution to a job. A job needing more than one trade
+    (e.g. a stuck automatic gate needing both structural and electrical
+    work) gets one of these per trade, each scoped to only the tags that
+    trade would actually perform — never a flat list of tags dumped under
+    a single category.
+
+    category:
+        Lowercase, hyphenated trade name. Preferably an exact
+        SERVICE_REGISTRY key; allowed to be freshly invented when the job
+        genuinely doesn't fit any existing one.
+    tags:
+        1-3 short, lowercase, hyphenated tags describing the SPECIFIC part
+        of the task this trade would handle. May be registry tags,
+        invented tags, or a mix — tags are never dropped just because
+        they aren't in the static registry. Precision beats registry
+        membership.
+    is_custom_category:
+        True if EITHER this category is not an exact registry match OR any
+        of its tags had to be invented. False only when both the category
+        and every tag are exact, verified registry matches. Informational —
+        tells the dispatch layer "this trade's match needs a closer look,"
+        not a gate that discards anything.
+    """
+    category: str
+    tags: List[str] = Field(default_factory=list)
+    is_custom_category: bool
+
+
 class CustomerProblemSchema(BaseModel):
     """
-    FIX: this schema was referenced by src/ai/customer_chat_analyser.py
-    (`from src.core.schema import CustomerProblemSchema`) but was never
-    actually defined anywhere — that import alone would crash the app on
-    startup before a single request could be served.
- 
-    This is the structured-output contract the extraction model is asked
-    to fill in via Ollama's `format=` JSON-schema mode. Field meanings
-    match exactly what's described in
-    customer_chat_analyser._build_extraction_prompt().
+    Structured-output contract the extraction model fills in after a
+    completed interview. Field meanings match exactly what's described in
+    chat_analyser_nvidia._build_extraction_prompt().
+
+    is_job_request:
+        False if the conversation never produced a genuine dispatchable
+        job (small talk, off-topic, refused/abandoned). `categories` and
+        `problem_description` are blanked out in that case — there is
+        nothing to dispatch.
+    categories:
+        1-3 CategoryMatch entries, one per trade genuinely needed for this
+        job, ordered with the most central trade first. This REPLACES the
+        old problem_category + secondary_categories + service_tags +
+        top-level is_custom_category fields — every piece of trade/tag/
+        custom-category data now lives here, scoped per trade instead of
+        flattened under one primary category. Empty list if
+        is_job_request is false.
+    problem_description:
+        One plain-language sentence summarizing what the customer
+        reported. Empty string if is_job_request is false.
     """
-    is_job_request:      bool
-    problem_category:    str
-    is_custom_category:  bool
-    service_tags:        List[str] = Field(default_factory=list)
+    is_job_request: bool
+    categories: List[CategoryMatch] = Field(default_factory=list)
     problem_description: str
+
+
+# ---------------------------------------------------------------------------
+# DIFF GUIDE — apply against your actual src/core/schema.py
+# ---------------------------------------------------------------------------
+#
+# Your ChatMessageOut and BookingSummaryOut response models currently expose
+# fields from the old flat CustomerProblemSchema shape. Based on what
+# dispatch.py constructs and returns, here's what each one needs:
+#
+#   class ChatMessageOut(BaseModel):
+#       ...                                      # whatever else it already has
+#       categories: List[CategoryMatch] = []      # NEW — full per-trade breakdown,
+#                                                  # use this for actual worker routing
+#       current_tags: List[str]                   # already exists — now a flattened
+#                                                  # union of tags across ALL trades,
+#                                                  # not just one category
+#       is_custom_category: bool                  # already exists — now means "true
+#                                                  # if ANY entry in `categories` is
+#                                                  # custom", not a single category's flag
+#
+#       (remember to `from src.core.schema import CategoryMatch` or define it
+#       in the same module before referencing it here)
+#
+#   class BookingSummaryOut(BaseModel):
+#       ...                                      # whatever else it already has
+#       categories: List[CategoryMatch] = []      # NEW — replaces problem_category,
+#                                                  # service_tags, and the old
+#                                                  # top-level is_custom_category;
+#                                                  # each entry carries its own
+#                                                  # is_custom_category now
+#
+# SessionStartOut and ChatHistoryOut are untouched by this change — neither
+# one ever carried category/tag data.
+# ---------------------------------------------------------------------------
+ 
+    
+    
 # 1. Schema for a single Role
 class UserRolesOut(BaseModel):
     roles: list[str]
