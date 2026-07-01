@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from src.database.database import engine
 from src.core import model
-from src.core.router import user, login, auth, worker, service_task, chat
+from src.core.router import user, login, auth, worker, service_task, chat1
 
 # 1. Define the startup logic using lifespan
 @asynccontextmanager
@@ -98,5 +98,5 @@ app.include_router(user.router) # includes the user router, which contains all t
 app.include_router(auth.router) # includes the auth router, which contains the API endpoint for user registration and role assignment
 app.include_router(login.router) # includes the login router, which contains the API endpoint for user login and token generation
 app.include_router(worker.router) # includes the worker router, which contains the API endpoint for worker role application
-app.include_router(chat.router) # includes the chat router, which contains the API endpoints for the customer support chat functionality
+app.include_router(chat1.router) # includes the chat router, which contains the API endpoints for the customer support chat functionality
 

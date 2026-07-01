@@ -14,7 +14,7 @@ import enum
 from datetime import datetime
 from geoalchemy2 import Geography
 from geoalchemy2.elements import WKBElement
-import sqlalchemy as sa 
+from sqlalchemy import JSON
 
 
 
@@ -29,6 +29,7 @@ class User(Base):
     lastName: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default='TRUE')
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default="now()")
+      
     
     # THE RELATIONSHIP LINK FOR USER
     roles: Mapped[List["Role"]] = relationship(
@@ -76,19 +77,71 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.database import Base  # adjust to match your project's declarative base import
 
 
-class BookingChat(Base):
+"""
+Changes needed in your model.py (the BookingChat class)
+==========================================================
+
+Replaces problem_category (String) + service_tags (ARRAY(String)) +
+is_custom_category (Boolean) with a single `categories` JSONB column that
+mirrors the new CategoryMatch list shape from src/core/schema.py:
+
+    [
+      {"category": "construction", "tags": ["gate-repair"], "is_custom_category": true},
+      {"category": "electrical",   "tags": ["electric-motor-replacement"], "is_custom_category": true}
+    ]
+
+`is_job_request` is unchanged — it's still a simple top-level bool.
+
+Note: your original is_job_request column comment says it's "set to true
+when the user clicks the Submit Job Request button in the frontend" — that
+doesn't match how dispatch.py actually sets it (from the extraction
+pipeline's result, not a button click). Worth a quick check on whether that
+comment is stale documentation or describes a different flag you haven't
+wired up yet — left as-is here since I can't tell which from the code alone.
+
+Apply this as a diff against your real model.py; this isn't a full file
+since I don't have your imports, Base class, or the rest of BookingChat's
+neighbors.
+"""
+
+# Required import in your model.py, if not already present:
+# from sqlalchemy.dialects.postgresql import JSONB
+
+
+class BookingChat(Base):  # (Base) — keep your existing base class
     __tablename__ = "booking_chats"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    history: Mapped[List[dict]] = mapped_column(JSONB, nullable=False)  # Store the  chat history as a JSON array of message objects
-    is_complete: Mapped[bool] = mapped_column(Boolean, server_default='FALSE', nullable=False)  # Flag to indicate if the chat has concluded and the data is ready for extraction
-    is_job_request: Mapped[bool] = mapped_column(Boolean, server_default='FALSE', nullable=False) # Flag to indicate if the user has confirmed that they want to submit a job request after the chat, this is used to trigger the extraction process in the backend, and it will be set to true when the user clicks the "Submit Job Request" button in the frontend after the chat is complete.
-    is_custom_category: Mapped[bool] = mapped_column(Boolean, server_default='FALSE', nullable=False) # Flag to indicate if the problem category is a custom category that is not in the predefined list, this is used to trigger a different extraction process in the backend that allows for more free-form input from the user, and it will be set to true when the user selects "Other" as the problem category in the frontend and enters a custom category.
-    # extract the data after [COMPLETE] flag is true, then store the extracted data in the service_tasks table, and link it with a foreign key to this booking_chat entry for traceability.
-    problem_category: Mapped[str] = mapped_column(String, nullable=True)
-    service_tags: Mapped[List[str]] = mapped_column(ARRAY(String), nullable=True)
-    problem_description: Mapped[str] = mapped_column(Text, nullable=True)
+    id: Mapped[int]= mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int]= mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    history: Mapped[list[dict]] = mapped_column(JSON, default=list) 
+    is_complete: Mapped[bool]  = mapped_column(Boolean, server_default='FALSE', nullable=False)
+    is_job_request: Mapped[bool]   = mapped_column(Boolean, server_default='FALSE', nullable=False)
+
+    # REPLACES problem_category (String) + service_tags (ARRAY(String)) +
+    # is_custom_category (Boolean). Each job can now span more than one
+    # trade, and each trade's tags stay scoped to that trade instead of
+    # being flattened under one category — see CategoryMatch in
+    # src/core/schema.py. First entry in the list is the most central
+    # category for the job.
+    categories: Mapped[list[dict]]   = mapped_column(JSONB, nullable=True)
+
+    problem_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Actual SQLAlchemy column definitions to copy in (same types you already
+# use elsewhere in this file — String/ARRAY swapped out, JSONB import added):
+# ---------------------------------------------------------------------------
+#
+#   categories: Mapped[List[dict]] = mapped_column(JSONB, nullable=True)
+#   # delete: problem_category, service_tags, is_custom_category
+#
+# Then generate + apply the matching Alembic migration — see
+# alembic_migration_multi_category.py in this same delivery, which adds the
+# new column, backfills it from your existing problem_category/service_tags/
+# is_custom_category data, and drops the three old columns.
+# ---------------------------------------------------------------------------
     
     
 class Worker(Base):

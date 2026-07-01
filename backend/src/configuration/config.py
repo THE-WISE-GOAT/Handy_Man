@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     ALGORITHM: str   # this is the algorithm used to sign our JWT tokens, HS256 is a common choice for symmetric signing
     ACCESS_TOKEN_EXPIRE_MINUTES: int # this is the number of minutes that our access tokens will be valid for, after that they will expire and the user will need to log in again to get a new token
     gemini_api_key: str
+    nvidia_api_key: str
     
     
 settings = Settings() # creates an instance of the Settings class, which will read the environment variables from the .env file and make them available when ever needed 
