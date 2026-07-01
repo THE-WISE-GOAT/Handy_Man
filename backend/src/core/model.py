@@ -6,7 +6,7 @@ import uuid
 from pydantic import BaseModel, Field
 
 from src.database.database import Base
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float, text
+from sqlalchemy import Column, DateTime, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float, text
 from sqlalchemy.sql.sqltypes import TIMESTAMP, UUID, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
@@ -15,7 +15,9 @@ from datetime import datetime
 from geoalchemy2 import Geography
 from geoalchemy2.elements import WKBElement
 from sqlalchemy import JSON
-
+from sqlalchemy import DateTime, JSON, func  
+from sqlalchemy.orm import Mapped, mapped_column
+from datetime import datetime
 
 
 class User(Base):
@@ -227,3 +229,96 @@ class WorkerSkillsSchema(BaseModel):
 
 
 
+
+"""
+New table needed in your model.py — worker interview pipeline
+================================================================
+This is a NEW table, not a modification of booking_chats. A worker
+registration interview has its own lifecycle (interview -> scenario test
+-> pass/reject -> profile) that doesn't fit the customer BookingChat shape,
+so it gets its own model.
+
+Required import in your model.py, if not already present:
+  from sqlalchemy.dialects.postgresql import JSONB
+
+Apply this as a diff against your real model.py — this isn't a full file
+since I don't have your imports, Base class, or the rest of your models'
+neighbors.
+"""
+
+
+class WorkerInterviewSession(Base):  # (Base) — keep your existing base class
+    __tablename__ = "worker_interview_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    history: Mapped[list[dict]] = mapped_column(JSONB, nullable=False)
+
+    # State machine — see worker_interview_nvidia.py module docstring and
+    # worker_interview_router.py.
+    #   "interviewing"             -> normal Q&A, no test triggered yet
+    #   "awaiting_scenario_answer" -> a scenario question has been asked;
+    #                                  the worker's NEXT message is graded,
+    #                                  not treated as an ordinary chat turn
+    #   "complete"                 -> is_complete=True; check is_rejected
+    #                                  to see which way it resolved
+    stage: Mapped[str]= mapped_column(String, server_default="interviewing", nullable=False)
+
+    is_complete: Mapped[bool]= mapped_column(Boolean, server_default="FALSE", nullable=False)
+    is_rejected: Mapped[bool] = mapped_column(Boolean, server_default="FALSE", nullable=False)
+    rejection_reason: Mapped[str | None]# = mapped_column(Text, nullable=True)
+
+    # Set the moment [TEST_REQUIRED: ...] fires. Kept (not cleared) after
+    # grading, so both the extraction step and the audit trail have it
+    # without re-parsing the raw history.
+    pending_sub_skill: Mapped[str | None]= mapped_column(Text, nullable=True)
+    pending_scenario: Mapped[str | None]= mapped_column(Text, nullable=True)
+    has_verified_specialty: Mapped[bool | None]= mapped_column(Boolean, nullable=True)
+
+    scenario_score: Mapped[int | None]= mapped_column(Integer, nullable=True)
+    scenario_passed: Mapped[bool | None]= mapped_column(Boolean, nullable=True)
+
+    # Full validated WorkerProfileSchema, only populated on a genuine pass
+    # where extraction also succeeded (see worker_interview_router.py's
+    # _handle_scenario_answer for the pass-but-extraction-failed case).
+    profile: Mapped[dict | None]= mapped_column(JSONB, nullable=True)
+
+    created_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Actual SQLAlchemy column definitions to copy in (same types you already
+# use elsewhere in this file — JSONB import added):
+# ---------------------------------------------------------------------------
+#
+#   from typing import Optional
+#   from datetime import datetime
+#   from sqlalchemy import String, Boolean, Text, Integer, DateTime, ForeignKey, func
+#   from sqlalchemy.dialects.postgresql import JSONB
+#   from sqlalchemy.orm import Mapped, mapped_column
+#
+#   class WorkerInterviewSession(Base):
+#       __tablename__ = "worker_interview_sessions"
+#
+#       id: Mapped[int] = mapped_column(primary_key=True, index=True)
+#       user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+#       history: Mapped[list[dict]] = mapped_column(JSONB, nullable=False)
+#       stage: Mapped[str] = mapped_column(String, server_default="interviewing", nullable=False)
+#       is_complete: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+#       is_rejected: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+#       rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+#       pending_sub_skill: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+#       pending_scenario: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+#       has_verified_specialty: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+#       scenario_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+#       scenario_passed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+#       profile: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+#       created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+#       updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+#
+# Then generate + apply the matching Alembic migration — see
+# alembic_migration_worker_interview.py in this same delivery, which
+# creates the table from scratch (no backfill needed, since this table
+# doesn't exist yet).
+# ---------------------------------------------------------------------------
