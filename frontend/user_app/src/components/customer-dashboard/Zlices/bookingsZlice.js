@@ -1,47 +1,48 @@
-// Zlices/bookingsZlice.js
-
 export const createBookingsZlice = (set, get) => ({
-  // ==========================================
-  // 1. BUSINESS CONTENT DATA
-  // ==========================================
   jobDescriptionDraft: "Job Description Workspace Primary Editor Terminal Node.",
   chatMessages: [
     { id: "init-1", sender: "system", text: "Live Dispatch - Active Session initiated." }
   ],
   activePostsCount: 0,
   isAiGenerating: false,
+  fetchedJobs: [],
 
-  // ==========================================
-  // 2. DYNAMIC LAYOUT POSITIONS (The Core Map)
-  // ==========================================
-  // Default positions mapped cleanly out as initial keys
   slots: {
     main: "AiChatTerminal",
     sidebar: "JobDescriptionWorkspace",
     bottom: "YourActivePosts"
   },
 
-  // ==========================================
-  // 3. UNIVERSAL SWAPPING ACTIONS
-  // ==========================================
-  
-  // The truly generic swap engine. No hardcoded module strings!
-  swapSlots: (clickedSlotName) => set((state) => {
-    if (clickedSlotName === "main") return {}; // Already on main screen, ignore
+  // Keep it purely as an action function
+  fetchCustomerJobs: async () => {
+    try {
+      const response = await fetch("http://localhost:8000/jobs/my-tasks");
+      const data = await response.json();
+      if (data.status === "success") {
+        set({ fetchedJobs: data.tasks });
+        set({ activePostsCount: data.tasks.length });
+        if (data.tasks.length > 0) {
+          set({ jobDescriptionDraft: data.tasks[0].problem_description });
+        }
+      }
+    } catch (error) {
+      console.error("Fetch Error:", error);
+    }
+  },
 
+  swapSlots: (clickedSlotName) => set((state) => {
+    if (clickedSlotName === "main") return {};
     const outgoingMainModule = state.slots.main;
     const incomingTargetModule = state.slots[clickedSlotName];
-
     return {
       slots: {
         ...state.slots,
-        main: incomingTargetModule,           // Target moves to center stage
-        [clickedSlotName]: outgoingMainModule // Old center module moves to sleeping slot
+        main: incomingTargetModule,
+        [clickedSlotName]: outgoingMainModule
       }
     };
   }),
 
-  // Standard business data updates
   setJobDescription: (text) => set({ jobDescriptionDraft: text }),
   addChatMessage: (text, sender = "user") => 
     set((state) => ({

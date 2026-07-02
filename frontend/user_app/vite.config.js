@@ -26,6 +26,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@shared": path.resolve(__dirname, "../shared"),
+      // Explicitly direct outside files to find your core packages locally
+      "react-router-dom": path.resolve(__dirname, "node_modules/react-router-dom"),
+      "react": path.resolve(__dirname, "node_modules/react"),
+      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
     },
   },
 });

@@ -1,4 +1,3 @@
-// components/customer-dashboard/dash1board.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCustomerDashboardData } from "./useCustomerDashboardData";
@@ -8,6 +7,7 @@ export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
 
+  // Bring in the items from Zustand
   const {
     slots,
     swapSlots,
@@ -16,7 +16,14 @@ export default function Dash1Board({ viewSlug }) {
     chatMessages,
     addChatMessage,
     activePostsCount,
+    fetchedJobs,         // <-- Hooked up state
+    fetchCustomerJobs,   // <-- Hooked up action
   } = useCustomerDashboardData();
+
+  // Trigger HTTP Fetch once when the page loads safely
+  useEffect(() => {
+    fetchCustomerJobs();
+  }, [fetchCustomerJobs]);
 
   // Route state synchronization layer
   useEffect(() => {
@@ -89,13 +96,41 @@ export default function Dash1Board({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card main-view">
-          <span className="card-flag">Main: REVIEW AND REFINE AUTO-GENERATED DETAILS</span>
+          <span className="card-flag">Main: LOGGED USER PIPELINE CONFIGURATION</span>
           <h2>JOB DESCRIPTION WORKSPACE</h2>
+          
+          {/* Main Workspace Editor */}
           <textarea
             className="workspace-textarea"
             value={jobDescriptionDraft}
             onChange={(e) => setJobDescription(e.target.value)}
+            style={{ marginBottom: "15px", width: "100%", height: "80px" }}
           />
+
+          <h3>YOUR HISTORICAL JOBS</h3>
+          <div className="jobs-list-container" style={{ maxHeight: "200px", overflowY: "auto" }}>
+            {fetchedJobs.length === 0 ? (
+              <p style={{ color: "#888", fontSize: "14px" }}>No jobs found for this customer session.</p>
+            ) : (
+              fetchedJobs.map((job) => (
+                <div 
+                  key={job.id} 
+                  onClick={() => setJobDescription(job.problem_description)}
+                  style={{
+                    padding: "10px",
+                    border: "1px solid #444",
+                    borderRadius: "4px",
+                    marginBottom: "8px",
+                    cursor: "pointer",
+                    background: "#222"
+                  }}
+                >
+                  <strong style={{ color: "#4caf50" }}>Job #{job.id}:</strong>
+                  <p style={{ margin: "5px 0 0 0", fontSize: "13px" }}>{job.problem_description}</p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       );
     }
@@ -108,7 +143,7 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• JOB DESCRIPTION WORKSPACE</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge">Sidebar: Description Live Glance — Draft Mode</span>
+            <span className="badge">Sidebar: Active Jobs Total: {fetchedJobs.length}</span>
             <p className="card-summary">{jobDescriptionDraft.substring(0, 35)}...</p>
           </>
         ) : (
@@ -163,4 +198,4 @@ export default function Dash1Board({ viewSlug }) {
       <div className="grid-sidebar">{resolveAndRenderModule("sidebar")}</div>
     </div>
   );
-}
+} 
