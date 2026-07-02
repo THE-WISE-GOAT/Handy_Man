@@ -70,7 +70,7 @@ app.add_middleware(
     ],  # allows all headers to be included in requests from the frontend
 )
 
-app.include_router(
+app.include_router(   
     user.router
 )  # includes the user router, which contains all the API endpoints related to user's CRUD operations
 app.include_router(

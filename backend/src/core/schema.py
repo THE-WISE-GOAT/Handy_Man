@@ -102,6 +102,13 @@ class ChatHistoryOut(BaseModel):
     turns_used:       int
     turns_remaining: int
  
+  # this is use to disply category for the specific job request
+class CategoryMatch(BaseModel):
+    category: str
+    tags: List[str] = Field(default_factory=list)
+    is_custom_category: bool
+ 
+ 
  # to display the structured summary mainly needed for the frontend to use dict keys
 class BookingSummaryOut(BaseModel):
     """Returned by GET /dispatch/{id}/summary once is_complete is True."""
@@ -110,11 +117,7 @@ class BookingSummaryOut(BaseModel):
     is_complete: bool
     is_job_request: bool
  
- # this is use to disply category for the specific job request
-class CategoryMatch(BaseModel):
-    category: str
-    tags: List[str] = Field(default_factory=list)
-    is_custom_category: bool
+
 
 # use in the customer_chat_analyser_nvidia.py to validate the data that is sent to the API
 class CustomerProblemSchema(BaseModel):
