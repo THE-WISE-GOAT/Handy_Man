@@ -22,7 +22,7 @@ it whenever it genuinely fits.
 
 But the registry is NOT exhaustive, and matching the wrong static tag
 because it happens to live under the right category is worse than inventing
-a new, precise one. This module guards against four specific failure modes:
+a new, precise one. This module guards against five specific failure modes:
 
   1. Tag-squashing: earlier versions of this pipeline hard-filtered the
      model's chosen tags against SERVICE_REGISTRY[category], silently
@@ -64,6 +64,17 @@ a new, precise one. This module guards against four specific failure modes:
      step outside the shortlist when the job genuinely calls for it, and
      any embedding failure falls back to the full registry, so this layer
      is never a hard dependency for dispatch to keep functioning.
+
+  5. Worked-example echo: a small model can occasionally reproduce this
+     prompt's own worked example almost verbatim instead of describing the
+     real conversation, especially when the actual job is topically close
+     to the example. problem_description is checked against the known
+     example text after extraction (_looks_like_example_echo); a detected
+     echo triggers one retry at a higher temperature with a corrective
+     nudge before the result is accepted. This matters more than it might
+     look: problem_description is later embedded and matched against
+     worker job_description text, so a copied example would silently
+     collapse unrelated jobs onto the same point in embedding space.
 
 Both the live chat and the extraction step also actively guard against
 off-topic conversations (small talk, unrelated questions, requests to do
@@ -626,10 +637,28 @@ def _build_extraction_prompt(candidate_categories: list[str] | None = None) -> s
         "described the task. False only when both the category and every "
         "one of its tags are exact, verified registry matches.\n"
         "     Empty list if is_job_request is false.\n\n"
-        "  3. problem_description — one clear sentence summarising what the "
-        "customer reported, in plain customer-facing language. Empty string "
-        "if is_job_request is false. Do not invent details the customer "
-        "didn't say; do not mention urgency or safety.\n\n"
+        "  3. problem_description — 1-2 plain sentences describing the "
+        "physical task or problem itself: what needs doing, to what, and "
+        "where. Empty string if is_job_request is false. Do not invent "
+        "details the customer didn't say; do not mention urgency or "
+        "safety.\n"
+        "     This text will later be embedded and matched against worker "
+        "job_description text from the worker vetting pipeline, so:\n"
+        "       - Never use first-person voice ('my sink is leaking') or "
+        "third-person customer framing ('the customer's sink is "
+        "leaking') — state the task directly, e.g. 'Leaking pipe under "
+        "the kitchen sink needs repair.'\n"
+        "       - Strip conversational filler, apologies, and requests "
+        "for help ('please help', 'can someone fix') — describe only the "
+        "physical task.\n"
+        "       - Use the same plain, concrete vocabulary as TAG REGISTRY "
+        "below for the matched category or categories, so wording lines "
+        "up with how worker capabilities are described for the same "
+        "domain. Do not force a registry term that doesn't genuinely fit "
+        "the task.\n"
+        "       - If the job spans more than one trade, cover every trade "
+        "listed in categories, but stay concise — 2 sentences is a "
+        "ceiling, not a target.\n\n"
         "REMEMBER: CATEGORY LIST and TAG REGISTRY below are a preferred, "
         "commonly-used set — not the only valid answers. Treat them as "
         "helpful defaults, not a constraint that overrides accuracy. "
@@ -664,7 +693,13 @@ def _build_extraction_prompt(candidate_categories: list[str] | None = None) -> s
         "electrical repair — not monitoring or protecting the property. "
         "'security' only applies when the job itself is about surveillance, "
         "alarms, or access-control systems (cameras, intercoms, alarm "
-        "panels), not the physical mechanism of a gate, door, or lock.\n\n"
+        "panels), not the physical mechanism of a gate, door, or lock.\n"
+        "  STYLE NOTE: this example illustrates categorisation and "
+        "description FORMAT only. If your own problem_description starts "
+        "to closely mirror its exact wording for a different job, that's a "
+        "sign you're echoing the example rather than describing what this "
+        "customer actually said — rewrite using only this conversation's "
+        "details, in your own words.\n\n"
         f"CATEGORY LIST (preferred, not exhaustive):\n{json.dumps(PROBLEM_CATEGORIES)}\n\n"
         f"TAG REGISTRY (grouped by category, examples only):"
         f"{_format_registry(candidate_categories)}"
@@ -727,6 +762,66 @@ def _blank_non_job_result(result: CustomerProblemSchema) -> CustomerProblemSchem
     return result
 
 
+# ── Worked-example echo guard ────────────────────────────────────────────────
+# Small models occasionally reproduce a prompt's own worked example almost
+# verbatim instead of describing the real conversation, especially when the
+# real job is topically close to the example. This is a targeted guard
+# against that specific, observed failure mode — not a general plagiarism
+# detector — so it's deliberately cheap: an exact/near-exact substring check
+# against the one example string that actually appears in this prompt.
+
+_EXAMPLE_ECHO_TEXTS = [
+    "automatic sliding driveway gate stuck halfway open due to a dead "
+    "motor and a jammed manual release lever",
+]
+
+
+def _looks_like_example_echo(problem_description: str) -> bool:
+    """
+    True if problem_description closely matches the worked example's own
+    wording rather than describing what this specific customer said.
+    """
+    normalized = problem_description.strip().lower()
+    return any(
+        example in normalized or normalized in example
+        for example in _EXAMPLE_ECHO_TEXTS
+    )
+
+
+def _call_extraction_model(
+    messages: list[dict], model_name: str, temperature: float
+) -> CustomerProblemSchema:
+    """
+    Shared call+parse logic used by both the primary extraction call and
+    the echo-recovery retry in extract_final_json, so the request /
+    fence-stripping / validation logic only lives in one place.
+    """
+    response = _nvidia_client.chat.completions.create(
+        model=model_name,
+        messages=messages,
+        # json_object mode enforces valid JSON on every response; the extraction
+        # prompt already specifies the exact fields, and Pydantic validates shape.
+        response_format={"type": "json_object"},
+        temperature=temperature,
+        max_tokens=1024,
+    )
+
+    raw = response.choices[0].message.content.strip()
+
+    # Small models sometimes emit markdown fences despite instructions
+    if raw.startswith("```json"):
+        raw = raw.split("```json", 1)[1].rsplit("```", 1)[0].strip()
+    elif raw.startswith("```"):
+        raw = raw.split("```", 1)[1].rsplit("```", 1)[0].strip()
+
+    try:
+        return CustomerProblemSchema.model_validate_json(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"Extraction model returned invalid JSON it could not be parsed from: {raw!r}"
+        ) from exc
+
+
 def extract_final_json(
     chat_history: list[dict],
     model_name: str = MODEL_NAME,
@@ -752,6 +847,12 @@ def extract_final_json(
     each entry owns only the tags that trade would actually perform, so
     multi-trade jobs route to every relevant worker pool without tags
     bleeding into the wrong trade.
+
+    problem_description is checked against _looks_like_example_echo after
+    the first extraction call. If it matches, the model gets one retry at a
+    higher temperature with an explicit correction nudge; if that retry
+    still echoes (or fails outright), the original result is kept rather
+    than blocking extraction on this defensive check.
 
     Outcomes:
       - Clean registry match: a category entry's name is an exact
@@ -783,30 +884,7 @@ def extract_final_json(
         {"role": "system", "content": _build_extraction_prompt(candidate_categories)}
     ] + cleaned
 
-    response = _nvidia_client.chat.completions.create(
-        model=model_name,
-        messages=messages,
-        # json_object mode enforces valid JSON on every response; the extraction
-        # prompt already specifies the exact fields, and Pydantic validates shape.
-        response_format={"type": "json_object"},
-        temperature=0.0,
-        max_tokens=1024,
-    )
-
-    raw = response.choices[0].message.content.strip()
-
-    # Small models sometimes emit markdown fences despite instructions
-    if raw.startswith("```json"):
-        raw = raw.split("```json", 1)[1].rsplit("```", 1)[0].strip()
-    elif raw.startswith("```"):
-        raw = raw.split("```", 1)[1].rsplit("```", 1)[0].strip()
-
-    try:
-        result = CustomerProblemSchema.model_validate_json(raw)
-    except ValueError as exc:
-        raise ValueError(
-            f"Extraction model returned invalid JSON it could not be parsed from: {raw!r}"
-        ) from exc
+    result = _call_extraction_model(messages, model_name, temperature=0.0)
 
     # Nothing dispatchable ever surfaced — don't fabricate a category/tags
     # just to fill the schema.
@@ -814,6 +892,36 @@ def extract_final_json(
         return _blank_non_job_result(result)
 
     result.categories = _sanitize_categories(result.categories)
+
+    if _looks_like_example_echo(result.problem_description):
+        logger.warning(
+            "Extraction echoed the worked example's problem_description "
+            "verbatim; retrying at a higher temperature."
+        )
+        retry_messages = messages + [
+            {
+                "role": "system",
+                "content": (
+                    "Your previous problem_description copied the worked "
+                    "example's exact wording. That example illustrates "
+                    "format only. Rewrite problem_description using only "
+                    "details this specific customer actually said, in "
+                    "different words."
+                ),
+            }
+        ]
+        try:
+            retry_result = _call_extraction_model(retry_messages, model_name, temperature=0.2)
+            if (
+                getattr(retry_result, "is_job_request", True)
+                and not _looks_like_example_echo(retry_result.problem_description)
+            ):
+                retry_result.categories = _sanitize_categories(retry_result.categories)
+                result = retry_result
+        except Exception as exc:
+            logger.warning(
+                "Retry after example echo failed, keeping original result: %s", exc
+            )
 
     if not result.categories or not result.problem_description.strip():
         # Incomplete extraction despite is_job_request=True — treat as no job
