@@ -37,19 +37,30 @@ services:
         condition: service_healthy
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - .:/app
 
   user_app:
     build:
       context: ./frontend
       dockerfile: ./user_app/Dockerfile
+      target: dev
       args:
-        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        VITE_API_URL: ${PUBLIC_API_URL:-http://backend:8000}
     container_name: handy_man_user_app
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "${USER_APP_PROD_PORT:-4173}:80"
- 
+      - "${USER_APP_PROD_PORT:-5173}:5173"
+    # --- ADDED ENVIRONMENT VARIABLES FOR VITE ---
+    environment:
+      - VITE_USE_POLLING=true      # Forces Vite to watch files over Windows/WSL file systems
+      - VITE_HMR_HOST=0.0.0.0      # Fixes the broken websocket connection
+    volumes:
+      - ./frontend:/app
+      - /app/user_app/node_modules
+
+
 volumes:
   postgres_data:
