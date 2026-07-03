@@ -1,5 +1,6 @@
 export const createBookingsZlice = (set, get) => ({
-  jobDescriptionDraft: "Job Description Workspace Primary Editor Terminal Node.",
+  jobDescriptionDraft: "I want to install a smart home manager like alexa....",
+  jobTitleDraft: "SMartHoME SeTUP",
   chatMessages: [
     { id: "init-1", sender: "system", text: "Live Dispatch - Active Session initiated." }
   ],
@@ -13,22 +14,24 @@ export const createBookingsZlice = (set, get) => ({
     bottom: "YourActivePosts"
   },
 
-  // Keep it purely as an action function
   fetchCustomerJobs: async () => {
-    try {
-      const response = await fetch("http://localhost:8000/jobs/my-tasks");
-      const data = await response.json();
-      if (data.status === "success") {
-        set({ fetchedJobs: data.tasks });
-        set({ activePostsCount: data.tasks.length });
-        if (data.tasks.length > 0) {
-          set({ jobDescriptionDraft: data.tasks[0].problem_description });
-        }
-      }
-    } catch (error) {
-      console.error("Fetch Error:", error);
+  try {
+    const response = await fetch("http://127.0.0.1:8000/jobs/my-tasks");
+    
+    if (!response.ok) {
+      throw new Error(`HTTP Error Status: ${response.status}`);
     }
-  },
+
+    const data = await response.json();
+
+    if (data.status === "success") {
+      set({ fetchedJobs: data.tasks });
+      set({ activePostsCount: data.tasks.length });
+    }
+  } catch (error) {
+    console.error("❌ Frontend fetch failure:", error);
+  }
+},
 
   swapSlots: (clickedSlotName) => set((state) => {
     if (clickedSlotName === "main") return {};
