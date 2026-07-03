@@ -8,24 +8,22 @@ router = APIRouter(
     tags=["jobs"]
 )
 
+# TODO: format according to alchemy, remove hardcode(fetch with current session customer, ...), ...
 @router.get("/my-tasks")
 def get_customer_tasks(db: Session = Depends(get_db)):
     try:
-        # 1. Look up active user in current session matrix
-        customer_id = 2
+        customer_id = 3
 
-        # 2. Fetch tasks matching this customer_id
         tasks_query = text("""
-            SELECT id, problem_description 
-            FROM service_tasks 
-            WHERE customer_id = :customer_id 
+            SELECT id, job_title, job_desc, professional 
+            FROM jobs
+            WHERE cust_id = :cid 
             ORDER BY id DESC;
         """)
-        results = db.execute(tasks_query, {"customer_id": customer_id}).fetchall()
+        results = db.execute(tasks_query, {"cid": customer_id}).fetchall()
 
-        # 3. Format into structured list
         tasks_list = [
-            {"id": row[0], "problem_description": row[1]} 
+            {"id": row[0], "title": row[1], "description": row[2], "professional": row[3]} 
             for row in results
         ]
         return {"status": "success", "tasks": tasks_list}
