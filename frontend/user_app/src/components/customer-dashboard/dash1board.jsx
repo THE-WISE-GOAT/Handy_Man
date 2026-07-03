@@ -12,12 +12,13 @@ export default function Dash1Board({ viewSlug }) {
     slots,
     swapSlots,
     jobDescriptionDraft,
+    jobTitleDraft,
     setJobDescription,
     chatMessages,
     addChatMessage,
     activePostsCount,
-    fetchedJobs,         // <-- Hooked up state
-    fetchCustomerJobs,   // <-- Hooked up action
+    fetchedJobs, // <-- Hooked up state
+    fetchCustomerJobs, // <-- Hooked up action
   } = useCustomerDashboardData();
 
   // Trigger HTTP Fetch once when the page loads safely
@@ -29,7 +30,9 @@ export default function Dash1Board({ viewSlug }) {
   useEffect(() => {
     if (!viewSlug) return;
     if (slots.main !== viewSlug) {
-      const targetSlot = Object.keys(slots).find((key) => slots[key] === viewSlug);
+      const targetSlot = Object.keys(slots).find(
+        (key) => slots[key] === viewSlug,
+      );
       if (targetSlot) swapSlots(targetSlot);
     }
   }, [viewSlug, slots, swapSlots]);
@@ -68,7 +71,9 @@ export default function Dash1Board({ viewSlug }) {
               onChange={(e) => setChatInput(e.target.value)}
               placeholder="Instruct AI..."
             />
-            <button type="submit" className="chat-btn">Send</button>
+            <button type="submit" className="chat-btn">
+              Send
+            </button>
           </form>
         </div>
       );
@@ -82,7 +87,9 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• AI CHAT TERMINAL</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge badge-highlight">Live Dispatch — Active Session</span>
+            <span className="badge badge-highlight">
+              Live Dispatch — Active Session
+            </span>
             <p className="card-summary">Logs Captured: {chatMessages.length}</p>
           </>
         ) : (
@@ -95,41 +102,73 @@ export default function Dash1Board({ viewSlug }) {
   const renderJobDescription = (slotKey) => {
     if (slotKey === "main") {
       return (
-        <div className="dashboard-card main-view">
-          <span className="card-flag">Main: LOGGED USER PIPELINE CONFIGURATION</span>
-          <h2>JOB DESCRIPTION WORKSPACE</h2>
-          
-          {/* Main Workspace Editor */}
-          <textarea
-            className="workspace-textarea"
-            value={jobDescriptionDraft}
-            onChange={(e) => setJobDescription(e.target.value)}
-            style={{ marginBottom: "15px", width: "100%", height: "80px" }}
-          />
+        <div
+          className="dashboard-card main-view"
+          style={{ display: "flex", flexDirection: "row", gap: "2px" }}
+        >
+          {/* ⬅️ LEFT SIDE COLUMN: Contains all your current content */}
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+            }}
+          >
+            <span className="card-flag" style={{ marginTop: "-14px" }}>
+              REVIEW AND REFINE AUTO-GENERATED DETAILS
+            </span>
+            {/* <h2>JOB PoSTINGS WORKSPACE</h2> */}
+            <h3
+              className="title"
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                whiteSpace: "pre",
+              }}
+            >
+              ·•TITLE:
+              <span
+                contentEditable={true}
+                suppressContentEditableWarning={true}
+                onBlur={(e) => setJobTitleDraft(e.currentTarget.innerText)}
+                style={{
+                  outline: "none",
+                  cursor: "text",
+                  spellCheck: false,
+                  minWidth: "50px", // Prevents the field from disappearing completely if empty
+                  display: "inline-block",
+                }}
+              >
+                {jobTitleDraft}
+              </span>
+              •·
+            </h3>
 
-          <h3>YOUR HISTORICAL JOBS</h3>
-          <div className="jobs-list-container" style={{ maxHeight: "200px", overflowY: "auto" }}>
-            {fetchedJobs.length === 0 ? (
-              <p style={{ color: "#888", fontSize: "14px" }}>No jobs found for this customer session.</p>
-            ) : (
-              fetchedJobs.map((job) => (
-                <div 
-                  key={job.id} 
-                  onClick={() => setJobDescription(job.problem_description)}
-                  style={{
-                    padding: "10px",
-                    border: "1px solid #444",
-                    borderRadius: "4px",
-                    marginBottom: "8px",
-                    cursor: "pointer",
-                    background: "#222"
-                  }}
-                >
-                  <strong style={{ color: "#4caf50" }}>Job #{job.id}:</strong>
-                  <p style={{ margin: "5px 0 0 0", fontSize: "13px" }}>{job.problem_description}</p>
-                </div>
-              ))
-            )}
+            <h3 className="title">DEsCRIPTION:</h3>
+            <textarea
+              className="workspace-textarea"
+              value={jobDescriptionDraft} // Fixed the previous evaluation bug here
+              onChange={(e) => setJobDescription(e.target.value)}
+              style={{
+                border: "2px dashed #000000",
+                borderRadius: "4px",
+                padding: "10px",
+                outline: "none",
+                flex: 1, // Ensures the textarea expands nicely down the left column
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {/* ➡️ RIGHT SIDE COLUMN: Strictly blank layout area */}
+          <div style={{ flex: 0.5, height: "100%", marginTop: '8px', background: "" }}>
+            <h3 className="title" dir="rtl" > AttACHMENTs</h3>
+                SCROLLABLE(l, r) ATTACHMENTS HERE
+            <h3 className="title" dir="rtl"> UsER INFo </h3>
+                user info here
+             <h3 className="title" dir="rtl"> EmERGENcY ToGGLE</h3>
           </div>
         </div>
       );
@@ -143,11 +182,18 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• JOB DESCRIPTION WORKSPACE</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge">Sidebar: Active Jobs Total: {fetchedJobs.length}</span>
-            <p className="card-summary">{jobDescriptionDraft.substring(0, 35)}...</p>
+            <span className="badge">
+              Sidebar: Description Live Glance — Draft Mode
+            </span>
+            <p className="card-summary">
+              {jobDescriptionDraft.substring(0, 35)}...
+            </p>
           </>
         ) : (
-          <span className="badge">Footer: Draft character footprint: {jobDescriptionDraft.length} chars</span>
+          <span className="badge">
+            Footer: Draft character footprint: {jobDescriptionDraft.length}{" "}
+            chars
+          </span>
         )}
       </div>
     );
@@ -171,11 +217,17 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• YOUR ACTIVE POSTS</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge badge-highlight">Network Pipeline Active</span>
-            <p className="card-summary">Live Trackable: {activePostsCount} Positions</p>
+            <span className="badge badge-highlight">
+              Network Pipeline Active
+            </span>
+            <p className="card-summary">
+              Live Trackable: {activePostsCount} Positions
+            </p>
           </>
         ) : (
-          <span className="badge">Posts Monitor sleeping below — {activePostsCount} items queued</span>
+          <span className="badge">
+            Posts Monitor sleeping below — {activePostsCount} items queued
+          </span>
         )}
       </div>
     );
@@ -184,10 +236,14 @@ export default function Dash1Board({ viewSlug }) {
   const resolveAndRenderModule = (slotKey) => {
     const moduleName = slots[slotKey];
     switch (moduleName) {
-      case "AiChatTerminal":           return renderAiChat(slotKey);
-      case "JobDescriptionWorkspace": return renderJobDescription(slotKey);
-      case "YourActivePosts":          return renderActivePosts(slotKey);
-      default:                         return null;
+      case "AiChatTerminal":
+        return renderAiChat(slotKey);
+      case "JobDescriptionWorkspace":
+        return renderJobDescription(slotKey);
+      case "YourActivePosts":
+        return renderActivePosts(slotKey);
+      default:
+        return null;
     }
   };
 
@@ -198,4 +254,4 @@ export default function Dash1Board({ viewSlug }) {
       <div className="grid-sidebar">{resolveAndRenderModule("sidebar")}</div>
     </div>
   );
-} 
+}
