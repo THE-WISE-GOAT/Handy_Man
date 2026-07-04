@@ -12,76 +12,6 @@ Public surface
   CATEGORY_DESCRIPTIONS    — one-line disambiguation per category, used both in
                               the extraction prompt and as the embedding corpus
   extract_final_json()    — converts a finished conversation into a validated payload
-
-Design notes (read before touching the extraction logic)
-----------------------------------------------------------
-SERVICE_REGISTRY is a *bias*, not a whitelist. Every category/tag in it is
-guaranteed to match real worker profiles, so a clean registry match is the
-"fully verified" / cheapest-to-route path, and the model is told to prefer
-it whenever it genuinely fits.
-
-But the registry is NOT exhaustive, and matching the wrong static tag
-because it happens to live under the right category is worse than inventing
-a new, precise one. This module guards against five specific failure modes:
-
-  1. Tag-squashing: earlier versions of this pipeline hard-filtered the
-     model's chosen tags against SERVICE_REGISTRY[category], silently
-     deleting any tag that wasn't already in that static list. This version
-     NEVER deletes a tag the model produced for being "novel" — it only
-     flags is_custom_category=True on that category's entry, so dispatch
-     can route precisely without losing information.
-
-  2. Cross-trade tag bleed: a real job can require more than one trade's
-     expertise (installing a timer on a water tank is plumbing AND
-     electrical; fixing a stuck automatic gate is structural AND
-     electrical). An earlier version forced a single problem_category and
-     flattened every tag under it, which meant tags from a second trade
-     either got dropped or got misfiled under the wrong trade entirely.
-     `categories` is now a list of independent
-     {category, tags, is_custom_category} entries — one per trade actually
-     needed — so each tag stays scoped to the trade that would actually
-     perform it, and dispatch can match against more than one worker pool
-     without guessing which tag belongs where.
-
-  3. Category semantic drift: an LLM reasoning over a customer's wording can
-     latch onto a surface-level word association — "gate" reads as
-     "security" even though the actual job (a dead motor and a jammed
-     lever) has nothing to do with surveillance or access control.
-     CATEGORY_DESCRIPTIONS gives every category an explicit, disambiguating
-     definition (including call-outs of what it explicitly does NOT cover),
-     and _build_extraction_prompt includes a worked example of exactly this
-     failure so the model has a concrete corrective pattern to follow
-     instead of having to infer the boundary on its own.
-
-  4. Classification noise from an oversized candidate set: reasoning
-     correctly over 19 categories and ~160 tags in a single pass gets
-     harder as the registry grows, and gives more surface area for drift
-     like #3. _shortlist_categories embeds the registry once (cached) and
-     the customer's description per-call, then ranks categories by
-     semantic similarity so the extraction prompt only has to present the
-     ~7 most relevant categories instead of the whole registry. This is a
-     recall aid, not a gate — the prompt explicitly allows the model to
-     step outside the shortlist when the job genuinely calls for it, and
-     any embedding failure falls back to the full registry, so this layer
-     is never a hard dependency for dispatch to keep functioning.
-
-  5. Worked-example echo: a small model can occasionally reproduce this
-     prompt's own worked example almost verbatim instead of describing the
-     real conversation, especially when the actual job is topically close
-     to the example. problem_description is checked against the known
-     example text after extraction (_looks_like_example_echo); a detected
-     echo triggers one retry at a higher temperature with a corrective
-     nudge before the result is accepted. This matters more than it might
-     look: problem_description is later embedded and matched against
-     worker job_description text, so a copied example would silently
-     collapse unrelated jobs onto the same point in embedding space.
-
-Both the live chat and the extraction step also actively guard against
-off-topic conversations (small talk, unrelated questions, requests to do
-something other than describe a job). If a conversation never produces a
-real job, extract_final_json returns is_job_request=False with an empty
-categories list and description rather than fabricating something to fill
-the schema.
 """
 
 import json
@@ -98,7 +28,7 @@ from src.core.schema import CustomerProblemSchema, CategoryMatch
 
 logger = logging.getLogger(__name__)
 
-# ── Force Python to search one directory layer up ──
+# Force Python to search one directory layer up
 base_dir = Path(__file__).resolve().parent.parent.parent  # Steps out of ai -> src -> backend
 env_path = base_dir.parent / ".env"                       # Targets the root folder .env
 
