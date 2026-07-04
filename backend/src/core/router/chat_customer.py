@@ -27,7 +27,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-
+import requests, os
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema
@@ -371,3 +371,101 @@ def get_booking_summary(
         "is_complete":          chat_session.is_complete,
         "is_job_request":       bool(chat_session.is_job_request),
     }
+  
+  
+  
+
+# use to post  the  customer  retrieve from chat to  database and also handle the  vector embedding from nvidia and save to database
+@router.post(
+    "/{booking_chat_id}/complete",
+    summary="Complete the AI chat, extract job explained keys, generate embedding, and save to DB",
+)
+def complete_customer_chat(
+    booking_chat_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: model.User = Depends(get_current_user)
+):
+    # Step 1: Get the completed AI chat session
+    chat_session = _get_own_session(booking_chat_id, db, current_user)
+
+    if not chat_session.is_complete:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot process summary. The AI chat session is not complete yet.",
+        )
+    
+    
+    job_desc = getattr(chat_session, "problem_description", "")
+    
+    # Step 3: Get Vector Embedding from Nvidia
+    embedding_vector = None
+    if job_desc:
+        try:
+            headers = {
+            "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
+            "Content-Type": "application/json"
+            }
+            payload = {
+                "model": "nvidia/nv-embed-v1",
+                "input": [job_desc],
+                "input_type": "passage",
+                "encoding_format": "float"
+            }
+    
+            response = requests.post(
+               "https://integrate.api.nvidia.com/v1/embeddings",
+               headers=headers, 
+               json=payload, 
+               timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                embedding_vector = response.json()["data"][0]["embedding"]
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Nvidia API error: {response.status_code} - {response.text}"
+                )
+        except requests.exceptions.RequestException as e:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to connect to Nvidia API: {e}"
+            )
+    else:
+        # Optional: Raise error if a job description was mandatory for your app logic
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job description is missing. Cannot generate vector profile."
+        )
+        
+    # Step 2: Check if CustomerChatData already exists (to prevent duplicate primary key crashes)
+    db_profile = db.query(model.CustomerChatData).filter(
+        model.CustomerChatData.booking_chat_id == booking_chat_id,
+        model.CustomerChatData.user_id == current_user.id
+    ).first()
+
+    # Define the dictionary of key-value data extracted from JSON summary
+    customer_fields = {
+        "is_complete": getattr(chat_session, "is_complete", False),
+        "is_job_request": getattr(chat_session, "is_job_request", False),
+        "categories": getattr(chat_session, "categories", []), 
+        "problem_description": job_desc,
+        "description_vector": embedding_vector 
+    }
+
+    if db_profile:
+        # If record exists, update its values (Upsert)
+        for key, value in customer_fields.items():
+            setattr(db_profile, key, value)
+    else:
+        # If record does not exist, create a new one
+        db_profile = model.CustomerChatData(
+            user_id=current_user.id,
+            booking_chat_id=booking_chat_id,
+            **customer_fields
+        )
+    db.add(db_profile)
+        
+    db.commit()
+    
+    return {"status": "success", "message": "Customer chat data structured and saved successfully."}
