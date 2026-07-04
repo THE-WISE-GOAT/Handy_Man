@@ -1,10 +1,7 @@
 # This file defines the database schema for the User model using SQLAlchemy. This is use for components of database components
 
 from typing import List, Optional
-import uuid
-
 from pydantic import BaseModel, Field
-
 from src.database.database import Base
 from sqlalchemy import Column, DateTime, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float, text
 from sqlalchemy.sql.sqltypes import TIMESTAMP, UUID, Numeric
@@ -18,6 +15,7 @@ from sqlalchemy import JSON
 from sqlalchemy import DateTime, JSON, func  
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+from pgvector.sqlalchemy import Vector
 
 
 class User(Base):
@@ -73,19 +71,6 @@ class BookingChat(Base):  # (Base) — keep your existing base class
     is_job_request: Mapped[bool]   = mapped_column(Boolean, server_default='FALSE', nullable=False) # tell if the chat is a job request or not
     categories: Mapped[list[dict]]   = mapped_column(JSONB, nullable=True) # tell about job categories, this is a list of dictionaries, each dictionary contains the category name and the subcategories
     problem_description: Mapped[str | None] = mapped_column(Text, nullable=True) # just text about the job request
-    
-    
-class Worker(Base):
-    __tablename__ = "workers"
-
-
-    id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    location: Mapped[WKBElement] = mapped_column(Geography(geometry_type='POINT', srid=4326), nullable=False)   
-    category: Mapped[str] = mapped_column(String, index=True, nullable=False) # this is the worker's main trade category,   
-    tags: Mapped[list[str]] = mapped_column(ARRAY(String), index=True, nullable=False) # this is a list of specific skills or services   
-    years_experience: Mapped[int] = mapped_column(nullable=False)  # this is the total years of experience the worker has in their trade
-    additional_metadata: Mapped[dict] = mapped_column(JSONB, nullable=True)  # put extra info that can be use for future
-    operating_radius: Mapped[float] = mapped_column(nullable=False) # this is the maximum distance in kilometers that the worker is willing to travel for a job
     
     
 
@@ -152,7 +137,7 @@ class WorkerSkillsSchema(BaseModel):
 
 #### models for the Worker Interview Session, this will be used to store the worker interview session data, including the chat history, the current stage of the interview, and the final outcome. 
 class WorkerInterviewSession(Base):
-    __tablename__ = "worker_interview_sessions"
+    __tablename__ = " "
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -169,3 +154,41 @@ class WorkerInterviewSession(Base):
     profile: Mapped[dict | None]= mapped_column(JSONB, nullable=True) # this will store the final profile of the worker after the interview is complete
     created_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False) # this will store the time when the interview session is created
     updated_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False) # this will store the time when the interview session is updated
+
+
+
+
+### model  for the Worker Profile, this will be used to store the worker profile data, including the skills, experience, and other relevant information. This will be used to match the worker with the job requests.
+class WorkerProfile(Base):
+    __tablename__ = "workers"
+
+        # Core Identifiers
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    worker_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+    # Outer Metadata Fields
+    stage: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., "complete"
+    is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Nested Profile Content Fields
+    job_category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)  # e.g., "plumber"
+    category_tag: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g., "plumbing"
+    is_custom_category: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Lists mapped to native PostgreSQL string arrays
+    specialities: Mapped[list[str]] = mapped_column(ARRAY(String(100)), nullable=False, default=list)
+    specialized_tools_or_equipment: Mapped[list[str]] = mapped_column(ARRAY(String(100)), nullable=False, default=list)
+    # Text, Numerical, and License Fields
+    years_experience: Mapped[int] = mapped_column(Integer, nullable=False)
+    license_or_certification: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    job_description: Mapped[str] = mapped_column(Text, nullable=False)
+    # Status, Flags, and Scores
+    emergency_available: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    has_verified_specialty: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    scenario_passed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    scenario_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    # AI Vector Column (CRUCIAL!)
+    # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from the 'job_description'
+    description_vector: Mapped[list[float]] = mapped_column(Vector(4096), nullable=True)
+    
+    
