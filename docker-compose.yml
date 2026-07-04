@@ -1,6 +1,13 @@
 services:
   db:
-    image: postgis/postgis:16-3.4
+    # 1. Instruct compose to build a customized layer instead of using a static image
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM postgis/postgis:16-3.4
+        RUN apt-get update && \
+            apt-get install -y --no-install-recommends postgresql-16-pgvector && \
+            rm -rf /var/lib/apt/lists/*
     container_name: handy_man_db
     restart: unless-stopped
     environment:

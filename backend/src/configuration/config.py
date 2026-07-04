@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     # these are only access through .env but is secured and not hardcoded in our codebase, so we can keep them secret and not push them to github
     DATABASE_HOSTNAME: str
     DATABASE_PORT: str
+    POSTGRES_EXPOSE_PORT:str
     DATABASE_NAME: str
     DATABASE_USERNAME: str
     DATABASE_PASSWORD: str
