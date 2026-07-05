@@ -754,7 +754,7 @@ def _call_extraction_model(
 
 def extract_final_json(
     chat_history: list[dict],
-    model_name: str = MODEL_NAME,
+    model_name: str = "meta/llama-3.1-70b-instruct",
 ) -> CustomerProblemSchema:
     """
     Convert a completed interview history into a validated payload.
