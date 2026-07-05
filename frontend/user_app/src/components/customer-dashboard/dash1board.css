@@ -17,18 +17,21 @@
   grid-column: 1;
   grid-row: 1;
   display: flex;
+  min-width: 0; /* Enforces strict 1fr allocation boundary */
 }
 
 .grid-bottom {
   grid-column: 1;
   grid-row: 2;
   display: flex;
+  min-width: 0;
 }
 
 .grid-sidebar {
   grid-column: 2;
   grid-row: 1 / span 2;
   display: flex;
+  min-width: 0;
 }
 
 /* ==========================================================================
@@ -46,6 +49,7 @@
   transition: transform 0.15s ease;
   padding-top: 18px;
   padding-left: 18px;
+  min-width: 0; /* Keeps card contained inside the grid layout track */
 }
 
 .clickable {
@@ -59,6 +63,7 @@
 
 .main-view {
   height: 100%;
+  max-height: 100%;
 }
 
 .main-view h2 {
@@ -71,8 +76,6 @@
   margin-left: -9px;
   margin-bottom: 0px;
 }
-
-
 
 .sidebar-slot {
   height: 100%;
@@ -133,7 +136,7 @@
 .workspace-textarea {
   flex: 1;
   width: 100%;
-  min-height: 200px;
+  min-height: 0;
   border: none;
   resize: none;
   font-family: inherit;
