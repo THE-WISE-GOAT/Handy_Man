@@ -201,3 +201,21 @@ class WorkerSummaryOut(BaseModel):
     is_rejected: bool
     rejection_reason: Optional[str] = None
     profile: Optional[WorkerProfileSchema] = None   
+    
+    
+    
+# ── Find Help (worker matching) ──────────────────────────────────────────────
+
+class WorkerMatchOut(BaseModel):
+    worker_chat_id: int
+    username: str
+    job_category: str
+    category_tag: str
+    job_description: str
+    match_score: float  # 1.0 = near-identical meaning, 0 = unrelated, negative = opposite
+
+
+class FindHelpOut(BaseModel):
+    matched_by_category: bool          # True if the category filter was actually used
+    category: Optional[str] = None     # the category that was searched (if any)
+    workers: List[WorkerMatchOut]

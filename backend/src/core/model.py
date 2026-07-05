@@ -137,7 +137,7 @@ class WorkerSkillsSchema(BaseModel):
 
 #### models for the Worker Interview Session, this will be used to store the worker interview session data, including the chat history, the current stage of the interview, and the final outcome. 
 class WorkerInterviewSession(Base):
-    __tablename__ = " "
+    __tablename__ = "worker_interview_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)

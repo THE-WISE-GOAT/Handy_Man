@@ -52,6 +52,7 @@ app.include_router(auth.router)
 app.include_router(login.router)
 app.include_router(worker.router)
 app.include_router(chat_customer.router)
+app.include_router(chat_customer.match_router)
 app.include_router(chat_worker.router)
 
 

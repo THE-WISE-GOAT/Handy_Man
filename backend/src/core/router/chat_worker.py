@@ -569,7 +569,7 @@ def complete_worker_chat(
                "https://integrate.api.nvidia.com/v1/embeddings",
                headers=headers, 
                json=payload, 
-               timeout=10.0
+               timeout=20.0
             )
             
             if response.status_code == 200:
