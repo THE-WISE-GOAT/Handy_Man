@@ -23,7 +23,7 @@ Endpoints
 """
 
 import logging
-
+from sqlalchemy import select, or_, func
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -42,6 +42,7 @@ from src.ai.customer_chat_analyser_nvidia import (
 )
 
 router = APIRouter(prefix="/dispatch", tags=["Dispatch"])
+match_router = APIRouter(tags=["Dispatch"])
 logger = logging.getLogger(__name__)
 
 
@@ -408,7 +409,7 @@ def complete_customer_chat(
             payload = {
                 "model": "nvidia/nv-embed-v1",
                 "input": [job_desc],
-                "input_type": "passage",
+                "input_type": "query",
                 "encoding_format": "float"
             }
     
@@ -469,3 +470,165 @@ def complete_customer_chat(
     db.commit()
     
     return {"status": "success", "message": "Customer chat data structured and saved successfully."}
+
+
+# ── Helper: pick the primary category ────────────────────────────────────────
+
+def _select_primary_category(categories: list[dict]) -> tuple[str | None, bool]:
+    """
+    Pick the primary (most central) trade from the customer's extracted
+    categories and report whether it came from the static registry or
+    the AI fallback.
+
+    categories is ordered most-central-trade-first (see BookingSummaryOut
+    docstring), so the first entry is authoritative for filtering.
+
+    Returns (category_name, is_custom). category_name is None if the
+    customer has no extracted categories at all.
+    """
+    if not categories:
+        return None, False
+    top = categories[0]
+    return top.get("category"), bool(top.get("is_custom_category", False))
+
+
+# ── Helper: cosine-similarity worker search ──────────────────────────────────
+
+def _vector_search_workers(
+    db: Session,
+    query_vector: list[float],
+    category: str | None,
+    limit: int = 5,
+):
+    """
+    Rank WorkerProfile rows by cosine distance against `query_vector`.
+
+    If `category` is given, restricts the candidate pool to workers whose
+    job_category OR category_tag matches it (case-insensitive) before
+    ranking — the "category found" fast path. If `category` is None,
+    ranks across every eligible worker — the semantic-only fallback.
+
+    Only considers workers who finished vetting, weren't rejected, and
+    actually have an embedding to compare against.
+
+    Returns a list of (WorkerProfile, username, cosine_distance) rows,
+    closest first.
+    """
+    distance = model.WorkerProfile.description_vector.cosine_distance(query_vector)
+
+    stmt = (
+        select(model.WorkerProfile, model.User.username, distance.label("distance"))
+        .join(model.User, model.User.id == model.WorkerProfile.user_id)
+        .where(
+            model.WorkerProfile.description_vector.isnot(None),
+            model.WorkerProfile.is_complete.is_(True),
+            model.WorkerProfile.is_rejected.is_(False),
+        )
+    )
+
+    if category:
+        stmt = stmt.where(
+            or_(
+                func.lower(model.WorkerProfile.job_category) == category.lower(),
+                func.lower(model.WorkerProfile.category_tag) == category.lower(),
+            )
+        )
+
+    stmt = stmt.order_by(distance).limit(limit)
+    return db.execute(stmt).all()
+
+
+# ── 5. Find help — match customer job to top workers ─────────────────────────
+
+@router.get(
+    "/match/{booking_chat_id}/find-help",
+    response_model=schema.FindHelpOut,
+    summary="Find the top 5 matching workers for a completed job request",
+)
+@match_router.get(
+    "/match/{booking_chat_id}/find-help",
+    response_model=schema.FindHelpOut,
+    summary="Find the top 5 matching workers for a completed job request",
+)
+def find_help(
+    booking_chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    """
+    Powers the customer's "Find Help" button.
+
+    Requires that POST /dispatch/{booking_chat_id}/complete has already
+    run for this session (that's what populates description_vector).
+
+    Strategy: category-aware match first (see _select_primary_category /
+    _vector_search_workers docstrings), falling back to a pure semantic
+    match over all workers if there's no usable category or the
+    category-filtered pool is empty.
+    """
+    customer_data = db.execute(
+        select(model.CustomerChatData).where(
+            model.CustomerChatData.booking_chat_id == booking_chat_id,
+            model.CustomerChatData.user_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+    if not customer_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No embedded job data found for this booking_chat_id. "
+                   "Call POST /dispatch/{booking_chat_id}/complete first.",
+        )
+
+    if customer_data.description_vector is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This job has no embedding yet — cannot search for workers.",
+        )
+
+    if not customer_data.is_job_request:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This chat session was not a dispatchable job request.",
+        )
+
+    category, is_custom = _select_primary_category(customer_data.categories or [])
+    used_category_filter = bool(category) and not is_custom
+
+    matches = []
+    if used_category_filter:
+        matches = _vector_search_workers(
+            db, customer_data.description_vector, category=category, limit=5,
+        )
+
+    if not matches:
+        # No usable category, a custom/invented one, or the filtered pool
+        # was empty — fall back to pure semantic search over everyone.
+        used_category_filter = False
+        matches = _vector_search_workers(
+            db, customer_data.description_vector, category=None, limit=5,
+        )
+
+    if not matches:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No matching workers found.",
+        )
+
+    workers = [
+        {
+            "worker_chat_id": worker.worker_chat_id,
+            "username": username,
+            "job_category": worker.job_category,
+            "category_tag": worker.category_tag,
+            "job_description": worker.job_description,
+            # "match_score": round(1 - distance, 4),
+        }
+        for worker, username, distance in matches
+    ]
+
+    return {
+        "matched_by_category": used_category_filter,
+        "category": category,
+        "workers": workers,
+    }
