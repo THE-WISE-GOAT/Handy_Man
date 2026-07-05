@@ -14,7 +14,8 @@ from src.core.router import (
     worker, 
     service_task, 
     chat_customer, 
-    chat_worker
+    chat_worker,
+    connection_manager
 )
 
 # 1. Define the startup logic using lifespan
@@ -58,10 +59,12 @@ def login_alias(
     return login.login(user_credentials, db)
 
 # 5. Core Application Routers (Included once and clearly)
-app.include_router(service_task.router)
+
 app.include_router(user.router)
 app.include_router(auth.router)
 app.include_router(login.router)
 app.include_router(worker.router)
 app.include_router(chat_customer.router)
 app.include_router(chat_worker.router)
+app.include_router(connection_manager.router)
+app.include_router(service_task.router)
