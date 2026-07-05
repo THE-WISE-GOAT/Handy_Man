@@ -11,7 +11,8 @@ export default function Dash1Worker({ viewSlug }) {
     swapWorkspaceSlots,
     mapStatus,
     bidsPipelineText,
-    jobSpecsText
+    jobSpecsText,
+    connectToDispatch
   } = useWorkerDashboardData();
 
   // Route state synchronization layer
@@ -26,6 +27,10 @@ export default function Dash1Worker({ viewSlug }) {
   const handleModuleSelect = (targetSlug) => {
     navigate(`/worker/workspace/${targetSlug}`);
   };
+
+  useEffect(()=>{
+      connectToDispatch();
+  }, [])
 
   // Shared card component for previewing or main states
   const Card = ({ slug, title, position, children }) => {
