@@ -39,6 +39,9 @@ services:
     environment:
       DATABASE_HOSTNAME: db
       DATABASE_PORT: 5432
+    volumes:
+      - ./.env:/app/.env
+    # --------------------------------------
     depends_on:
       db:
         condition: service_healthy
