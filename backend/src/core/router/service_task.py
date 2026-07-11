@@ -43,14 +43,12 @@ class CreateJob(BaseModel):
 @router.post("/post-job")
 async def createJob(payload: CreateJob, db: Session = Depends(get_db)):
     try:
-        # Added 'id' to the RETURNING clause so created[0] matches your response schema
         query = text("""
             INSERT INTO jobs (cust_id, job_title, job_desc, professional) 
             VALUES (:cus, :tit, :des, :pro)
             RETURNING id, cust_id, job_title, job_desc, professional;
         """)
         
-        # FIXED: Changed db.db.execute to db.execute
         result = db.execute(query, {
             "cus": payload.cust_id,
             "tit": payload.title,
@@ -59,9 +57,9 @@ async def createJob(payload: CreateJob, db: Session = Depends(get_db)):
         })
 
         db.commit()
-        created = result.fetchone()
-        await db.refresh(created)
+        created = result.fetchone() # This returns a tuple-like Row object
         
+        # --- FIXED: REMOVED await db.refresh(created) ---
 
         await manager.broadcast_to_profession(
             created[4], {
@@ -73,8 +71,7 @@ async def createJob(payload: CreateJob, db: Session = Depends(get_db)):
                 "professional" : created[4],
             }
         )
-        # Indexes now match the RETURNING order exactly: 
-        # 0=id, 1=cust_id, 2=job_title, 3=job_desc, 4=professional
+        
         return {
             "status": "success",
             "job": { 

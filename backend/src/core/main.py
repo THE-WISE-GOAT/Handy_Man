@@ -55,7 +55,8 @@ app.include_router(worker.router)
 app.include_router(chat_customer.router)
 app.include_router(chat_customer.match_router)
 app.include_router(chat_worker.router)
-app.include_router(connection_manager)
+app.include_router(connection_manager.router)
+app.include_router(service_task.router)
 
 
 # 5. Core Alias Root Routes
