@@ -40,7 +40,6 @@ services:
       DATABASE_PORT: 5432
       PYTHONPATH: /app      # Force python to check the root directory for modules
     volumes:
-      - ./.env:/app/.env
       - ./backend:/app
     depends_on:
       db:
