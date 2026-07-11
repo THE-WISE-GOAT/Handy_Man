@@ -1,6 +1,5 @@
 services:
   db:
-    # 1. Instruct compose to build a customized layer instead of using a static image
     build:
       context: .
       dockerfile_inline: |
@@ -19,11 +18,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${DATABASE_USERNAME:-postgres} -d ${DATABASE_NAME:-handy_man_db}",
-        ]
+      test: [
+        "CMD-SHELL",
+        "pg_isready -U ${DATABASE_USERNAME:-postgres} -d ${DATABASE_NAME:-handy_man_db}"
+      ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -40,8 +38,8 @@ services:
       DATABASE_HOSTNAME: db
       DATABASE_PORT: 5432
     volumes:
-      - ./.env:/app/.env
-    # --------------------------------------
+      - .env:/app/.env
+      - .:/app
     depends_on:
       db:
         condition: service_healthy
@@ -52,14 +50,22 @@ services:
     build:
       context: ./frontend
       dockerfile: ./user_app/Dockerfile
+      target: dev
       args:
-        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        VITE_API_URL: ${PUBLIC_API_URL:-http://backend:8000}
     container_name: handy_man_user_app
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "${USER_APP_PROD_PORT:-4173}:80"
- 
+      - "${USER_APP_PROD_PORT:-5173}:5173"
+    environment:
+      CHOKIDAR_USEPOLLING: "true"  # Actually forces file changes to trigger reload over WSL/Windows
+      VITE_USE_POLLING: "true"
+      VITE_HMR_HOST: "0.0.0.0"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
 volumes:
   postgres_data:

@@ -1,13 +1,12 @@
 # this page is for the validation of data that is sent to database
-from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime
-from typing import Any, List, Literal, Optional, Dict
-from pydantic import Field
-from pydantic import BaseModel, Field, EmailStr
+from typing import Any, Dict, List, Literal, Optional
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
+# ==========================================
+# 1. CORE AUTHENTICATION & USER SCHEMAS
+# ==========================================
 
-
-# we put value through this schema before it goes to the database, so we can validate that the data is in the correct format and that all required fields are present, this is also used for the API endpoints to validate the data that is sent to the API
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -22,31 +21,58 @@ class RoleOut(BaseModel):
     class Config:
         from_attributes = True
             
-# this is the schema for the data that is sent back to the frontend, we don't want to send the password back to the frontend, so we create a separate schema for that   
 class UserOut(BaseModel):
     id: int
     email: EmailStr 
     username: str
     is_active: bool
     created_at: datetime
-    roles: list[RoleOut]
+    roles: List[RoleOut]
     firstName: Optional[str] = None
     lastName: Optional[str] = None
 
     class Config:
         from_attributes = True
-        
 
 class Token(BaseModel):
-    access_token:str # this is token that will be used to authenticate the user, it will be generated when the user logs in, and it will be sent back to the frontend, and the frontend will use this token to authenticate the user for subsequent requests to the API
-    token_type:str # it will be set as "bearer", which is a common type of token used for authentication, it indicates that the token is a bearer token, which means that the token itself is sufficient to authenticate the user, and no additional credentials are required.
-    
+    access_token: str 
+    token_type: str 
     
 class TokenData(BaseModel):
-    user_id: str | None = None # this is the data that will be contained in the token, it will be used to identify the user when the token is decoded, it will be set to None by default, and it will be populated with the user_id when the token is created.
-    
+    user_id: Optional[str] = None
 
-# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API, and it will be used to validate the data
+class UserRolesOut(BaseModel):
+    """Schema for returning user role assignments."""
+    roles: List[str]
+
+# ==========================================
+# 2. DISPATCH PIPELINE TAXONOMY SCHEMAS
+# ==========================================
+
+class CategoryMatch(BaseModel):
+    """
+    One trade's contribution to a job. A job needing more than one trade
+    (e.g. a stuck automatic gate needing both structural and electrical
+    work) gets one of these per trade, each scoped to only the tags that
+    trade would actually perform.
+    """
+    category: str
+    tags: List[str] = Field(default_factory=list)
+    is_custom_category: bool
+
+class CustomerProblemSchema(BaseModel):
+    """
+    Structured-output contract the extraction model fills in after a
+    completed interview. Used also in customer_chat_analyser_nvidia.py.
+    """
+    is_job_request: bool
+    categories: List[CategoryMatch] = Field(default_factory=list)
+    problem_description: str
+
+# ==========================================
+# 3. CHAT INTERVIEW PIPELINE SCHEMAS
+# ==========================================
+
 class ChatMessageIn(BaseModel):
     """Payload the client sends on each chat turn."""
     booking_chat_id: int = Field(
@@ -66,16 +92,14 @@ class ChatMessageIn(BaseModel):
         stripped = v.strip()
         if not stripped:
             raise ValueError("message cannot be empty or whitespace-only")
-        return stripped  # normalised once, here — not re-stripped downstream
- 
- # use to display session start response
+        return stripped
+
 class SessionStartOut(BaseModel):
     """Returned when a new session is created (POST /dispatch/session)."""
     booking_chat_id: int
-    ai_response:     str
+    ai_response: str
     turns_remaining: int
  
- # display the chat message response after each chat turn
 class ChatMessageOut(BaseModel):
     """Returned after each chat turn (POST /dispatch/chat)."""
     booking_chat_id: int
@@ -85,53 +109,32 @@ class ChatMessageOut(BaseModel):
     is_job_request: bool  # True only on the completion turn, if a real job was found
     is_custom_category: bool # True if the category/tags came from the AI fallback, not the static registry
     turns_used: int # number of turns used in the chat session
-    turns_remaining:  int # number of turns remaining in the chat session
- 
- # dsupport to display the chat history response after each chat turn
+    turns_remaining: int # number of turns remaining in the chat session
+
 class HistoryMessage(BaseModel):
     """A single turn in the client-visible conversation."""
-    role:    Literal["user", "assistant"]
+    role: Literal["user", "assistant"]
     content: str
- 
- # display the all chat history response 
+
 class ChatHistoryOut(BaseModel):
     """Returned by GET /dispatch/{id}/history."""
     booking_chat_id: int
-    history:         List[HistoryMessage]
-    is_complete:     bool
-    turns_used:       int
+    history: List[HistoryMessage]
+    is_complete: bool
+    turns_used: int
     turns_remaining: int
- 
-  # this is use to disply category for the specific job request
-class CategoryMatch(BaseModel):
-    category: str
-    tags: List[str] = Field(default_factory=list)
-    is_custom_category: bool
- 
- 
- # to display the structured summary mainly needed for the frontend to use dict keys
+
 class BookingSummaryOut(BaseModel):
     """Returned by GET /dispatch/{id}/summary once is_complete is True."""
     categories: List[CategoryMatch] = Field(default_factory=list)
     problem_description: str
     is_complete: bool
     is_job_request: bool
- 
 
+# ==========================================
+# 4. WORKER PIPELINE SCHEMAS
+# ==========================================
 
-# use in the customer_chat_analyser_nvidia.py to validate the data that is sent to the API
-class CustomerProblemSchema(BaseModel):
-    is_job_request: bool
-    categories: List[CategoryMatch] = Field(default_factory=list)
-    problem_description: str
-
-
- # for now this is just use to get the what is the roles of the user 
-# 1. Schema for a single Role
-class UserRolesOut(BaseModel):
-    roles: list[str]
-    
- # for now this support in worker.py   
 class WorkerOnboardIn(BaseModel):
     latitude: float
     longitude: float
@@ -142,14 +145,8 @@ class WorkerOnboardIn(BaseModel):
     additional_metadata: Dict[str, Any]
     ai_assessed_skills_json: Optional[List[str]] = []
 
-
-
-
-
-### schemas for the worker chat functionality
-
-# use in the worker_chat_analyser_nvidia.py to validate the data that is sent to the API
 class WorkerProfileSchema(BaseModel):
+    """Structured-output contract the extraction model fills in after scenario test."""
     job_category: str
     category_tag: str
     is_custom_category: bool
@@ -163,19 +160,17 @@ class WorkerProfileSchema(BaseModel):
     scenario_passed: bool
     scenario_score: int
 
-# use to display session start response
 class WorkerSessionStartOut(BaseModel):
     worker_chat_id: int
     ai_response: str
     stage: str
 
-# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API, and it will be used to validate the data
 class WorkerChatMessageIn(BaseModel):
     worker_chat_id: int
     message: str
 
-# this display the chat message response after each chat turn
 class WorkerChatMessageOut(BaseModel):
+    """Returned after each worker chat turn."""
     worker_chat_id: int
     ai_response: str
     stage: str     # "interviewing" | "awaiting_scenario_answer" | "complete"
@@ -185,26 +180,25 @@ class WorkerChatMessageOut(BaseModel):
     turns_used: int
     turns_remaining: int
 
-#  display the all chat history response 
 class WorkerChatHistoryOut(BaseModel):
     worker_chat_id: int
-    history: List[dict]
+    history: List[Dict[str, Any]]
     stage: str
     is_complete: bool
     turns_used: int
     turns_remaining: int
 
-# to display the structured summary mainly needed for the frontend to use dict keys
 class WorkerSummaryOut(BaseModel):
+    """Displays structured summary for the frontend to digest via dict keys."""
     stage: str
     is_complete: bool
     is_rejected: bool
     rejection_reason: Optional[str] = None
     profile: Optional[WorkerProfileSchema] = None   
-    
-    
-    
-# ── Find Help (worker matching) ──────────────────────────────────────────────
+
+# ==========================================
+# 5. WORKER MATCHING / FIND HELP SCHEMAS
+# ==========================================
 
 class WorkerMatchOut(BaseModel):
     worker_chat_id: int
@@ -212,10 +206,10 @@ class WorkerMatchOut(BaseModel):
     job_category: str
     category_tag: str
     job_description: str
-    match_score: float  # 1.0 = near-identical meaning, 0 = unrelated, negative = opposite
-
+    match_score: float  # 1.0 = near-identical meaning, 0 = unrelated
 
 class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used
     category: Optional[str] = None     # the category that was searched (if any)
     workers: List[WorkerMatchOut]
+    profile: Optional[WorkerProfileSchema] = None
