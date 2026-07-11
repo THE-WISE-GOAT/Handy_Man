@@ -1,12 +1,19 @@
 # this will handle the database connection, creates tables, and establishes sessions for the application
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from src.configuration.config import settings # imports the settings from our config.py file, which allows environement variables indirectly
+from src.configuration.config import settings # imports the settings from our config.py file, which allows environment variables indirectly
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{settings.DATABASE_USERNAME}:{settings.DATABASE_PASSWORD}@{settings.DATABASE_HOSTNAME}:{settings.DATABASE_PORT}/{settings.DATABASE_NAME}" # URL to connect to the PostgreSQL database
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL) # creates a engine to connect to the database
+engine = create_engine(SQLALCHEMY_DATABASE_URL) # creates an engine to connect to the database
+
+# --- FIX: Activate pgvector extension inside the database on startup ---
+with engine.connect() as connection:
+    # Postgres extensions require a commit to persist across connections
+    connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+    connection.commit()
+# ----------------------------------------------------------------------
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine) 
 # creates a session factory that will be used to create sessions for interacting with the database
@@ -22,5 +29,3 @@ def get_db():
         yield db # this allows us to use this get_db function as a dependency, so we can get access to the database session in our API endpoints
     finally:
         db.close() # ensuring that db session is closed
-        
-        

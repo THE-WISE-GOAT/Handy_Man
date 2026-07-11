@@ -437,15 +437,29 @@ def _build_extraction_prompt(
         "doing, what this worker handles — not who they are.\n"
         "    - Lead with the core job, then fold in the tested speciality "
         "(or core-competency scope, if no speciality) naturally.\n"
+        "    - Ground every sentence in THIS worker's own words from the "
+        "transcript above: their stated job, the exact tested sub-skill "
+        f'(\\"{pending_sub_skill}\\"), any tools they personally named, and '
+        "specific detail from their scenario answer. Do not write a generic "
+        "description of the trade — write a description of THIS worker.\n"
         "    - Borrow wording from VOCABULARY REFERENCE below where it "
         "genuinely applies, so phrasing matches how customer requests in "
         "the same domain are worded. Do not force a term that doesn't fit "
         "the actual job just because it appears in the reference.\n"
-        "  Bad: 'I am an experienced and reliable plumber with great "
-        "skills.'\n"
-        "  Good: 'Fixes leaking pipes and taps, repairs and installs water "
-        "heaters, and handles pressurised system commissioning and "
-        "backflow prevention checks for homes and small buildings.'\n\n"
+        "  The examples below show STYLE ONLY — never reuse their wording, "
+        "trade, or specifics. If two different workers in the same job end "
+        "up with near-identical job_description text, that is a critical "
+        "failure: it means you defaulted to a template instead of reading "
+        "this worker's transcript.\n"
+        "  Bad (sales voice, no real content): 'I am an experienced and "
+        "reliable carpenter with great skills.'\n"
+        "  Bad (generic to the trade, ignores this worker's own answers): "
+        "'Fixes furniture and doors and does general wood work for homes.'\n"
+        "  Good (style reference only — shows the SHAPE, not content to "
+        "copy — an electrician tested on three-phase industrial panel "
+        "wiring): 'Installs and repairs household wiring, switches, and "
+        "sockets, and handles three-phase industrial panel wiring and load "
+        "balancing for workshops and small factories.'\n\n"
         "emergency_available — true ONLY if the worker explicitly said yes "
         "to emergency, urgent, or after-hours calls. Any ambiguous or "
         "unstated answer -> false.\n\n"
@@ -470,7 +484,7 @@ def extract_worker_profile(
     pending_sub_skill: str,
     has_verified_specialty: bool,
     scenario_score: int,
-    model_name: str = MODEL_NAME,
+    model_name: str = "meta/llama-3.1-70b-instruct",
 ) -> WorkerProfileSchema:
     """
     Convert a passed interview (including the scenario Q&A) into a

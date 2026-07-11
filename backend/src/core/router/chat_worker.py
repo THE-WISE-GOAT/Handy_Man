@@ -34,6 +34,7 @@ worker_interview_nvidia.py's module docstring first):
 """
 
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -42,6 +43,7 @@ from sqlalchemy import select
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema
+import requests
 from src.ai.worker_chat_analyser_nvidia import (
     _nvidia_client,          # shared NIM client — same instance dispatch.py uses
     build_fresh_history,
@@ -489,7 +491,6 @@ def get_worker_history(
 
 
 # ── 4. Structured summary ─────────────────────────────────────────────────────
-
 @router.get(
     "/{worker_chat_id}/summary",
     response_model=schema.WorkerSummaryOut,
@@ -524,3 +525,118 @@ def get_worker_summary(
         "rejection_reason": chat_session.rejection_reason,
         "profile": chat_session.profile,
     }
+
+
+
+
+@router.post(
+    "/{worker_chat_id}/complete",
+    summary="Complete the AI chat, extract profile keys, generate embedding, and save to DB",
+)
+def complete_worker_chat(
+    worker_chat_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: model.User = Depends(get_current_user)
+):
+    # Step 1: Get the completed AI chat session
+    chat_session = _get_own_worker_session(worker_chat_id, db, current_user)
+
+    if not chat_session.is_complete:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot process summary. The AI chat session is not complete yet.",
+        )
+        
+    profile_data = chat_session.profile if chat_session.profile else {}
+    job_desc = profile_data.get("job_description", "")
+    
+    # Step 3: Get Vector Embedding from Nvidia
+    embedding_vector = None
+    if job_desc:
+        try:
+            headers = {
+            "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
+            "Content-Type": "application/json"
+            }
+            payload = {
+                "model": "nvidia/nv-embed-v1",
+                "input": [job_desc],
+                "input_type": "passage",
+                "encoding_format": "float"
+            }
+    
+            response = requests.post(
+               "https://integrate.api.nvidia.com/v1/embeddings",
+               headers=headers, 
+               json=payload, 
+               timeout=20.0
+            )
+            
+            if response.status_code == 200:
+                embedding_vector = response.json()["data"][0]["embedding"]
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Nvidia API error: {response.status_code} - {response.text}"
+                )
+        except requests.exceptions.RequestException as e:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to connect to Nvidia API: {e}"
+            )
+    else:
+        # Optional: Raise error if a job description was mandatory for your app logic
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job description is missing. Cannot generate vector profile."
+        )
+        
+    # Step 2: Check if WorkerProfile already exists (to prevent duplicate primary key crashes)
+    db_profile = db.query(model.WorkerProfile).filter(
+        model.WorkerProfile.worker_chat_id == worker_chat_id,
+        model.WorkerProfile.user_id == current_user.id
+    ).first()
+
+    # Define the dictionary of key-value data extracted from JSON summary
+    profile_fields = {
+        "stage": chat_session.stage,
+        "is_complete": chat_session.is_complete,
+        "is_rejected": chat_session.is_rejected,
+        "rejection_reason": chat_session.rejection_reason,
+        "job_category": profile_data.get("job_category"),
+        "category_tag": profile_data.get("category_tag"),
+        "is_custom_category": profile_data.get("is_custom_category", False),
+        "specialities": profile_data.get("specialities", []),
+        "years_experience": profile_data.get("years_experience", 0),
+        "license_or_certification": profile_data.get("license_or_certification"),
+        "specialized_tools_or_equipment": profile_data.get("specialized_tools_or_equipment", []),
+        "job_description": job_desc,
+        "emergency_available": profile_data.get("emergency_available", False),
+        "has_verified_specialty": profile_data.get("has_verified_specialty", False),
+        "scenario_passed": profile_data.get("scenario_passed", False),
+        "scenario_score": profile_data.get("scenario_score", 0),
+        "description_vector": embedding_vector
+    }
+
+    if db_profile:
+        # If record exists, update its values (Upsert)
+        for key, value in profile_fields.items():
+            setattr(db_profile, key, value)
+    else:
+        # If record does not exist, create a new one
+        db_profile = model.WorkerProfile(
+            user_id=current_user.id,
+            worker_chat_id=worker_chat_id,
+            **profile_fields
+        )
+    db.add(db_profile)
+        
+    db.commit()
+    
+    return {"status": "success", "message": "Worker profile structured and saved successfully."}
+
+    
+    
+    
+    
+    

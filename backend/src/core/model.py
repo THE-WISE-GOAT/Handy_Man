@@ -1,15 +1,12 @@
 # This file defines the database schema for the User model using SQLAlchemy. This is use for components of database components
 
 from typing import List, Optional
-import uuid
-
 from pydantic import BaseModel, Field
-
 from src.database.database import Base
 from sqlalchemy import Column, DateTime, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float, text
 from sqlalchemy.sql.sqltypes import TIMESTAMP, UUID, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 import enum
 from datetime import datetime
 from geoalchemy2 import Geography
@@ -18,7 +15,8 @@ from sqlalchemy import JSON
 from sqlalchemy import DateTime, JSON, func  
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
-
+from pgvector.sqlalchemy import Vector
+from typing import Dict, Any
 
 class User(Base):
     __tablename__ = "users"
@@ -61,112 +59,29 @@ class UserRole(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
 
-"""
-SQLAlchemy model for a single dispatch chat session.
-
-NOTE: the only thing src/routers/dispatch.py relies on here is the
-`user_id` foreign key column below. The router previously referenced a
-`customer_id` column that doesn't exist on this model — see dispatch.py
-for the fix.
-"""
-
-from typing import List
-
-from sqlalchemy import Boolean, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlalchemy.orm import Mapped, mapped_column
-
-from src.database import Base  # adjust to match your project's declarative base import
-
-
-"""
-Changes needed in your model.py (the BookingChat class)
-==========================================================
-
-Replaces problem_category (String) + service_tags (ARRAY(String)) +
-is_custom_category (Boolean) with a single `categories` JSONB column that
-mirrors the new CategoryMatch list shape from src/core/schema.py:
-
-    [
-      {"category": "construction", "tags": ["gate-repair"], "is_custom_category": true},
-      {"category": "electrical",   "tags": ["electric-motor-replacement"], "is_custom_category": true}
-    ]
-
-`is_job_request` is unchanged — it's still a simple top-level bool.
-
-Note: your original is_job_request column comment says it's "set to true
-when the user clicks the Submit Job Request button in the frontend" — that
-doesn't match how dispatch.py actually sets it (from the extraction
-pipeline's result, not a button click). Worth a quick check on whether that
-comment is stale documentation or describes a different flag you haven't
-wired up yet — left as-is here since I can't tell which from the code alone.
-
-Apply this as a diff against your real model.py; this isn't a full file
-since I don't have your imports, Base class, or the rest of BookingChat's
-neighbors.
-"""
-
-# Required import in your model.py, if not already present:
-# from sqlalchemy.dialects.postgresql import JSONB
 
 
 class BookingChat(Base):  # (Base) — keep your existing base class
     __tablename__ = "booking_chats"
-
+    
     id: Mapped[int]= mapped_column(primary_key=True, index=True)
     user_id: Mapped[int]= mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-
-    history: Mapped[list[dict]] = mapped_column(JSON, default=list) 
-    is_complete: Mapped[bool]  = mapped_column(Boolean, server_default='FALSE', nullable=False)
-    is_job_request: Mapped[bool]   = mapped_column(Boolean, server_default='FALSE', nullable=False)
-
-    # REPLACES problem_category (String) + service_tags (ARRAY(String)) +
-    # is_custom_category (Boolean). Each job can now span more than one
-    # trade, and each trade's tags stay scoped to that trade instead of
-    # being flattened under one category — see CategoryMatch in
-    # src/core/schema.py. First entry in the list is the most central
-    # category for the job.
-    categories: Mapped[list[dict]]   = mapped_column(JSONB, nullable=True)
-
-    problem_description: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-
-# ---------------------------------------------------------------------------
-# Actual SQLAlchemy column definitions to copy in (same types you already
-# use elsewhere in this file — String/ARRAY swapped out, JSONB import added):
-# ---------------------------------------------------------------------------
-#
-#   categories: Mapped[List[dict]] = mapped_column(JSONB, nullable=True)
-#   # delete: problem_category, service_tags, is_custom_category
-#
-# Then generate + apply the matching Alembic migration — see
-# alembic_migration_multi_category.py in this same delivery, which adds the
-# new column, backfills it from your existing problem_category/service_tags/
-# is_custom_category data, and drops the three old columns.
-# ---------------------------------------------------------------------------
-    
-    
-class Worker(Base):
-    __tablename__ = "workers"
-
-
-    id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    location: Mapped[WKBElement] = mapped_column(Geography(geometry_type='POINT', srid=4326), nullable=False)   
-    category: Mapped[str] = mapped_column(String, index=True, nullable=False) # this is the worker's main trade category,   
-    tags: Mapped[list[str]] = mapped_column(ARRAY(String), index=True, nullable=False) # this is a list of specific skills or services   
-    years_experience: Mapped[int] = mapped_column(nullable=False)  # this is the total years of experience the worker has in their trade
-    additional_metadata: Mapped[dict] = mapped_column(JSONB, nullable=True)  # put extra info that can be use for future
-    operating_radius: Mapped[float] = mapped_column(nullable=False) # this is the maximum distance in kilometers that the worker is willing to travel for a job
+    history: Mapped[list[dict]] = mapped_column(JSON, default=list) # store chat history as a list of dictionaries
+    is_complete: Mapped[bool]  = mapped_column(Boolean, server_default='FALSE', nullable=False) # tell if the chat is complete or not
+    is_job_request: Mapped[bool]   = mapped_column(Boolean, server_default='FALSE', nullable=False) # tell if the chat is a job request or not
+    categories: Mapped[list[dict]]   = mapped_column(JSONB, nullable=True) # tell about job categories, this is a list of dictionaries, each dictionary contains the category name and the subcategories
+    problem_description: Mapped[str | None] = mapped_column(Text, nullable=True) # just text about the job request
     
     
 
-
+# needs top work on it
 class JobStatus(str, enum.Enum):
     OPEN = "open"
     MATCHED = "matched"
     COMPLETED = "completed"
     
- 
+
+# needs to work on it
 class Service_tasks(Base):
     __tablename__ = "service_tasks"
 
@@ -182,20 +97,8 @@ class Service_tasks(Base):
     default=JobStatus.OPEN # Python handles the default assignment smoothly
 )
     
-    
-class Chat_logs(Base):
-    __tablename__ = "chat_logs"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    task_id: Mapped[int | None] = mapped_column(ForeignKey("service_tasks.id", ondelete="SET NULL"), nullable=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    role_context: Mapped[str] = mapped_column(String, nullable=False) 
-    message_body: Mapped[str] = mapped_column(Text, nullable=False) 
-    sender: Mapped[str] = mapped_column(String, nullable=False) 
-    timestamp: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default="now()")
-    
-    
-
+# needs to work on it
 class BidStatus(str, enum.Enum):
     SUBMITTED = "submitted"
     SELECTED = "selected"
@@ -216,8 +119,8 @@ class Bids(Base):
     default=BidStatus.SUBMITTED # Python handles the default assignment smoothly
 )
     
-    
-    
+
+# in my point of view not needed
 class WorkerSkillsSchema(BaseModel):
     primary_trades: List[str] = Field(default_factory=list, description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
     specific_skills: List[str] = Field(default_factory=list, description="Specific tasks they can do, e.g., fixing leaks, installing ceiling fans, drywall patching")
@@ -230,95 +133,84 @@ class WorkerSkillsSchema(BaseModel):
 
 
 
-"""
-New table needed in your model.py — worker interview pipeline
-================================================================
-This is a NEW table, not a modification of booking_chats. A worker
-registration interview has its own lifecycle (interview -> scenario test
--> pass/reject -> profile) that doesn't fit the customer BookingChat shape,
-so it gets its own model.
-
-Required import in your model.py, if not already present:
-  from sqlalchemy.dialects.postgresql import JSONB
-
-Apply this as a diff against your real model.py — this isn't a full file
-since I don't have your imports, Base class, or the rest of your models'
-neighbors.
-"""
 
 
-class WorkerInterviewSession(Base):  # (Base) — keep your existing base class
+#### models for the Worker Interview Session, this will be used to store the worker interview session data, including the chat history, the current stage of the interview, and the final outcome. 
+class WorkerInterviewSession(Base):
     __tablename__ = "worker_interview_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    history: Mapped[list[dict]] = mapped_column(JSONB, nullable=False)
-
-    # State machine — see worker_interview_nvidia.py module docstring and
-    # worker_interview_router.py.
-    #   "interviewing"             -> normal Q&A, no test triggered yet
-    #   "awaiting_scenario_answer" -> a scenario question has been asked;
-    #                                  the worker's NEXT message is graded,
-    #                                  not treated as an ordinary chat turn
-    #   "complete"                 -> is_complete=True; check is_rejected
-    #                                  to see which way it resolved
-    stage: Mapped[str]= mapped_column(String, server_default="interviewing", nullable=False)
-
-    is_complete: Mapped[bool]= mapped_column(Boolean, server_default="FALSE", nullable=False)
-    is_rejected: Mapped[bool] = mapped_column(Boolean, server_default="FALSE", nullable=False)
-    rejection_reason: Mapped[str | None]# = mapped_column(Text, nullable=True)
-
-    # Set the moment [TEST_REQUIRED: ...] fires. Kept (not cleared) after
-    # grading, so both the extraction step and the audit trail have it
-    # without re-parsing the raw history.
-    pending_sub_skill: Mapped[str | None]= mapped_column(Text, nullable=True)
-    pending_scenario: Mapped[str | None]= mapped_column(Text, nullable=True)
-    has_verified_specialty: Mapped[bool | None]= mapped_column(Boolean, nullable=True)
-
-    scenario_score: Mapped[int | None]= mapped_column(Integer, nullable=True)
-    scenario_passed: Mapped[bool | None]= mapped_column(Boolean, nullable=True)
-
-    # Full validated WorkerProfileSchema, only populated on a genuine pass
-    # where extraction also succeeded (see worker_interview_router.py's
-    # _handle_scenario_answer for the pass-but-extraction-failed case).
-    profile: Mapped[dict | None]= mapped_column(JSONB, nullable=True)
-
-    created_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    history: Mapped[list[dict]] = mapped_column(JSONB, nullable=False) # this will store the chat history as a list of dictionaries
+    stage: Mapped[str]= mapped_column(String, server_default="interviewing", nullable=False) # what stage the interview is in, can be "interviewing", "completed", "rejected"
+    is_complete: Mapped[bool]= mapped_column(Boolean, server_default="FALSE", nullable=False) # check if the interview is complete or not
+    is_rejected: Mapped[bool] = mapped_column(Boolean, server_default="FALSE", nullable=False) # check if the interview is rejected or not
+    rejection_reason: Mapped[str | None]= mapped_column(Text, nullable=True) # reason for rejection if applicable
+    pending_sub_skill: Mapped[str | None]= mapped_column(Text, nullable=True) # this will store the sub skill that the worker is pending to complete
+    pending_scenario: Mapped[str | None]= mapped_column(Text, nullable=True) # this will store the scenario that the worker will give test with this pending scenario
+    has_verified_specialty: Mapped[bool | None]= mapped_column(Boolean, nullable=True) # after test they will be verifed
+    scenario_score: Mapped[int | None]= mapped_column(Integer, nullable=True) # store score
+    scenario_passed: Mapped[bool | None]= mapped_column(Boolean, nullable=True) # store passed or not
+    profile: Mapped[dict | None]= mapped_column(JSONB, nullable=True) # this will store the final profile of the worker after the interview is complete
+    created_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False) # this will store the time when the interview session is created
+    updated_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False) # this will store the time when the interview session is updated
 
 
-# ---------------------------------------------------------------------------
-# Actual SQLAlchemy column definitions to copy in (same types you already
-# use elsewhere in this file — JSONB import added):
-# ---------------------------------------------------------------------------
-#
-#   from typing import Optional
-#   from datetime import datetime
-#   from sqlalchemy import String, Boolean, Text, Integer, DateTime, ForeignKey, func
-#   from sqlalchemy.dialects.postgresql import JSONB
-#   from sqlalchemy.orm import Mapped, mapped_column
-#
-#   class WorkerInterviewSession(Base):
-#       __tablename__ = "worker_interview_sessions"
-#
-#       id: Mapped[int] = mapped_column(primary_key=True, index=True)
-#       user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-#       history: Mapped[list[dict]] = mapped_column(JSONB, nullable=False)
-#       stage: Mapped[str] = mapped_column(String, server_default="interviewing", nullable=False)
-#       is_complete: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
-#       is_rejected: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
-#       rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-#       pending_sub_skill: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-#       pending_scenario: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-#       has_verified_specialty: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
-#       scenario_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-#       scenario_passed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
-#       profile: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-#       created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-#       updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-#
-# Then generate + apply the matching Alembic migration — see
-# alembic_migration_worker_interview.py in this same delivery, which
-# creates the table from scratch (no backfill needed, since this table
-# doesn't exist yet).
-# ---------------------------------------------------------------------------
+
+
+### model  for the Worker Profile, this will be used to store the worker profile data, including the skills, experience, and other relevant information. This will be used to match the worker with the job requests.
+class WorkerProfile(Base):
+    __tablename__ = "workers"
+
+        # Core Identifiers
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    worker_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+    # Outer Metadata Fields
+    stage: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., "complete"
+    is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Nested Profile Content Fields
+    job_category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)  # e.g., "plumber"
+    category_tag: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g., "plumbing"
+    is_custom_category: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Lists mapped to native PostgreSQL string arrays
+    specialities: Mapped[list[str]] = mapped_column(ARRAY(String(100)), nullable=False, default=list)
+    specialized_tools_or_equipment: Mapped[list[str]] = mapped_column(ARRAY(String(100)), nullable=False, default=list)
+    # Text, Numerical, and License Fields
+    years_experience: Mapped[int] = mapped_column(Integer, nullable=False)
+    license_or_certification: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    job_description: Mapped[str] = mapped_column(Text, nullable=False)
+    # Status, Flags, and Scores
+    emergency_available: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    has_verified_specialty: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    scenario_passed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    scenario_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    # AI Vector Column (CRUCIAL!)
+    # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from the 'job_description'
+    description_vector: Mapped[list[float]] = mapped_column(Vector(4096), nullable=True)
+    
+    
+class CustomerChatData(Base):
+    __tablename__ = "customer_chat_data"
+
+    # Core Identifiers
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    booking_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+    
+    # Outer Metadata Fields
+    is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_job_request: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    # Text, Numerical, and Description Fields
+    problem_description: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # Nested Profile Content Fields (Stored as a native PostgreSQL JSONB Array)
+    # Stores: [{"category": str, "tags": [str], "is_custom_category": bool}, ...]
+    categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    
+    # AI Vector Column
+    # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from 'problem_description'
+    description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
