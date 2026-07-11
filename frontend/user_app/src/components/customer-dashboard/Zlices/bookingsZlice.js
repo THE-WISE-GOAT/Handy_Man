@@ -1,52 +1,110 @@
-// Zlices/bookingsZlice.js
-
 export const createBookingsZlice = (set, get) => ({
-  // ==========================================
-  // 1. BUSINESS CONTENT DATA
-  // ==========================================
-  jobDescriptionDraft: "Job Description Workspace Primary Editor Terminal Node.",
+  jobDescriptionDraft: "I want to install a smart home manager like alexa....",
+  jobTitleDraft: "SMartHoME SeTUP",
   chatMessages: [
-    { id: "init-1", sender: "system", text: "Live Dispatch - Active Session initiated." }
+    {
+      id: "init-1",
+      sender: "system",
+      text: "Live Dispatch - Active Session initiated.",
+    },
   ],
   activePostsCount: 0,
   isAiGenerating: false,
+  fetchedJobs: [],
 
-  // ==========================================
-  // 2. DYNAMIC LAYOUT POSITIONS (The Core Map)
-  // ==========================================
-  // Default positions mapped cleanly out as initial keys
+  userName: "ANUP G",
+  userAddr: "BHAKTAPUR",
+  userCont: "+977 9814737741",
+
+  jobProfessional: "plumber",
+  cust_id: 1,
+  isSubmitting: false,
+
   slots: {
     main: "AiChatTerminal",
     sidebar: "JobDescriptionWorkspace",
-    bottom: "YourActivePosts"
+    bottom: "YourActivePosts",
   },
 
-  // ==========================================
-  // 3. UNIVERSAL SWAPPING ACTIONS
-  // ==========================================
-  
-  // The truly generic swap engine. No hardcoded module strings!
-  swapSlots: (clickedSlotName) => set((state) => {
-    if (clickedSlotName === "main") return {}; // Already on main screen, ignore
+  fetchCustomerJobs: async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/jobs/my-tasks");
 
-    const outgoingMainModule = state.slots.main;
-    const incomingTargetModule = state.slots[clickedSlotName];
-
-    return {
-      slots: {
-        ...state.slots,
-        main: incomingTargetModule,           // Target moves to center stage
-        [clickedSlotName]: outgoingMainModule // Old center module moves to sleeping slot
+      if (!response.ok) {
+        throw new Error(`HTTP Error Status: ${response.status}`);
       }
-    };
-  }),
 
-  // Standard business data updates
+      const data = await response.json();
+
+      if (data.status === "success") {
+        set({ fetchedJobs: data.tasks });
+        set({ activePostsCount: data.tasks.length });
+      }
+    } catch (error) {
+      console.error("❌ Frontend fetch failure:", error);
+    }
+  },
+
+  createJob: async () => {
+    const { jobTitleDraft, jobDescriptionDraft, jobProfessional, cust_id } =
+      get();
+
+    set({ isSubmitting: true });
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/jobs/post-job", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: jobTitleDraft,
+          description: jobDescriptionDraft,
+          cust_id: parseInt(cust_id),
+          professional: jobProfessional,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+      const data = await response.json();
+
+      if (data.status === "success") {
+        console.log("🚀 Job saved successfully to DB:", data.job);
+      }
+    } catch {}
+  },
+
+
+  swapSlots: (clickedSlotName) =>
+    set((state) => {
+      if (clickedSlotName === "main") return {};
+      const outgoingMainModule = state.slots.main;
+      const incomingTargetModule = state.slots[clickedSlotName];
+      return {
+        slots: {
+          ...state.slots,
+          main: incomingTargetModule,
+          [clickedSlotName]: outgoingMainModule,
+        },
+      };
+    }),
+
   setJobDescription: (text) => set({ jobDescriptionDraft: text }),
-  addChatMessage: (text, sender = "user") => 
+  setJobTitle: (text) => set({ jobTitleDraft: text }),
+  addChatMessage: (text, sender = "user") =>
     set((state) => ({
-      chatMessages: [...state.chatMessages, { id: crypto.randomUUID(), sender, text }]
+      chatMessages: [
+        ...state.chatMessages,
+        { id: crypto.randomUUID(), sender, text },
+      ],
     })),
   setAiGenerating: (status) => set({ isAiGenerating: status }),
-  setActivePostsCount: (count) => set({ activePostsCount: count })
+  setActivePostsCount: (count) => set({ activePostsCount: count }),
+  setUserName: (text) => set({ userName: text }),
+  setUserAddr: (text) => set({ userAddr: text }),
+  setUserCont: (text) => set({ userCont: text }),
+  setId: (int) => set({ cust_id: int }),
+  setProfessional: (text) => set({ jobProfessional: text }),
 });

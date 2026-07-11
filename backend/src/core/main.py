@@ -17,7 +17,8 @@ from src.core.router import (
     worker, 
     service_task, 
     chat_customer, 
-    chat_worker
+    chat_worker,
+    connection_manager
 )
 
 # 1. Define the startup logic using a SINGLE lifespan block
@@ -54,6 +55,8 @@ app.include_router(worker.router)
 app.include_router(chat_customer.router)
 app.include_router(chat_customer.match_router)
 app.include_router(chat_worker.router)
+app.include_router(connection_manager.router)
+app.include_router(service_task.router)
 
 
 # 5. Core Alias Root Routes
@@ -61,7 +64,6 @@ app.include_router(chat_worker.router)
 @app.post("/signup", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut)
 def register_alias(new_user: schema.UserCreate, db: Session = Depends(get_db)):
     return auth._create_user(new_user, db)
-
 
 @app.post("/login", response_model=schema.Token)
 @app.post("/login/", response_model=schema.Token, include_in_schema=False)

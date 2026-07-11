@@ -1,13 +1,13 @@
 # this page is for the validation of data that is sent to database
-from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime
-from typing import Any, List, Literal, Optional, Dict
-from pydantic import Field
-from pydantic import BaseModel, Field, EmailStr
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
+# ==========================================
+# 1. CORE AUTHENTICATION & USER SCHEMAS
+# ==========================================
 
-
-# we put value through this schema before it goes to the database, so we can validate that the data is in the correct format and that all required fields are present, this is also used for the API endpoints to validate the data that is sent to the API
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -22,7 +22,6 @@ class RoleOut(BaseModel):
     class Config:
         from_attributes = True
             
-# this is the schema for the data that is sent back to the frontend, we don't want to send the password back to the frontend, so we create a separate schema for that   
 class UserOut(BaseModel):
     id: int
     email: EmailStr 
@@ -35,16 +34,13 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
-        
 
 class Token(BaseModel):
-    access_token:str # this is token that will be used to authenticate the user, it will be generated when the user logs in, and it will be sent back to the frontend, and the frontend will use this token to authenticate the user for subsequent requests to the API
-    token_type:str # it will be set as "bearer", which is a common type of token used for authentication, it indicates that the token is a bearer token, which means that the token itself is sufficient to authenticate the user, and no additional credentials are required.
-    
+    access_token: str 
+    token_type: str 
     
 class TokenData(BaseModel):
-    user_id: str | None = None # this is the data that will be contained in the token, it will be used to identify the user when the token is decoded, it will be set to None by default, and it will be populated with the user_id when the token is created.
-    
+    user_id: str | None = None 
 
 # this is the schema for the chat functionality, it will be used to validate the data that is sent to the API, and it will be used to validate the data
 class ChatMessageIn(BaseModel):
@@ -90,7 +86,7 @@ class ChatMessageOut(BaseModel):
  # dsupport to display the chat history response after each chat turn
 class HistoryMessage(BaseModel):
     """A single turn in the client-visible conversation."""
-    role:    Literal["user", "assistant"]
+    role:  Literal["user", "assistant"]
     content: str
  
  # display the all chat history response 
@@ -141,7 +137,6 @@ class WorkerOnboardIn(BaseModel):
     operating_radius: float
     additional_metadata: Dict[str, Any]
     ai_assessed_skills_json: Optional[List[str]] = []
-
 
 
 
