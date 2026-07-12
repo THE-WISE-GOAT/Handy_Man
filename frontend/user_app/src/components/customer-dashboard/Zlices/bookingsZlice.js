@@ -126,7 +126,7 @@ export const createBookingsZlice = (set, get) => ({
 
     try {
       // Pull the JWT keycard out of localStorage
-      const token = localStorage.getItem("auth_token"); 
+      const token = localStorage.getItem("handy_man_access_token"); 
 
       const response = await fetch("http://127.0.0.1:8000/dispatch/session", {
         method: "POST",
@@ -188,7 +188,7 @@ export const createBookingsZlice = (set, get) => ({
 
     try {
       // Pull the same JWT keycard out of localStorage
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("handy_man_access_token");
 
       const response = await fetch("http://127.0.0.1:8000/dispatch/chat", {
         method: "POST",
