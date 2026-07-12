@@ -35,6 +35,9 @@ export default function Dash1Board({ viewSlug }) {
     sendCustomerMessage,
     turns_remaining,
     is_complete,
+    ai_response,
+    current_tags,
+    categories
 
   } = useCustomerDashboardData();
 
@@ -612,7 +615,9 @@ export default function Dash1Board({ viewSlug }) {
               Sidebar: Description Live Glance — Draft Mode
             </span>
             <p className="card-summary">
-              {jobDescriptionDraft.substring(0, 35)}...
+               <div>{ai_response}</div>
+               <div>{current_tags}</div>
+               <div>{categories}</div>
             </p>
           </>
         ) : (

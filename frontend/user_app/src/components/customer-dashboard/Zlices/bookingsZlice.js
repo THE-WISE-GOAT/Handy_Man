@@ -233,6 +233,4 @@ export const createBookingsZlice = (set, get) => ({
       console.error("❌ Failed to process chat turn over secure transport:", error);
     }
   },
-
-
 });
