@@ -31,6 +31,10 @@ export default function Dash1Board({ viewSlug }) {
     setProfessional,
     setId,
     createJob,
+    startNewSession,
+    sendCustomerMessage,
+    turns_remaining,
+    is_complete,
 
   } = useCustomerDashboardData();
 
@@ -54,10 +58,17 @@ export default function Dash1Board({ viewSlug }) {
     { id: 10, name: "Setup.log", type: "LOG" },
   ];
 
-  // Trigger HTTP Fetch once when the page loads safely
+
+  
+// Trigger HTTP Fetch once when the page loads safely
   useEffect(() => {
     fetchCustomerJobs();
   }, [fetchCustomerJobs]);
+
+  // ── ADD THIS NEW HOOK DIRECTLY HERE ──
+  useEffect(() => {
+    startNewSession();
+  }, [startNewSession]);
 
   // Route state synchronization layer
   useEffect(() => {
@@ -98,16 +109,20 @@ export default function Dash1Board({ viewSlug }) {
 
   const renderAiChat = (slotKey) => {
     if (slotKey === "main") {
+      // ── UPDATED SUBMISSION INTERCEPTOR ──
       const handleSend = (e) => {
         e.preventDefault();
-        if (!chatInput.trim()) return;
-        addChatMessage(chatInput, "user");
+        if (!chatInput.trim() || is_complete) return;
+        sendCustomerMessage(chatInput);
         setChatInput("");
       };
 
       return (
         <div className="dashboard-card main-view">
-          <span className="card-flag">INTERACTIVE DISPATCH MANAGER</span>
+          <span className="card-flag">
+            INTERACTIVE DISPATCH MANAGER 
+            {turns_remaining !== undefined && ` — TURNS LEFT: ${turns_remaining}`}
+          </span>
           <h2>AI CHAT TERMINAL</h2>
           <div className="chat-box">
             {chatMessages.map((m) => (
@@ -117,12 +132,14 @@ export default function Dash1Board({ viewSlug }) {
             ))}
           </div>
           <form onSubmit={handleSend} className="chat-form">
+            {/* ── UPDATED INPUT HOOKS WITH CONDITIONAL DISABLED CONTROLS ── */}
             <input
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Instruct AI..."
+              placeholder={is_complete ? "Conversation finalized." : "Instruct AI..."}
+              disabled={is_complete}
             />
-            <button type="submit" className="chat-btn">
+            <button type="submit" className="chat-btn" disabled={is_complete || !chatInput.trim()}>
               Send
             </button>
           </form>
