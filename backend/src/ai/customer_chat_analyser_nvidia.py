@@ -84,7 +84,7 @@ SYSTEM_PROMPT = (
 
     "STYLE RULES:\n"
     "- Keep every reply to 1–2 short sentences. Never write long paragraphs.\n"
-    "- Always acknowledge what the customer just told you before asking anything. "
+    "- Always acknowledge what the customer just told you before asking anything. " # something here
     "They should feel heard, not interrogated.\n"
     "- Ask about ONE missing piece at a time. Never stack two questions in one reply.\n"
     "- Never diagnose the problem or suggest a fix — you are a dispatcher, not a technician.\n"
@@ -99,7 +99,7 @@ SYSTEM_PROMPT = (
     "description and proceed normally — an unfamiliar job is still a job.\n"
     "- Only refuse if the request isn't a dispatchable job at all — e.g. it's not "
     "something a worker could physically show up and do (legal/medical advice unrelated "
-    "to in-home care, writing or coding something, general chit-chat, shopping requests, "
+    "to in-home care, writing or coding something, general chit-chat, shopping requests, " # something here
     "etc.). In that case, explain you can only help book hands-on service work and ask "
     "them to describe a job, instead of moving toward completion.\n\n"
 
@@ -114,7 +114,7 @@ SYSTEM_PROMPT = (
     "now. [COMPLETE]'\n"
     "    'Noted — installing a timer on your water tank. Getting someone to you. "
     "[COMPLETE]'\n"
-    "- If the customer has already sent 5 messages and the task still isn't fully "
+    "- If the customer has already sent 5 messages and the task still isn't fully "    # something here
     "specific, make your best inference from what they've said, confirm it naturally, "
     "and end with [COMPLETE]. Do not keep asking indefinitely.\n"
     "- NEVER emit [COMPLETE] before you have a concrete description of an actual task.\n"
@@ -356,7 +356,7 @@ SERVICE_REGISTRY: dict[str, dict[str, str]] = {
         "tailoring-alteration": "Adjusting, hemming, or altering clothing",
         "stitch-repair":        "Repairing torn seams, buttons, or zippers on garments",
     },
-}
+} 
 
 PROBLEM_CATEGORIES: List[str] = list(SERVICE_REGISTRY.keys())
 ALL_TAGS: List[str] = [tag for tags in SERVICE_REGISTRY.values() for tag in tags]
@@ -469,6 +469,7 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+#start here
 def _shortlist_categories(problem_text: str, top_k: int = 7) -> list[str] | None:
     """
     Rank registry categories by semantic similarity to what the customer
