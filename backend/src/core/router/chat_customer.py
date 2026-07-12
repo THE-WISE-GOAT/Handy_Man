@@ -272,6 +272,8 @@ def dispatch_chat(
     turns_used      = user_turn_count
     turns_remaining = max(0, MAX_TURNS - turns_used)
 
+    #endpoint here
+
     return {
         "booking_chat_id":     chat_session.id,
         "ai_response":         display_message,
@@ -319,7 +321,7 @@ def get_history(
         for msg in chat_session.history
         if msg["role"] != "system"
     ]
-
+    #endpoint here
     return {
         "booking_chat_id":  chat_session.id,
         "history":          visible_history,
