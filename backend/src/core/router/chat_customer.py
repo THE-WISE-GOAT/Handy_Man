@@ -376,9 +376,7 @@ def get_booking_summary(
         "is_complete":          chat_session.is_complete,
         "is_job_request":       bool(chat_session.is_job_request),
     }
-  
-  
-  
+ 
 
 # use to post  the  customer  retrieve from chat to  database and also handle the  vector embedding from nvidia and save to database
 @router.post(
@@ -387,7 +385,7 @@ def get_booking_summary(
 )
 def complete_customer_chat(
     booking_chat_id: int, 
-    payload: CompleteChatIn, # 👈 Accepts the edited text block parameters from the UI layout payload
+    payload: schema.CompleteChatIn, # 👈 Accepts the edited text block parameters from the UI layout payload
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
