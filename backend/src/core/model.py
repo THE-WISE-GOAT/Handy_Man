@@ -227,7 +227,6 @@ class CustomerChatData(Base):
     problem_description: Mapped[str] = mapped_column(Text, nullable=False)
     
     # ── ADD THIS COLUMN FOR THE JOB TITLE ──
-    job_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     
     categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
