@@ -44,7 +44,7 @@ _nvidia_client = OpenAI(
 )
 
 MODEL_NAME = "meta/llama-3.1-8b-instruct"
-MAX_TURNS         = 6  # customer messages; endpoint enforces this
+MAX_TURNS         = 20  # customer messages; endpoint enforces this
 INITIAL_GREETING  = "Hi! What's going on — what's broken and what's happening?"
 
 SYSTEM_PROMPT = (
