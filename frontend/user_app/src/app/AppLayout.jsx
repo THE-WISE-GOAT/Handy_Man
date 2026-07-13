@@ -9,8 +9,10 @@ import {
 import {
   CUSTOMER_NAV_ITEMS,
   WORKER_NAV_ITEMS,
+  ADMIN_NAV_ITEMS,
   getDefaultCustomerPath,
   getDefaultWorkerPath,
+  getDefaultAdminPath,
 } from "@shared/config/viewRoutes";
 import "./app-layout.css";
 
@@ -19,7 +21,12 @@ export default function AppLayout({ role = "customer" }) {
   const navigate = useNavigate();
   const { user, logout, canAccessWorker, refreshUser } = useAuth();
 
-  const navItems = role === "worker" ? WORKER_NAV_ITEMS : CUSTOMER_NAV_ITEMS;
+  const navItems =
+    role === "worker"
+      ? WORKER_NAV_ITEMS
+      : role === "admin"
+        ? ADMIN_NAV_ITEMS
+        : CUSTOMER_NAV_ITEMS;
   const activePanel =
     navItems.find((item) =>
       location.pathname.startsWith(item.matchPrefix || item.path),
@@ -60,6 +67,14 @@ export default function AppLayout({ role = "customer" }) {
           },
         ]
       : []),
+    ...(role === "admin"
+      ? [
+          {
+            label: "Switch to Customer Dashboard",
+            onClick: () => navigate(getDefaultCustomerPath("bookings")),
+          },
+        ]
+      : []),
     {
       label: "Log out",
       onClick: async () => {
@@ -76,7 +91,9 @@ export default function AppLayout({ role = "customer" }) {
         brandEyebrow={
           role === "worker"
             ? "Unified Worker Workspace"
-            : "Unified Customer Workspace"
+            : role === "admin"
+              ? "Unified Admin Workspace"
+              : "Unified Customer Workspace"
         }
         navItems={navItems}
         activePanel={activePanel}
@@ -91,11 +108,19 @@ export default function AppLayout({ role = "customer" }) {
             label={
               user?.firstName ||
               user?.username ||
-              (role === "worker" ? "Worker" : "Customer")
+              (role === "worker"
+                ? "Worker"
+                : role === "admin"
+                  ? "Admin"
+                  : "Customer")
             }
             sublabel={
               user?.email ||
-              (role === "worker" ? "Worker session" : "Customer session")
+              (role === "worker"
+                ? "Worker session"
+                : role === "admin"
+                  ? "Admin session"
+                  : "Customer session")
             }
             actions={profileActions}
           />
@@ -103,7 +128,9 @@ export default function AppLayout({ role = "customer" }) {
       />
 
       <main className="fixfast-shell app-layout-shell">
-        <Outlet />
+        <div className="app-layout-container">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

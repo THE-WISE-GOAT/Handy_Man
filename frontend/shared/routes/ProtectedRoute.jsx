@@ -24,7 +24,6 @@ export default function ProtectedRoute({ children, requiredRole = null }) {
     isAuthenticated,
     isLoading,
     hasRole,
-    canAccessWorker,
     defaultHomePath,
   } = useAuth();
   const location = useLocation();
@@ -37,11 +36,7 @@ export default function ProtectedRoute({ children, requiredRole = null }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (requiredRole === "worker" && !canAccessWorker) {
-    return <Navigate to={defaultHomePath} replace />;
-  }
-
-  if (requiredRole && requiredRole !== "worker" && !hasRole(requiredRole)) {
+  if (requiredRole && !hasRole(requiredRole)) {
     return <Navigate to={defaultHomePath} replace />;
   }
 
