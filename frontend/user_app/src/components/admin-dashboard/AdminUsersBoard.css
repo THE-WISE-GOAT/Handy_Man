@@ -1,0 +1,133 @@
+.admin-board {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  font-family: "JetBrains Mono", "SFMono-Regular", monospace;
+  color: var(--fixfast-black, #000);
+}
+
+.admin-board__head h1 {
+  margin: 0.2rem 0;
+  font-size: 1.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-board__sub {
+  margin: 0;
+  color: var(--fixfast-muted, #5b6068);
+  font-size: 0.85rem;
+}
+
+.admin-status {
+  padding: 1rem;
+  border: 2px dashed #000;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.admin-status--error {
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.admin-board__grid {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.admin-section {
+  border: 2px solid #000;
+  border-radius: 16px;
+  background: #fff;
+  padding: 1rem 1.1rem 1.2rem;
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.06);
+}
+
+.admin-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+}
+
+.admin-section__head h2 {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-section__count {
+  display: grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  background: var(--fixfast-yellow, #ffd700);
+  border: 2px solid #000;
+  border-radius: 12px;
+  font-weight: 900;
+}
+
+.admin-section__empty {
+  color: var(--fixfast-muted, #5b6068);
+  font-size: 0.85rem;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid #e3e3e3;
+  white-space: nowrap;
+}
+
+.admin-table th {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  color: var(--fixfast-muted, #5b6068);
+}
+
+.admin-cell-email {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-all;
+}
+
+.admin-row:hover {
+  background: #fafafa;
+}
+
+.admin-pill {
+  display: inline-block;
+  margin: 0 0.2rem 0.2rem 0;
+  padding: 0.1rem 0.5rem;
+  border: 1.5px solid #000;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: capitalize;
+}
+
+.admin-row--worker .admin-pill {
+  background: #e8f0ff;
+}
+
+.admin-row--customer .admin-pill {
+  background: #fff6d6;
+}
+
+.admin-row--admin .admin-pill {
+  background: var(--fixfast-yellow, #ffd700);
+}
