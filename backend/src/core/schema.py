@@ -12,6 +12,23 @@ class CompleteChatIn(BaseModel):
     edited_title: str
     edited_description: str
 
+# ── UPDATE THIS CLASS IN YOUR schema.py FILE ──
+class ChatMessageOut(BaseModel):
+    """Returned after each chat turn (POST /dispatch/chat)."""
+    booking_chat_id: int
+    ai_response: str
+    is_complete: bool
+    current_tags: List[str]  
+    is_job_request: bool  
+    is_custom_category: bool 
+    turns_used: int 
+    turns_remaining: int 
+    
+    # ── ADD THESE TWO FIELDS ──
+    problem_description: Optional[str] = None  # 👈 Allows AI summary to pass to UI
+    categories: List[CategoryMatch] = Field(default_factory=list)  # 👈 Allows title extraction to pass to UI
+
+
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -75,17 +92,17 @@ class SessionStartOut(BaseModel):
     ai_response:     str
     turns_remaining: int
  
- # display the chat message response after each chat turn
-class ChatMessageOut(BaseModel):
-    """Returned after each chat turn (POST /dispatch/chat)."""
-    booking_chat_id: int
-    ai_response: str
-    is_complete: bool
-    current_tags: List[str]  # problem related tags
-    is_job_request: bool  # True only on the completion turn, if a real job was found
-    is_custom_category: bool # True if the category/tags came from the AI fallback, not the static registry
-    turns_used: int # number of turns used in the chat session
-    turns_remaining:  int # number of turns remaining in the chat session
+#  # display the chat message response after each chat turn
+# class ChatMessageOut(BaseModel):
+#     """Returned after each chat turn (POST /dispatch/chat)."""
+#     booking_chat_id: int
+#     ai_response: str
+#     is_complete: bool
+#     current_tags: List[str]  # problem related tags
+#     is_job_request: bool  # True only on the completion turn, if a real job was found
+#     is_custom_category: bool # True if the category/tags came from the AI fallback, not the static registry
+#     turns_used: int # number of turns used in the chat session
+#     turns_remaining:  int # number of turns remaining in the chat session
  
  # dsupport to display the chat history response after each chat turn
 class HistoryMessage(BaseModel):
