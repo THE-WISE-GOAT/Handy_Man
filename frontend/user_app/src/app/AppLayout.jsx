@@ -19,7 +19,7 @@ import "./app-layout.css";
 export default function AppLayout({ role = "customer" }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, canAccessWorker, refreshUser } = useAuth();
+  const { user, logout, canAccessWorker, canAccessAdmin, refreshUser } = useAuth();
 
   const navItems =
     role === "worker"
@@ -42,47 +42,73 @@ export default function AppLayout({ role = "customer" }) {
     }
   };
 
-  const profileActions = [
-    ...(role === "customer" && !canAccessWorker
-      ? [
-          {
-            label: "Join us as Worker",
-            onClick: handleJoinWorker,
-          },
-        ]
-      : []),
-    ...(role === "customer" && canAccessWorker
-      ? [
-          {
-            label: "Switch to Worker Dashboard",
-            onClick: () => navigate(getDefaultWorkerPath()),
-          },
-        ]
-      : []),
-    ...(role === "worker"
-      ? [
-          {
-            label: "Switch to customer",
-            onClick: () => navigate(getDefaultCustomerPath("bookings")),
-          },
-        ]
-      : []),
-    ...(role === "admin"
-      ? [
-          {
-            label: "Switch to Customer Dashboard",
-            onClick: () => navigate(getDefaultCustomerPath("bookings")),
-          },
-        ]
-      : []),
-    {
-      label: "Log out",
-      onClick: async () => {
-        await logout();
-        navigate("/login", { replace: true });
-      },
+  const profileActions = [];
+
+  if (canAccessAdmin) {
+    // Admin users can reach every workspace — show the relevant switches per view.
+    if (role === "admin") {
+      profileActions.push(
+        {
+          label: "Switch to Customer Dashboard",
+          onClick: () => navigate(getDefaultCustomerPath("bookings")),
+        },
+        {
+          label: "Switch to Worker Dashboard",
+          onClick: () => navigate(getDefaultWorkerPath()),
+        },
+      );
+    } else if (role === "customer") {
+      profileActions.push(
+        {
+          label: "Switch to Worker Dashboard",
+          onClick: () => navigate(getDefaultWorkerPath()),
+        },
+        {
+          label: "Switch to Admin Dashboard",
+          onClick: () => navigate(getDefaultAdminPath()),
+        },
+      );
+    } else if (role === "worker") {
+      profileActions.push(
+        {
+          label: "Switch to Customer Dashboard",
+          onClick: () => navigate(getDefaultCustomerPath("bookings")),
+        },
+        {
+          label: "Switch to Admin Dashboard",
+          onClick: () => navigate(getDefaultAdminPath()),
+        },
+      );
+    }
+  } else {
+    // Non-admin users keep the original customer/worker switching behavior.
+    if (role === "customer" && !canAccessWorker) {
+      profileActions.push({
+        label: "Join us as Worker",
+        onClick: handleJoinWorker,
+      });
+    }
+    if (role === "customer" && canAccessWorker) {
+      profileActions.push({
+        label: "Switch to Worker Dashboard",
+        onClick: () => navigate(getDefaultWorkerPath()),
+      });
+    }
+    if (role === "worker") {
+      profileActions.push({
+        label: "Switch to customer",
+        onClick: () => navigate(getDefaultCustomerPath("bookings")),
+      });
+    }
+  }
+
+  profileActions.push({
+    label: "Log out",
+    onClick: async () => {
+      await logout();
+      navigate("/login", { replace: true });
     },
-  ];
+  });
 
   return (
     <div className="fixfast-page">
@@ -128,9 +154,7 @@ export default function AppLayout({ role = "customer" }) {
       />
 
       <main className="fixfast-shell app-layout-shell">
-        <div className="app-layout-container">
-          <Outlet />
-        </div>
+        <Outlet />
       </main>
     </div>
   );
