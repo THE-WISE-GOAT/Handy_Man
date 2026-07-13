@@ -152,6 +152,25 @@ export function AuthProvider({ children }) {
     return bootstrapUserSession({ token, type, usernameValue });
   };
 
+  const refreshUser = async () => {
+    if (!accessToken) return null;
+
+    const responseBody = await apiClient.get(`/users/me`, {
+      token: accessToken,
+      tokenType,
+    });
+
+    const profile = normalizeUserProfile(responseBody, username);
+
+    if (profile) {
+      localStorage.setItem(USER_KEY, JSON.stringify(profile));
+    }
+
+    setUser(profile);
+
+    return profile;
+  };
+
   const logoutLocal = () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(TOKEN_TYPE_KEY);
@@ -198,6 +217,7 @@ export function AuthProvider({ children }) {
       hasRole,
       login,
       logout,
+      refreshUser,
     }),
     [
       accessToken,
