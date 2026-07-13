@@ -69,7 +69,6 @@ export const createBookingsZlice = (set, get) => ({
         },
         body: JSON.stringify({
           // Fixed fallback implementation: if text inputs are deleted entirely, submit safe clean parameters to backend 
-          edited_title: jobTitleDraft.trim() || "New Job Request",
           edited_description: jobDescriptionDraft || ""
         }),
       });
