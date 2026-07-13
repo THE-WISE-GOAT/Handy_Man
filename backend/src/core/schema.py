@@ -8,6 +8,10 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 # 1. CORE AUTHENTICATION & USER SCHEMAS
 # ==========================================
 
+class CompleteChatIn(BaseModel):
+    edited_title: str
+    edited_description: str
+
 class UserCreate(BaseModel):
     username: str
     email: str
