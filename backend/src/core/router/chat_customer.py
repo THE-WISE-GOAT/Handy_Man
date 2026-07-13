@@ -321,7 +321,9 @@ def get_history(
         for msg in chat_session.history
         if msg["role"] != "system"
     ]
+
     #endpoint here
+    
     return {
         "booking_chat_id":  chat_session.id,
         "history":          visible_history,
@@ -385,6 +387,7 @@ def get_booking_summary(
 )
 def complete_customer_chat(
     booking_chat_id: int, 
+    payload: CompleteChatIn, # 👈 Accepts the edited text block parameters from the UI layout payload
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
@@ -397,8 +400,8 @@ def complete_customer_chat(
             detail="Cannot process summary. The AI chat session is not complete yet.",
         )
     
-    
-    job_desc = getattr(chat_session, "problem_description", "")
+    # CRITICAL REFINEMENT: Pull the customized, finalized description value directly from the user's edits
+    job_desc = payload.edited_description.strip()
     
     # Step 3: Get Vector Embedding from Nvidia
     embedding_vector = None
@@ -408,7 +411,8 @@ def complete_customer_chat(
             "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
             "Content-Type": "application/json"
             }
-            payload = {
+            # The Nvidia payload now matches exactly what the customer finalized on screen
+            nvidia_payload = {
                 "model": "nvidia/nv-embed-v1",
                 "input": [job_desc],
                 "input_type": "query",
@@ -418,7 +422,7 @@ def complete_customer_chat(
             response = requests.post(
                "https://integrate.api.nvidia.com/v1/embeddings",
                headers=headers, 
-               json=payload, 
+               json=nvidia_payload, 
                timeout=10.0
             )
             
@@ -472,7 +476,6 @@ def complete_customer_chat(
     db.commit()
     
     return {"status": "success", "message": "Customer chat data structured and saved successfully."}
-
 
 # ── Helper: pick the primary category ────────────────────────────────────────
 
