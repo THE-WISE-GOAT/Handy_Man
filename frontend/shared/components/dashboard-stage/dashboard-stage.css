@@ -90,11 +90,56 @@
     right: 0;
     top: calc(100% + 0.5rem);
     width: 14rem;
+    max-width: calc(100vw - 1rem);
     display: grid;
     gap: 0.45rem;
-    padding: 0.6rem;
+    padding: 0.75rem;
     background: var(--fixfast-white);
     border: var(--fixfast-border);
     border-radius: 20px;
     box-shadow: var(--fixfast-shadow);
+    overflow: hidden;
+    text-align: left;
+}
+
+.fixfast-profile__meta {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.1rem 0.25rem 0.55rem;
+    margin-bottom: 0.35rem;
+    border-bottom: var(--fixfast-border);
+}
+
+.fixfast-profile__meta strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fixfast-profile__email {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-all;
+    color: var(--fixfast-muted);
+    font-size: 0.8rem;
+    line-height: 1.2;
+}
+
+.fixfast-profile__menu button {
+    min-width: 0;
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    background: var(--fixfast-bg);
+    border: var(--fixfast-border);
+    border-radius: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--fixfast-ease);
+}
+
+.fixfast-profile__menu button:hover {
+    background: var(--fixfast-yellow);
+    transform: translateY(-1px);
 }

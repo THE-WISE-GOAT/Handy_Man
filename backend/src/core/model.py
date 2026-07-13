@@ -192,25 +192,41 @@ class WorkerProfile(Base):
     description_vector: Mapped[list[float]] = mapped_column(Vector(4096), nullable=True)
     
     
+# class CustomerChatData(Base):
+#     __tablename__ = "customer_chat_data"
+
+#     # Core Identifiers
+#     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+#     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+#     booking_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+    
+#     # Outer Metadata Fields
+#     is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+#     is_job_request: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+#     # Text, Numerical, and Description Fields
+#     problem_description: Mapped[str] = mapped_column(Text, nullable=False)
+    
+#     # Nested Profile Content Fields (Stored as a native PostgreSQL JSONB Array)
+#     # Stores: [{"category": str, "tags": [str], "is_custom_category": bool}, ...]
+#     categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    
+#     # AI Vector Column
+#     # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from 'problem_description'
+#     description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
+
+
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"
 
-    # Core Identifiers
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     booking_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
-    
-    # Outer Metadata Fields
     is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_job_request: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    
-    # Text, Numerical, and Description Fields
     problem_description: Mapped[str] = mapped_column(Text, nullable=False)
     
-    # Nested Profile Content Fields (Stored as a native PostgreSQL JSONB Array)
-    # Stores: [{"category": str, "tags": [str], "is_custom_category": bool}, ...]
-    categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    # ── ADD THIS COLUMN FOR THE JOB TITLE ──
     
-    # AI Vector Column
-    # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from 'problem_description'
+    categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)

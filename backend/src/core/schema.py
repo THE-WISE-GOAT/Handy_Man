@@ -1,4 +1,5 @@
 # this page is for the validation of data that is sent to database
+from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
@@ -7,6 +8,24 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 # ==========================================
 # 1. CORE AUTHENTICATION & USER SCHEMAS
 # ==========================================
+
+class CompleteChatIn(BaseModel):
+    edited_description: str
+
+class ChatMessageOut(BaseModel):
+    """Returned after each chat turn (POST /dispatch/chat)."""
+    booking_chat_id: int
+    ai_response: str
+    is_complete: bool
+    current_tags: List[str]  
+    is_job_request: bool  
+    is_custom_category: bool 
+    turns_used: int 
+    turns_remaining: int 
+    
+    problem_description: Optional[str] = None  # Allows AI summary to pass to UI
+    categories: List[CategoryMatch] = Field(default_factory=list)  # Allows title extraction to pass to UI
+
 
 class UserCreate(BaseModel):
     username: str
@@ -42,7 +61,7 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     user_id: str | None = None 
 
-# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API, and it will be used to validate the data
+# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API
 class ChatMessageIn(BaseModel):
     """Payload the client sends on each chat turn."""
     booking_chat_id: int = Field(
@@ -64,48 +83,36 @@ class ChatMessageIn(BaseModel):
             raise ValueError("message cannot be empty or whitespace-only")
         return stripped  # normalised once, here — not re-stripped downstream
  
- # use to display session start response
+# use to display session start response
 class SessionStartOut(BaseModel):
     """Returned when a new session is created (POST /dispatch/session)."""
     booking_chat_id: int
     ai_response:     str
     turns_remaining: int
  
- # display the chat message response after each chat turn
-class ChatMessageOut(BaseModel):
-    """Returned after each chat turn (POST /dispatch/chat)."""
-    booking_chat_id: int
-    ai_response: str
-    is_complete: bool
-    current_tags: List[str]  # problem related tags
-    is_job_request: bool  # True only on the completion turn, if a real job was found
-    is_custom_category: bool # True if the category/tags came from the AI fallback, not the static registry
-    turns_used: int # number of turns used in the chat session
-    turns_remaining:  int # number of turns remaining in the chat session
- 
- # dsupport to display the chat history response after each chat turn
+# dsupport to display the chat history response after each chat turn
 class HistoryMessage(BaseModel):
     """A single turn in the client-visible conversation."""
     role:  Literal["user", "assistant"]
     content: str
  
- # display the all chat history response 
+# display the all chat history response 
 class ChatHistoryOut(BaseModel):
     """Returned by GET /dispatch/{id}/history."""
     booking_chat_id: int
     history:         List[HistoryMessage]
     is_complete:     bool
-    turns_used:       int
+    turns_used:      int
     turns_remaining: int
  
-  # this is use to disply category for the specific job request
+ # this is use to disply category for the specific job request
 class CategoryMatch(BaseModel):
     category: str
     tags: List[str] = Field(default_factory=list)
     is_custom_category: bool
  
  
- # to display the structured summary mainly needed for the frontend to use dict keys
+# to display the structured summary mainly needed for the frontend to use dict keys
 class BookingSummaryOut(BaseModel):
     """Returned by GET /dispatch/{id}/summary once is_complete is True."""
     categories: List[CategoryMatch] = Field(default_factory=list)
@@ -113,7 +120,6 @@ class BookingSummaryOut(BaseModel):
     is_complete: bool
     is_job_request: bool
  
-
 
 # use in the customer_chat_analyser_nvidia.py to validate the data that is sent to the API
 class CustomerProblemSchema(BaseModel):
@@ -164,7 +170,7 @@ class WorkerSessionStartOut(BaseModel):
     ai_response: str
     stage: str
 
-# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API, and it will be used to validate the data
+# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API
 class WorkerChatMessageIn(BaseModel):
     worker_chat_id: int
     message: str

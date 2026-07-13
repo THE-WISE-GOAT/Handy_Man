@@ -1,6 +1,7 @@
 import React from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@shared/context/AuthContext";
+import { apiClient } from "@shared/api/client";
 import {
   FixFastNavbar,
   FixFastProfile,
@@ -16,7 +17,7 @@ import "./app-layout.css";
 export default function AppLayout({ role = "customer" }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, canAccessWorker } = useAuth();
+  const { user, logout, canAccessWorker, refreshUser } = useAuth();
 
   const navItems = role === "worker" ? WORKER_NAV_ITEMS : CUSTOMER_NAV_ITEMS;
   const activePanel =
@@ -24,11 +25,29 @@ export default function AppLayout({ role = "customer" }) {
       location.pathname.startsWith(item.matchPrefix || item.path),
     )?.id || navItems[0]?.id;
 
+  const handleJoinWorker = async () => {
+    try {
+      await apiClient.post("/users/become-worker");
+      await refreshUser();
+      navigate(getDefaultWorkerPath());
+    } catch (error) {
+      console.error("Failed to join as worker:", error);
+    }
+  };
+
   const profileActions = [
+    ...(role === "customer" && !canAccessWorker
+      ? [
+          {
+            label: "Join us as Worker",
+            onClick: handleJoinWorker,
+          },
+        ]
+      : []),
     ...(role === "customer" && canAccessWorker
       ? [
           {
-            label: "Switch to worker",
+            label: "Switch to Worker Dashboard",
             onClick: () => navigate(getDefaultWorkerPath()),
           },
         ]

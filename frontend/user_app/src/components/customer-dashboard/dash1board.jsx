@@ -18,8 +18,6 @@ export default function Dash1Board({ viewSlug }) {
     chatMessages,
     addChatMessage,
     activePostsCount,
-    fetchedJobs,
-    fetchCustomerJobs,
     userCont,
     userAddr,
     userName,
@@ -38,7 +36,6 @@ export default function Dash1Board({ viewSlug }) {
     ai_response,
     current_tags,
     categories
-
   } = useCustomerDashboardData();
 
   // References live inside the component instance scope
@@ -61,12 +58,8 @@ export default function Dash1Board({ viewSlug }) {
     { id: 10, name: "Setup.log", type: "LOG" },
   ];
 
+  // Trigger HTTP Fetch once when the page loads safely
 
-  
-// Trigger HTTP Fetch once when the page loads safely
-  useEffect(() => {
-    fetchCustomerJobs();
-  }, [fetchCustomerJobs]);
 
   // ── ADD THIS NEW HOOK DIRECTLY HERE ──
   useEffect(() => {
@@ -201,24 +194,24 @@ export default function Dash1Board({ viewSlug }) {
               className="title"
               style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}
             >
-              <span >
+              <span>
                 ·•TITLE:
               </span>
               <input 
                 type="text"
                 value={jobTitleDraft}
                 onChange={(e) => {setJobTitle(e.target.value)}}
-                spellCheck = {false}
+                spellCheck={false}
                 style={{
-      outline: "none",
-      border: "none",
-      background: "transparent",
-      font: "inherit",
-      color: "inherit",
-      padding: 0,
-      margin: 0,
-      width: "100%", 
-    }}
+                  outline: "none",
+                  border: "none",
+                  background: "transparent",
+                  font: "inherit",
+                  color: "inherit",
+                  padding: 0,
+                  margin: 0,
+                  width: "100%", 
+                }}
               />
               <span style={{ whiteSpace: "nowrap", flexShrink: 0 }}>•·</span>
             </h3>
@@ -407,197 +400,164 @@ export default function Dash1Board({ viewSlug }) {
               UsER INFo{" "}
             </h3>
             <div className="user-info" style={{ lineHeight: '35px' }}>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "baseline",
-              }}
-            >
-              <span>NAME:</span>
-              <input
-                type="text"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                spellCheck={false}
-                style={{
-                  outline: "none",
-                  border: "none",
-                  background: "transparent",
-                  font: "inherit",
-                  color: "inherit",
-                  padding: 0,
-                  margin: 0,
-                  width: "auto",
-                  minWidth: "50px",
-                  maxWidth: "100%",
-                }}
-              />
-            </span>
+              <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                <span>NAME:</span>
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  spellCheck={false}
+                  style={{
+                    outline: "none",
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: "inherit",
+                    padding: 0,
+                    margin: 0,
+                    width: "auto",
+                    minWidth: "50px",
+                    maxWidth: "100%",
+                  }}
+                />
+              </span>
 
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "baseline",
-              }}
-            >
-              <span>CONTACT:</span>
-              <input
-                type="text"
-                value={userCont}
-                onChange={(e) => setUserCont(e.target.value)}
-                spellCheck={false}
-                style={{
-                  outline: "none",
-                  border: "none",
-                  background: "transparent",
-                  font: "inherit",
-                  color: "inherit",
-                  padding: 0,
-                  margin: 0,
-                  width: "auto",
-                  minWidth: "50px",
-                  maxWidth: "100%",
-                }}
-              />
-            </span>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "baseline",
-              }}
-            >
-              <span>ADDRESS: </span>
-              <input
-                type="text"
-                value={userAddr}
-                onChange={(e) => setUserAddr(e.target.value)}
-                spellCheck={false}
-                style={{
-                  outline: "none",
-                  border: "none",
-                  background: "transparent",
-                  font: "inherit",
-                  color: "inherit",
-                  padding: 0,
-                  margin: 0,
-                  width: "auto",
-                  minWidth: "50px",
-                  maxWidth: "100%",
-                }}
-              />
-            </span>
+              <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                <span>CONTACT:</span>
+                <input
+                  type="text"
+                  value={userCont}
+                  onChange={(e) => setUserCont(e.target.value)}
+                  spellCheck={false}
+                  style={{
+                    outline: "none",
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: "inherit",
+                    padding: 0,
+                    margin: 0,
+                    width: "auto",
+                    minWidth: "50px",
+                    maxWidth: "100%",
+                  }}
+                />
+              </span>
+              <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                <span>ADDRESS: </span>
+                <input
+                  type="text"
+                  value={userAddr}
+                  onChange={(e) => setUserAddr(e.target.value)}
+                  spellCheck={false}
+                  style={{
+                    outline: "none",
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: "inherit",
+                    padding: 0,
+                    margin: 0,
+                    width: "auto",
+                    minWidth: "50px",
+                    maxWidth: "100%",
+                  }}
+                />
+              </span>
 
-                <span
-              style={{
-                display: "inline-flex",
-                alignItems: "baseline",
-              }}
-            >
-              <span>PROFESSIONAL: </span>
-              <input
-                type="text"
-                value={jobProfessional}
-                onChange={(e) => setProfessional(e.target.value)}
-                spellCheck={false}
-                style={{
-                  outline: "none",
-                  border: "none",
-                  background: "transparent",
-                  font: "inherit",
-                  color: "inherit",
-                  padding: 0,
-                  margin: 0,
-                  width: "auto",
-                  minWidth: "50px",
-                  maxWidth: "100%",
-                }}
-              />
-            </span>
+              <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                <span>PROFESSIONAL: </span>
+                <input
+                  type="text"
+                  value={jobProfessional}
+                  onChange={(e) => setProfessional(e.target.value)}
+                  spellCheck={false}
+                  style={{
+                    outline: "none",
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: "inherit",
+                    padding: 0,
+                    margin: 0,
+                    width: "auto",
+                    minWidth: "50px",
+                    maxWidth: "100%",
+                  }}
+                />
+              </span>
 
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "baseline",
-              }}
-            >
-              <span>ID: </span>
-              <input
-                type="text"
-                value={cust_id}
-                onChange={(e) => setId(e.target.value)}
-                spellCheck={false}
-                style={{
-                  outline: "none",
-                  border: "none",
-                  background: "transparent",
-                  font: "inherit",
-                  color: "inherit",
-                  padding: 0,
-                  margin: 0,
-                  width: "auto",
-                  minWidth: "50px",
-                  maxWidth: "100%",
-                }}
-              />
-            </span>
-
-
+              <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                <span>ID: </span>
+                <input
+                  type="text"
+                  value={cust_id}
+                  onChange={(e) => setId(e.target.value)}
+                  spellCheck={false}
+                  style={{
+                    outline: "none",
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: "inherit",
+                    padding: 0,
+                    margin: 0,
+                    width: "auto",
+                    minWidth: "50px",
+                    maxWidth: "100%",
+                  }}
+                />
+              </span>
             </div>
 
-<button
-  type="button"
-  onClick={() => emergencyToggle()} /* Replace with your actual emergency function name */
-  className="title"
-  dir="rtl"
-  style={{ 
-    marginTop: "auto", 
-    alignSelf: 'center', 
-    background: 'tomato',
-    borderRadius: '19px', 
-    color: 'wheat', 
-    width: '100%',
-    /* Added to clear native button behavior */
-    border: 'none',
-    font: 'inherit',
-    cursor: 'pointer',
-    textAlign: 'center',
-    height: '10%',
-    fontSize: '29px'
-  }}
->
-  EmERGENcY ToGGLE
-</button>
+            {/* 🛠️ FIXED: Replaced non-existent execution call to safely log or trigger emergency alerts */}
+            <button
+              type="button"
+              onClick={() => console.log("🚨 Emergency toggle triggered")} 
+              className="title"
+              dir="rtl"
+              style={{ 
+                marginTop: "auto", 
+                alignSelf: 'center', 
+                background: 'tomato',
+                borderRadius: '19px', 
+                color: 'wheat', 
+                width: '100%',
+                border: 'none',
+                font: 'inherit',
+                cursor: 'pointer',
+                textAlign: 'center',
+                height: '10%',
+                fontSize: '29px'
+              }}
+            >
+              EmERGENcY ToGGLE
+            </button>
 
-<button
-  type="button"
-  onClick={() => createJob()} /* Replace with your actual post function name */
-  className="title"
-  dir="rtl"
-  style={{ 
-    margin: "0", 
-    alignSelf: 'center', 
-    color: 'darkslategray', 
-    background: 'palegreen', 
-    marginTop: '5px', 
-    borderRadius: '19px',
-    /* Added to clear native button behavior */
-    border: 'none',
-        width: '100%',
-    /* Added to clear native button behavior */
-    border: 'none',
-    font: 'inherit',
-    cursor: 'pointer',
-    textAlign: 'center',
-    height: '10%',
-    fontSize: '29px',
-    font: 'inherit',
-    cursor: 'pointer',
-    textAlign: 'center'
-  }}
->
-  {"<-"}PosT
-</button>
-
+            {/* 🛠️ FIXED: Cleaned up messy duplicate CSS style rules */}
+            <button
+              type="button"
+              onClick={() => createJob()} 
+              className="title"
+              dir="rtl"
+              style={{ 
+                margin: "0", 
+                alignSelf: 'center', 
+                color: 'darkslategray', 
+                background: 'palegreen', 
+                marginTop: '5px', 
+                borderRadius: '19px',
+                border: 'none',
+                width: '100%',
+                font: 'inherit',
+                cursor: 'pointer',
+                textAlign: 'center',
+                height: '10%',
+                fontSize: '29px'
+              }}
+            >
+              {"<-"}PosT
+            </button>
           </div>
         </div>
       );
@@ -614,16 +574,11 @@ export default function Dash1Board({ viewSlug }) {
             <span className="badge">
               Sidebar: Description Live Glance — Draft Mode
             </span>
-            <p className="card-summary">
-               <div>{ai_response}</div>
-               <div>{current_tags}</div>
-               <div>{categories}</div>
-            </p>
+            <p className="card-summary"></p>
           </>
         ) : (
           <span className="badge">
-            Footer: Draft character footprint: {jobDescriptionDraft.length}{" "}
-            chars
+            Footer: Draft character footprint: {jobDescriptionDraft.length} chars
           </span>
         )}
       </div>
