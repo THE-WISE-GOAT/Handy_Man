@@ -18,8 +18,6 @@ export default function Dash1Board({ viewSlug }) {
     chatMessages,
     addChatMessage,
     activePostsCount,
-    fetchedJobs,
-    fetchCustomerJobs,
     userCont,
     userAddr,
     userName,
@@ -61,9 +59,7 @@ export default function Dash1Board({ viewSlug }) {
   ];
 
   // Trigger HTTP Fetch once when the page loads safely
-  useEffect(() => {
-    fetchCustomerJobs();
-  }, [fetchCustomerJobs]);
+
 
   // ── ADD THIS NEW HOOK DIRECTLY HERE ──
   useEffect(() => {
