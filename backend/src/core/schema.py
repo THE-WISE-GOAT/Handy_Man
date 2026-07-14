@@ -5,10 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-# ==========================================
-# 1. CORE AUTHENTICATION & USER SCHEMAS
-# ==========================================
-
 class LocationCoordinates(BaseModel):
     longitude: float = Field(..., description="Longitude coordinate (X)", ge=-180, le=180)
     latitude: float = Field(..., description="Latitude coordinate (Y)", ge=-90, le=90)
@@ -16,6 +12,12 @@ class LocationCoordinates(BaseModel):
 class CompleteChatIn(BaseModel):
     edited_description: str
     location: LocationCoordinates
+    title: str
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: str = "pending"
+    mode: str = "regular"
+    attachments: List[Dict[str, Any]] = Field(default_factory=list)
 
 class ChatMessageOut(BaseModel):
     """Returned after each chat turn (POST /dispatch/chat)."""
@@ -30,7 +32,6 @@ class ChatMessageOut(BaseModel):
     
     problem_description: Optional[str] = None  # Allows AI summary to pass to UI
     categories: List[CategoryMatch] = Field(default_factory=list)  # Allows title extraction to pass to UI
-
 
 class UserCreate(BaseModel):
     username: str
@@ -116,7 +117,6 @@ class CategoryMatch(BaseModel):
     tags: List[str] = Field(default_factory=list)
     is_custom_category: bool
  
- 
 # to display the structured summary mainly needed for the frontend to use dict keys
 class BookingSummaryOut(BaseModel):
     """Returned by GET /dispatch/{id}/summary once is_complete is True."""
@@ -125,13 +125,11 @@ class BookingSummaryOut(BaseModel):
     is_complete: bool
     is_job_request: bool
  
-
 # use in the customer_chat_analyser_nvidia.py to validate the data that is sent to the API
 class CustomerProblemSchema(BaseModel):
     is_job_request: bool
     categories: List[CategoryMatch] = Field(default_factory=list)
     problem_description: str
-
 
  # for now this is just use to get the what is the roles of the user 
 # 1. Schema for a single Role
@@ -148,9 +146,6 @@ class WorkerOnboardIn(BaseModel):
     operating_radius: float
     additional_metadata: Dict[str, Any]
     ai_assessed_skills_json: Optional[List[str]] = []
-
-
-
 
 ### schemas for the worker chat functionality
 
@@ -208,8 +203,6 @@ class WorkerSummaryOut(BaseModel):
     rejection_reason: Optional[str] = None
     profile: Optional[WorkerProfileSchema] = None   
     
-    
-    
 # ── Find Help (worker matching) ──────────────────────────────────────────────
 
 class WorkerMatchOut(BaseModel):
@@ -219,7 +212,6 @@ class WorkerMatchOut(BaseModel):
     category_tag: str
     job_description: str
     match_score: float  # 1.0 = near-identical meaning, 0 = unrelated, negative = opposite
-
 
 class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used
