@@ -486,6 +486,8 @@ def complete_customer_chat(
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
+    logger.info(f"Starting completion pipeline for booking_chat_id: {booking_chat_id}")
+    
     lng = payload.location.longitude
     lat = payload.location.latitude
     wkt_point = f"POINT({lng} {lat})"
@@ -494,6 +496,7 @@ def complete_customer_chat(
     chat_session = _get_own_session(booking_chat_id, db, current_user)
 
     if not chat_session.is_complete:
+        logger.warning(f"Completion failed: Session {booking_chat_id} is not complete.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot process summary. The AI chat session is not complete yet.",
@@ -502,6 +505,7 @@ def complete_customer_chat(
     # 2. Extract incoming values
     job_desc = payload.edited_description.strip()
     if not job_desc:
+        logger.warning("Completion failed: Job description is empty.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Job description is missing. Cannot generate vector profile."
@@ -510,6 +514,7 @@ def complete_customer_chat(
     # 3. Request Vector Embedding from Nvidia
     embedding_vector = None
     try:
+        logger.info("Requesting embedding from Nvidia NIM...")
         headers = {
             "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
             "Content-Type": "application/json"
@@ -530,18 +535,22 @@ def complete_customer_chat(
         
         if response.status_code == 200:
             embedding_vector = response.json()["data"][0]["embedding"]
+            logger.info("Successfully received embedding from Nvidia.")
         else:
+            logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Nvidia API error: {response.status_code} - {response.text}"
+                detail=f"Nvidia API error: {response.status_code}"
             )
     except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to connect to Nvidia API: {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to connect to Nvidia API: {e}"
         )
         
     # 4. Upsert CustomerChatData (Analytical Record)
+    logger.info("Upserting CustomerChatData...")
     db_profile = db.query(model.CustomerChatData).filter(
         model.CustomerChatData.booking_chat_id == booking_chat_id,
         model.CustomerChatData.user_id == current_user.id
@@ -568,6 +577,7 @@ def complete_customer_chat(
     db.add(db_profile)
 
     # 5. Upsert Job Table (Live Operational Ticket)
+    logger.info("Upserting Jobs table...")
     db_job = db.query(model.Job).filter(
         model.Job.booking_chat_id == booking_chat_id
     ).first()
@@ -590,14 +600,26 @@ def complete_customer_chat(
     }
 
     if db_job:
+        logger.info(f"Updating existing job record for chat_id {booking_chat_id}")
         for key, value in job_fields.items():
             setattr(db_job, key, value)
     else:
+        logger.info(f"Creating new job record for chat_id {booking_chat_id}")
         new_job = model.Job(booking_chat_id=booking_chat_id, **job_fields)
         db.add(new_job)
         
-    # 6. Single Atomic Commit
-    db.commit()
+    # 6. Single Atomic Commit with logging
+    try:
+        db.commit()
+        logger.info(f"Transaction committed successfully for booking_chat_id: {booking_chat_id}")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"DATABASE COMMIT FAILED for booking_chat_id {booking_chat_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database write failure: {str(e)}"
+        )
+
     return {"status": "success", "message": "Job created and vectorized successfully."}
 
 
