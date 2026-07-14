@@ -22,6 +22,54 @@ def get_current_user_info(current_user: model.User = Depends(get_current_user)):
     return current_user
 
 
+# Quick role promotion: instantly promote the current user to a Worker (role id 2)
+# by attaching the worker role. No interview/onboarding steps required.
+# Role id mapping: 1 = Customer, 2 = Worker, 3 = Admin.
+@router.post("/become-worker", status_code=status.HTTP_200_OK, response_model=schema.UserOut)
+def become_worker(current_user: model.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Reuse the existing Worker role (case-insensitive: "WORKER" / "worker" / "Worker").
+    worker_role = (
+        db.query(model.Role)
+        .filter(model.Role.name.ilike("worker"))
+        .first()
+    )
+    if not worker_role:
+        worker_role = model.Role(name="worker")
+        db.add(worker_role)
+        db.flush()
+
+    already_worker = any(
+        role.name and role.name.lower() == "worker" for role in current_user.roles
+    )
+
+    if not already_worker:
+        current_user.roles.append(worker_role)
+        db.commit()
+        db.refresh(current_user)
+
+    return current_user
+
+
+def _is_admin(user: model.User) -> bool:
+    return any(role.name and role.name.lower() == "admin" for role in user.roles)
+
+
+# Admin-only: list every user (with roles) so the admin dashboard can show
+# all customers and workers. Role id mapping: 1 = Customer, 2 = Worker, 3 = Admin.
+@router.get("/", status_code=status.HTTP_200_OK, response_model=list[schema.UserOut])
+def list_users(
+    current_user: model.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not _is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+    return db.query(model.User).all()
+
+
 # Gatekeeper logic to see the role of the user that can return ['Customer'] or ['Customer', 'Worker']
 @router.get("/{user_id}/roles", status_code=status.HTTP_200_OK, response_model=schema.UserRolesOut)
 def get_current_user_roles(user_id: int, current_user: model.User = Depends(get_current_user), db: Session = Depends(get_db)):
