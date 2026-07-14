@@ -59,8 +59,6 @@ class UserRole(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
 
-
-
 class BookingChat(Base):  # (Base) — keep your existing base class
     __tablename__ = "booking_chats"
     
@@ -72,14 +70,11 @@ class BookingChat(Base):  # (Base) — keep your existing base class
     categories: Mapped[list[dict]]   = mapped_column(JSONB, nullable=True) # tell about job categories, this is a list of dictionaries, each dictionary contains the category name and the subcategories
     problem_description: Mapped[str | None] = mapped_column(Text, nullable=True) # just text about the job request
     
-    
-
 # needs top work on it
 class JobStatus(str, enum.Enum):
     OPEN = "open"
     MATCHED = "matched"
     COMPLETED = "completed"
-    
 
 # needs to work on it
 class Service_tasks(Base):
@@ -97,13 +92,11 @@ class Service_tasks(Base):
     default=JobStatus.OPEN # Python handles the default assignment smoothly
 )
     
-
 # needs to work on it
 class BidStatus(str, enum.Enum):
     SUBMITTED = "submitted"
     SELECTED = "selected"
     REJECTED = "rejected"
-
 
 class Bids(Base):
     __tablename__ = "bids"
@@ -119,7 +112,6 @@ class Bids(Base):
     default=BidStatus.SUBMITTED # Python handles the default assignment smoothly
 )
     
-
 # in my point of view not needed
 class WorkerSkillsSchema(BaseModel):
     primary_trades: List[str] = Field(default_factory=list, description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
@@ -129,11 +121,6 @@ class WorkerSkillsSchema(BaseModel):
     certifications: List[str] = Field(default_factory=list, description="Any professional licenses or certifications mentioned")
     estimated_hourly_rate: Optional[float] = Field(None, description="Their preferred hourly rate if mentioned, otherwise null")
     ai_confidence_summary: str = Field(default="", description="A brief paragraph summarizing their professional background and reliability based on the chat")
-
-
-
-
-
 
 #### models for the Worker Interview Session, this will be used to store the worker interview session data, including the chat history, the current stage of the interview, and the final outcome. 
 class WorkerInterviewSession(Base):
@@ -154,9 +141,6 @@ class WorkerInterviewSession(Base):
     profile: Mapped[dict | None]= mapped_column(JSONB, nullable=True) # this will store the final profile of the worker after the interview is complete
     created_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False) # this will store the time when the interview session is created
     updated_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False) # this will store the time when the interview session is updated
-
-
-
 
 ### model  for the Worker Profile, this will be used to store the worker profile data, including the skills, experience, and other relevant information. This will be used to match the worker with the job requests.
 class WorkerProfile(Base):
@@ -190,31 +174,6 @@ class WorkerProfile(Base):
     # AI Vector Column (CRUCIAL!)
     # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from the 'job_description'
     description_vector: Mapped[list[float]] = mapped_column(Vector(4096), nullable=True)
-    
-    
-# class CustomerChatData(Base):
-#     __tablename__ = "customer_chat_data"
-
-#     # Core Identifiers
-#     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-#     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-#     booking_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
-    
-#     # Outer Metadata Fields
-#     is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-#     is_job_request: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    
-#     # Text, Numerical, and Description Fields
-#     problem_description: Mapped[str] = mapped_column(Text, nullable=False)
-    
-#     # Nested Profile Content Fields (Stored as a native PostgreSQL JSONB Array)
-#     # Stores: [{"category": str, "tags": [str], "is_custom_category": bool}, ...]
-#     categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
-    
-#     # AI Vector Column
-#     # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from 'problem_description'
-#     description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
-
 
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"
@@ -228,7 +187,6 @@ class CustomerChatData(Base):
     categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
     location = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)
-    
     
 class Job(Base):
     __tablename__ = "jobs"
