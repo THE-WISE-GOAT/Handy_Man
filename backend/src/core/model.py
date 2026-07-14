@@ -228,3 +228,47 @@ class CustomerChatData(Base):
     categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
     location = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)
+    
+    
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    
+    # ── Relational Foreign Keys ───────────────────────────────────────────────
+    customer_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    booking_chat_id: Mapped[Optional[int]] = mapped_column(ForeignKey("booking_chats.id", ondelete="SET NULL"), nullable=True, unique=True, index=True)
+    worker_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    # ── Core Job Data ─────────────────────────────────────────────────────────
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False, index=True)
+    is_job_request: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+
+    # ── NEW: Customer's Job-Specific Context ──────────────────────────────────
+    # The name of the person on-site (e.g., if the account holder books for a tenant or parent)
+    contact_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    
+    # Direct phone number or contact info specific to this service appointment
+    contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    
+    # Booking Mode: e.g., 'instant_dispatch', 'scheduled', 'emergency', 'remote_consult'
+    mode: Mapped[str] = mapped_column(String(50), default="instant_dispatch", nullable=False, index=True)
+
+    # Stores list of uploaded media objects: [{"url": "...", "type": "image"}, {"url": "...", "type": "video"}]
+    attachments: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+
+    # ── Map & Geolocation Parameters ─────────────────────────────────────────
+    address_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    location = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)
+
+    # ── Semantic Search / Smart Matching Data ─────────────────────────────────
+    description_vector: Mapped[Optional[List[float]]] = mapped_column(Vector(4096), nullable=True)
+
+    # ── Timestamps ────────────────────────────────────────────────────────────
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)

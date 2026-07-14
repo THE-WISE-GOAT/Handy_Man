@@ -372,23 +372,125 @@ def dispatch_chat(
 
 # use to post  the  customer  retrieve from chat to  database and also handle the  vector embedding from nvidia and save to database
 # ── Consolidated complete_customer_chat endpoint ──
+# @router.post(
+#     "/{booking_chat_id}/complete",
+#     summary="Complete the AI chat, extract job explained keys, generate embedding, and save to DB",
+# )
+# def complete_customer_chat(
+#     booking_chat_id: int, 
+#     payload: schema.CompleteChatIn, # Accepts the edited text block parameters from the UI layout payload
+#     db: Session = Depends(get_db), 
+#     current_user: model.User = Depends(get_current_user)
+# ):
+    
+#     lng = payload.location.longitude
+#     lat = payload.location.latitude
+
+#     wkt_point = f"POINT({lng} {lat})"
+
+#     # Step 1 / 1. Verify and fetch the chat session
+#     chat_session = _get_own_session(booking_chat_id, db, current_user)
+
+#     if not chat_session.is_complete:
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Cannot process summary. The AI chat session is not complete yet.",
+#         )
+    
+#     # Step 2 / 2. Extract incoming values from frontend payload
+#     # CRITICAL REFINEMENT: Pull the customized, finalized description value directly from the user's edits
+#     job_desc = payload.edited_description.strip()
+    
+#     # Optional: Raise error if a job description was mandatory for your app logic
+#     if not job_desc:
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Job description is missing. Cannot generate vector profile."
+#         )
+
+#     # Step 3 / 3. Request Vector Embedding from Nvidia
+#     embedding_vector = None
+#     try:
+#         headers = {
+#             "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
+#             "Content-Type": "application/json"
+#         }
+#         # The Nvidia payload now matches exactly what the customer finalized on screen
+#         nvidia_payload = {
+#             "model": "nvidia/nv-embed-v1",
+#             "input": [job_desc],
+#             "input_type": "query",
+#             "encoding_format": "float"
+#         }
+
+#         response = requests.post(
+#            "https://integrate.api.nvidia.com/v1/embeddings",
+#            headers=headers, 
+#            json=nvidia_payload, 
+#            timeout=10.0
+#         )
+        
+#         if response.status_code == 200:
+#             embedding_vector = response.json()["data"][0]["embedding"]
+#         else:
+#             raise HTTPException(
+#                 status_code=status.HTTP_502_BAD_GATEWAY,
+#                 detail=f"Nvidia API error: {response.status_code} - {response.text}"
+#             )
+#     except requests.exceptions.RequestException as e:
+#         raise HTTPException(
+#             status_code=status.HTTP_502_BAD_GATEWAY,
+#             detail=f"Failed to connect to Nvidia API: {e}"
+#         )
+        
+#     # Step 2 / 4. Check for existing data profile to prevent duplicate rows / primary key crashes
+#     db_profile = db.query(model.CustomerChatData).filter(
+#         model.CustomerChatData.booking_chat_id == booking_chat_id,
+#         model.CustomerChatData.user_id == current_user.id
+#     ).first()
+
+#     # ... keep your vector code ...
+#     customer_fields = {
+#         "is_complete": getattr(chat_session, "is_complete", False),
+#         "is_job_request": getattr(chat_session, "is_job_request", False),
+#         "categories": getattr(chat_session, "categories", []), 
+#         "problem_description": job_desc,
+#         "location": wkt_point,
+#         "description_vector": embedding_vector 
+#     }
+
+#     if db_profile:
+#         # If record exists, update its values (Upsert)
+#         for key, value in customer_fields.items():
+#             setattr(db_profile, key, value)
+#     else:
+#         # If record does not exist, create a new one
+#         db_profile = model.CustomerChatData(
+#             user_id=current_user.id,
+#             booking_chat_id=booking_chat_id,
+#             **customer_fields
+#         )
+#     db.add(db_profile)
+        
+#     db.commit()
+#     return {"status": "success", "message": "Customer chat data structured and saved successfully."}
+
+
 @router.post(
     "/{booking_chat_id}/complete",
     summary="Complete the AI chat, extract job explained keys, generate embedding, and save to DB",
 )
 def complete_customer_chat(
     booking_chat_id: int, 
-    payload: schema.CompleteChatIn, # Accepts the edited text block parameters from the UI layout payload
+    payload: schema.CompleteChatIn, 
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
-    
     lng = payload.location.longitude
     lat = payload.location.latitude
-
     wkt_point = f"POINT({lng} {lat})"
 
-    # Step 1 / 1. Verify and fetch the chat session
+    # 1. Verify and fetch the chat session
     chat_session = _get_own_session(booking_chat_id, db, current_user)
 
     if not chat_session.is_complete:
@@ -397,25 +499,21 @@ def complete_customer_chat(
             detail="Cannot process summary. The AI chat session is not complete yet.",
         )
     
-    # Step 2 / 2. Extract incoming values from frontend payload
-    # CRITICAL REFINEMENT: Pull the customized, finalized description value directly from the user's edits
+    # 2. Extract incoming values
     job_desc = payload.edited_description.strip()
-    
-    # Optional: Raise error if a job description was mandatory for your app logic
     if not job_desc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Job description is missing. Cannot generate vector profile."
         )
 
-    # Step 3 / 3. Request Vector Embedding from Nvidia
+    # 3. Request Vector Embedding from Nvidia
     embedding_vector = None
     try:
         headers = {
             "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
             "Content-Type": "application/json"
         }
-        # The Nvidia payload now matches exactly what the customer finalized on screen
         nvidia_payload = {
             "model": "nvidia/nv-embed-v1",
             "input": [job_desc],
@@ -443,13 +541,12 @@ def complete_customer_chat(
             detail=f"Failed to connect to Nvidia API: {e}"
         )
         
-    # Step 2 / 4. Check for existing data profile to prevent duplicate rows / primary key crashes
+    # 4. Upsert CustomerChatData (Analytical Record)
     db_profile = db.query(model.CustomerChatData).filter(
         model.CustomerChatData.booking_chat_id == booking_chat_id,
         model.CustomerChatData.user_id == current_user.id
     ).first()
 
-    # ... keep your vector code ...
     customer_fields = {
         "is_complete": getattr(chat_session, "is_complete", False),
         "is_job_request": getattr(chat_session, "is_job_request", False),
@@ -460,20 +557,49 @@ def complete_customer_chat(
     }
 
     if db_profile:
-        # If record exists, update its values (Upsert)
         for key, value in customer_fields.items():
             setattr(db_profile, key, value)
     else:
-        # If record does not exist, create a new one
         db_profile = model.CustomerChatData(
             user_id=current_user.id,
             booking_chat_id=booking_chat_id,
             **customer_fields
         )
     db.add(db_profile)
+
+    # 5. Upsert Job Table (Live Operational Ticket)
+    db_job = db.query(model.Job).filter(
+        model.Job.booking_chat_id == booking_chat_id
+    ).first()
+
+    job_fields = {
+        "customer_id": current_user.id,
+        "title": payload.title,
+        "description": job_desc,
+        "status": payload.status,
+        "is_job_request": getattr(chat_session, "is_job_request", True),
+        "categories": getattr(chat_session, "categories", []),
+        "contact_name": payload.contact_name,
+        "contact_phone": payload.contact_phone,
+        "mode": payload.mode,
+        "attachments": payload.attachments,
+        "latitude": lat,
+        "longitude": lng,
+        "location": wkt_point,
+        "description_vector": embedding_vector
+    }
+
+    if db_job:
+        for key, value in job_fields.items():
+            setattr(db_job, key, value)
+    else:
+        new_job = model.Job(booking_chat_id=booking_chat_id, **job_fields)
+        db.add(new_job)
         
+    # 6. Single Atomic Commit
     db.commit()
-    return {"status": "success", "message": "Customer chat data structured and saved successfully."}
+    return {"status": "success", "message": "Job created and vectorized successfully."}
+
 
 
 # ── 3. Retrieve conversation history ─────────────────────────────────────────
@@ -635,6 +761,100 @@ def _vector_search_workers(
 
 # ── 5. Find help — match customer job to top workers ─────────────────────────
 
+# @router.get(
+#     "/match/{booking_chat_id}/find-help",
+#     response_model=schema.FindHelpOut,
+#     summary="Find the top 5 matching workers for a completed job request",
+# )
+# @match_router.get(
+#     "/match/{booking_chat_id}/find-help",
+#     response_model=schema.FindHelpOut,
+#     summary="Find the top 5 matching workers for a completed job request",
+# )
+# def find_help(
+#     booking_chat_id: int,
+#     db: Session = Depends(get_db),
+#     current_user: model.User = Depends(get_current_user),
+# ):
+#     """
+#     Powers the customer's "Find Help" button.
+
+#     Requires that POST /dispatch/{booking_chat_id}/complete has already
+#     run for this session (that's what populates description_vector).
+
+#     Strategy: category-aware match first (see _select_primary_category /
+#     _vector_search_workers docstrings), falling back to a pure semantic
+#     match over all workers if there's no usable category or the
+#     category-filtered pool is empty.
+#     """
+#     customer_data = db.execute(
+#         select(model.CustomerChatData).where(
+#             model.CustomerChatData.booking_chat_id == booking_chat_id,
+#             model.CustomerChatData.user_id == current_user.id,
+#         )
+#     ).scalar_one_or_none()
+
+#     if not customer_data:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="No embedded job data found for this booking_chat_id. "
+#                    "Call POST /dispatch/{booking_chat_id}/complete first.",
+#         )
+
+#     if customer_data.description_vector is None:
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="This job has no embedding yet — cannot search for workers.",
+#         )
+
+#     if not customer_data.is_job_request:
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="This chat session was not a dispatchable job request.",
+#         )
+
+#     category, is_custom = _select_primary_category(customer_data.categories or [])
+#     used_category_filter = bool(category) and not is_custom
+
+#     matches = []
+#     if used_category_filter:
+#         matches = _vector_search_workers(
+#             db, customer_data.description_vector, category=category, limit=5,
+#         )
+
+#     if not matches:
+#         # No usable category, a custom/invented one, or the filtered pool
+#         # was empty — fall back to pure semantic search over everyone.
+#         used_category_filter = False
+#         matches = _vector_search_workers(
+#             db, customer_data.description_vector, category=None, limit=5,
+#         )
+
+#     if not matches:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="No matching workers found.",
+#         )
+
+#     workers = [
+#         {
+#             "worker_chat_id": worker.worker_chat_id,
+#             "username": username,
+#             "job_category": worker.job_category,
+#             "category_tag": worker.category_tag,
+#             "job_description": worker.job_description,
+#             # "match_score": round(1 - distance, 4),
+#         }
+#         for worker, username, distance in matches
+#     ]
+
+#     return {
+#         "matched_by_category": used_category_filter,
+#         "category": category,
+#         "workers": workers,
+#     }
+
+
 @router.get(
     "/match/{booking_chat_id}/find-help",
     response_model=schema.FindHelpOut,
@@ -650,58 +870,46 @@ def find_help(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    """
-    Powers the customer's "Find Help" button.
-
-    Requires that POST /dispatch/{booking_chat_id}/complete has already
-    run for this session (that's what populates description_vector).
-
-    Strategy: category-aware match first (see _select_primary_category /
-    _vector_search_workers docstrings), falling back to a pure semantic
-    match over all workers if there's no usable category or the
-    category-filtered pool is empty.
-    """
-    customer_data = db.execute(
-        select(model.CustomerChatData).where(
-            model.CustomerChatData.booking_chat_id == booking_chat_id,
-            model.CustomerChatData.user_id == current_user.id,
+    # ── SHIFTED DATA SOURCE: Now pulling from the live Jobs table ──
+    job_data = db.execute(
+        select(model.Job).where(
+            model.Job.booking_chat_id == booking_chat_id,
+            model.Job.customer_id == current_user.id,
         )
     ).scalar_one_or_none()
 
-    if not customer_data:
+    if not job_data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No embedded job data found for this booking_chat_id. "
+            detail="No operational job data found for this booking_chat_id. "
                    "Call POST /dispatch/{booking_chat_id}/complete first.",
         )
 
-    if customer_data.description_vector is None:
+    if job_data.description_vector is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This job has no embedding yet — cannot search for workers.",
         )
 
-    if not customer_data.is_job_request:
+    if not job_data.is_job_request:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This chat session was not a dispatchable job request.",
         )
 
-    category, is_custom = _select_primary_category(customer_data.categories or [])
+    category, is_custom = _select_primary_category(job_data.categories or [])
     used_category_filter = bool(category) and not is_custom
 
     matches = []
     if used_category_filter:
         matches = _vector_search_workers(
-            db, customer_data.description_vector, category=category, limit=5,
+            db, job_data.description_vector, category=category, limit=5,
         )
 
     if not matches:
-        # No usable category, a custom/invented one, or the filtered pool
-        # was empty — fall back to pure semantic search over everyone.
         used_category_filter = False
         matches = _vector_search_workers(
-            db, customer_data.description_vector, category=None, limit=5,
+            db, job_data.description_vector, category=None, limit=5,
         )
 
     if not matches:
@@ -717,7 +925,6 @@ def find_help(
             "job_category": worker.job_category,
             "category_tag": worker.category_tag,
             "job_description": worker.job_description,
-            # "match_score": round(1 - distance, 4),
         }
         for worker, username, distance in matches
     ]

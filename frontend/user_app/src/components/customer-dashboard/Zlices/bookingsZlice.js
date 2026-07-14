@@ -64,7 +64,15 @@ export const createBookingsZlice = (set, get) => ({
   },
 
  createJob: async () => {
-    const { booking_chat_id, jobTitleDraft, jobDescriptionDraft, userLng, userLat } = get();
+    const { 
+      booking_chat_id, 
+      jobTitleDraft, 
+      jobDescriptionDraft, 
+      userLng, 
+      userLat,
+      userName,
+      userCont
+    } = get();
 
     if (!booking_chat_id) {
       console.error("❌ Cannot post job. No active booking_chat_id found.");
@@ -84,12 +92,18 @@ export const createBookingsZlice = (set, get) => ({
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          // Fixed fallback implementation: if text inputs are deleted entirely, submit safe clean parameters to backend 
           edited_description: jobDescriptionDraft || "",
           location: {
             longitude: parseFloat(userLng) || 0.0,
             latitude: parseFloat(userLat) || 0.0
-          }
+          },
+          // New Expanded Payload Data
+          title: jobTitleDraft || "NEW JOB REQUEST",
+          contact_name: userName || "",
+          contact_phone: userCont || "",
+          status: "pending",
+          mode: "regular",
+          attachments: [] 
         }),
       });
 
@@ -100,7 +114,6 @@ export const createBookingsZlice = (set, get) => ({
       const data = await response.json();
       if (data.status === "success") {
         console.log("🚀 Success! Job verified, vectorized by Nvidia, and stored securely.");
-        
         // Optional: Reset drafts or trigger UI success view changes here
       }
     } catch (error) {

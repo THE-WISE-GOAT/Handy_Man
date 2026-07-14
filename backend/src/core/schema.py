@@ -16,6 +16,12 @@ class LocationCoordinates(BaseModel):
 class CompleteChatIn(BaseModel):
     edited_description: str
     location: LocationCoordinates
+    title: str
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: str = "pending"
+    mode: str = "regular"
+    attachments: List[Dict[str, Any]] = Field(default_factory=list)
 
 class ChatMessageOut(BaseModel):
     """Returned after each chat turn (POST /dispatch/chat)."""
