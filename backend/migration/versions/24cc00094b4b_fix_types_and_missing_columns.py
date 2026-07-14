@@ -43,7 +43,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_worker_interview_sessions_id'), 'worker_interview_sessions', ['id'], unique=False)
-    op.drop_index(op.f('ix_jobs_id'), table_name='jobs')
+    # op.drop_index(op.f('ix_jobs_id'), table_name='jobs')
     op.drop_table('jobs')
     op.add_column('booking_chats', sa.Column('categories', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
     op.alter_column('booking_chats', 'history',
@@ -137,7 +137,7 @@ def downgrade() -> None:
     sa.Column('professional', sa.VARCHAR(), autoincrement=False, nullable=True),
     sa.PrimaryKeyConstraint('id', name=op.f('jobs_pkey'))
     )
-    op.create_index(op.f('ix_jobs_id'), 'jobs', ['id'], unique=False)
+    # op.create_index(op.f('ix_jobs_id'), 'jobs', ['id'], unique=False)
     op.drop_index(op.f('ix_worker_interview_sessions_id'), table_name='worker_interview_sessions')
     op.drop_table('worker_interview_sessions')
     # ### end Alembic commands ###
