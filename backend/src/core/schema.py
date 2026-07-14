@@ -9,8 +9,13 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 # 1. CORE AUTHENTICATION & USER SCHEMAS
 # ==========================================
 
+class LocationCoordinates(BaseModel):
+    longitude: float = Field(..., description="Longitude coordinate (X)", ge=-180, le=180)
+    latitude: float = Field(..., description="Latitude coordinate (Y)", ge=-90, le=90)
+
 class CompleteChatIn(BaseModel):
     edited_description: str
+    location: LocationCoordinates
 
 class ChatMessageOut(BaseModel):
     """Returned after each chat turn (POST /dispatch/chat)."""
