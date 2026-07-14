@@ -225,8 +225,6 @@ class CustomerChatData(Base):
     is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_job_request: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     problem_description: Mapped[str] = mapped_column(Text, nullable=False)
-    
-    # ── ADD THIS COLUMN FOR THE JOB TITLE ──
-    
     categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
+    location = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)

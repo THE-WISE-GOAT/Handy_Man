@@ -9,6 +9,7 @@ import { apiClient } from "@shared/api/client";
 import {
   getDefaultCustomerPath,
   getDefaultWorkerPath,
+  getDefaultAdminPath,
 } from "@shared/config/viewRoutes";
 
 const AuthContext = createContext(null);
@@ -199,9 +200,12 @@ export function AuthProvider({ children }) {
   const canAccessWorker = ["worker", "technician", "provider"].some(
     (roleName) => hasRole(roleName),
   );
-  const defaultHomePath = canAccessWorker
-    ? getDefaultWorkerPath()
-    : getDefaultCustomerPath("dashboard");
+  const canAccessAdmin = hasRole("admin");
+  const defaultHomePath = canAccessAdmin
+    ? getDefaultAdminPath()
+    : canAccessWorker
+      ? getDefaultWorkerPath()
+      : getDefaultCustomerPath("dashboard");
 
   const value = useMemo(
     () => ({
@@ -213,6 +217,7 @@ export function AuthProvider({ children }) {
       isLoading,
       isAuthenticated,
       canAccessWorker,
+      canAccessAdmin,
       defaultHomePath,
       hasRole,
       login,
@@ -228,6 +233,7 @@ export function AuthProvider({ children }) {
       isLoading,
       isAuthenticated,
       canAccessWorker,
+      canAccessAdmin,
       defaultHomePath,
     ],
   );

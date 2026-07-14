@@ -61,6 +61,56 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
+button[name="emergency"] {
+  margin-top: auto;
+  align-self: center;
+  background: #e9e9ed;
+  border-radius: 19px;
+  color: #ff9292;
+  width: 100%;
+  border: 3px dashed white;
+  font-variant: inherit;
+  font-weight: inherit;
+  font-stretch: inherit;
+  font-size: 29px;
+  line-height: inherit;
+  font-family: inherit;
+  font-optical-sizing: inherit;
+  font-variation-settings: inherit;
+  font-size-adjust: inherit;
+  font-kerning: inherit;
+  font-language-override: inherit;
+  font-feature-settings: inherit;
+  cursor: pointer;
+  text-align: center;
+  height: 10%;
+}
+
+button[name="post"] {
+  margin: 5px 0px 0px;
+  align-self: center;
+  color: #40cd00;
+  border-radius: 19px;
+  border: medium dashed white;
+  width: 100%;
+  font-style: inherit;
+  font-variant: inherit;
+  font-weight: inherit;
+  font-stretch: inherit;
+  font-size: 29px;
+  line-height: inherit;
+  font-family: inherit;
+  font-optical-sizing: inherit;
+  font-variation-settings: inherit;
+  font-size-adjust: inherit;
+  font-kerning: inherit;
+  font-language-override: inherit;
+  font-feature-settings: inherit;
+  cursor: pointer;
+  text-align: center;
+  height: 10%;
+}
+
 .main-view {
   height: 100%;
   max-height: 100%;

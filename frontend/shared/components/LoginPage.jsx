@@ -69,12 +69,18 @@ const profile = await login({
           usernameValue: trimmedIdentity
         });
 
-        // Redirect based on role (worker/technician/provider/service specialis -> worker dashboard)
-        const hasWorkerRole = profile.roles?.some(r => ['worker', 'technician', 'provider'].includes(r.toLowerCase()));
-        if (hasWorkerRole) {
-          onNavigate?.('worker_dashboard', { replace: true });
+        // Redirect based on role (admin -> admin dashboard, worker/technician/provider -> worker dashboard)
+        const roleNames = profile.roles?.map((r) => String(r).toLowerCase()) || [];
+        const isAdmin = roleNames.includes("admin");
+        const hasWorkerRole = roleNames.some((r) =>
+          ["worker", "technician", "provider"].includes(r),
+        );
+        if (isAdmin) {
+          onNavigate?.("admin_dashboard", { replace: true });
+        } else if (hasWorkerRole) {
+          onNavigate?.("worker_dashboard", { replace: true });
         } else {
-          onNavigate?.('customer_dashboard', { replace: true });
+          onNavigate?.("customer_dashboard", { replace: true });
         }
 
        setStatusType('success');

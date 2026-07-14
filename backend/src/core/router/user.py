@@ -50,6 +50,26 @@ def become_worker(current_user: model.User = Depends(get_current_user), db: Sess
     return current_user
 
 
+def _is_admin(user: model.User) -> bool:
+    return any(role.name and role.name.lower() == "admin" for role in user.roles)
+
+
+# Admin-only: list every user (with roles) so the admin dashboard can show
+# all customers and workers. Role id mapping: 1 = Customer, 2 = Worker, 3 = Admin.
+@router.get("/", status_code=status.HTTP_200_OK, response_model=list[schema.UserOut])
+def list_users(
+    current_user: model.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not _is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+    return db.query(model.User).all()
+
+
 # Gatekeeper logic to see the role of the user that can return ['Customer'] or ['Customer', 'Worker']
 @router.get("/{user_id}/roles", status_code=status.HTTP_200_OK, response_model=schema.UserRolesOut)
 def get_current_user_roles(user_id: int, current_user: model.User = Depends(get_current_user), db: Session = Depends(get_db)):

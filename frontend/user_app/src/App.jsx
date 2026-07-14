@@ -9,9 +9,12 @@ import CustomerSectionRedirect from "./pages/customer/CustomerSectionRedirect";
 import CustomerViewRoute from "./pages/customer/CustomerViewRoute";
 import WorkerSectionRedirect from "./pages/worker/WorkerSectionRedirect";
 import WorkerViewRoute from "./pages/worker/WorkerViewRoute";
+import AdminSectionRedirect from "./pages/admin/AdminSectionRedirect";
+import AdminViewRoute from "./pages/admin/AdminViewRoute";
 import {
   getDefaultCustomerPath,
   getDefaultWorkerPath,
+  getDefaultAdminPath,
 } from "@shared/config/viewRoutes";
 
 export default function App() {
@@ -23,7 +26,7 @@ export default function App() {
       signup: "/signup",
       customer_dashboard: getDefaultCustomerPath("dashboard"),
       worker_dashboard: getDefaultWorkerPath(),
-      admin_dashboard: getDefaultCustomerPath("dashboard"),
+      admin_dashboard: getDefaultAdminPath(),
       home: "/",
     };
 
@@ -92,6 +95,22 @@ export default function App() {
           />
           <Route path=":section" element={<WorkerSectionRedirect />} />
           <Route path=":section/:viewSlug" element={<WorkerViewRoute />} />
+        </Route>
+
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AppLayout role="admin" />
+            </ProtectedRoute>
+          }
+        >
+          <Route
+            index
+            element={<Navigate to={getDefaultAdminPath()} replace />}
+          />
+          <Route path=":section" element={<AdminSectionRedirect />} />
+          <Route path=":section/:viewSlug" element={<AdminViewRoute />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

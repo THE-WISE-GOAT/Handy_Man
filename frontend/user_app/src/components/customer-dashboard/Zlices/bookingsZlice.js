@@ -1,4 +1,20 @@
 export const createBookingsZlice = (set, get) => ({
+
+  userAddrText: "Bhaktapur, Nepal", 
+  userLng: 85.4280, // Default or null initially
+  userLat: 27.6710, // Default or null initially
+
+  //task: fetch city name from cords and set userAddrText
+
+  setUserAddrText: (text) => set({ userAddrText: text }),
+  setUserCoordinates: (lng, lat) => set({ userLng: lng, userLat: lat }),
+  //alternative
+  setUserLocation: (address, lng, lat) => set({ 
+    userAddrText: address, 
+    userLng: lng, 
+    userLat: lat 
+  }),
+
   jobDescriptionDraft: "I want to install a smart home manager like alexa....",
   jobTitleDraft: "SMartHoME SeTUP",
   aiTitle: "",
@@ -48,7 +64,7 @@ export const createBookingsZlice = (set, get) => ({
   },
 
  createJob: async () => {
-    const { booking_chat_id, jobTitleDraft, jobDescriptionDraft } = get();
+    const { booking_chat_id, jobTitleDraft, jobDescriptionDraft, userLng, userLat } = get();
 
     if (!booking_chat_id) {
       console.error("❌ Cannot post job. No active booking_chat_id found.");
@@ -69,7 +85,11 @@ export const createBookingsZlice = (set, get) => ({
         },
         body: JSON.stringify({
           // Fixed fallback implementation: if text inputs are deleted entirely, submit safe clean parameters to backend 
-          edited_description: jobDescriptionDraft || ""
+          edited_description: jobDescriptionDraft || "",
+          location: {
+            longitude: parseFloat(userLng) || 0.0,
+            latitude: parseFloat(userLat) || 0.0
+          }
         }),
       });
 
@@ -229,7 +249,7 @@ export const createBookingsZlice = (set, get) => ({
       set({
         booking_chat_id: data.booking_chat_id,
         ai_response: data.ai_response,
-        is_complete: data.is_complete,
+        is_complete: data.is_complete ,
         categories: data.categories,
         current_tags: data.current_tags,
         is_job_request: data.is_job_request,

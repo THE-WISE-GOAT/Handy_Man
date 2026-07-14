@@ -378,10 +378,16 @@ def dispatch_chat(
 )
 def complete_customer_chat(
     booking_chat_id: int, 
-    payload: schema.CompleteChatIn, # 👈 Accepts the edited text block parameters from the UI layout payload
+    payload: schema.CompleteChatIn, # Accepts the edited text block parameters from the UI layout payload
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
+    
+    lng = payload.location.longitude
+    lat = payload.location.latitude
+
+    wkt_point = f"POINT({lng} {lat})"
+
     # Step 1 / 1. Verify and fetch the chat session
     chat_session = _get_own_session(booking_chat_id, db, current_user)
 
@@ -449,7 +455,7 @@ def complete_customer_chat(
         "is_job_request": getattr(chat_session, "is_job_request", False),
         "categories": getattr(chat_session, "categories", []), 
         "problem_description": job_desc,
-        # 👈 Map the title parameter to your new DB column
+        "location": wkt_point,
         "description_vector": embedding_vector 
     }
 
