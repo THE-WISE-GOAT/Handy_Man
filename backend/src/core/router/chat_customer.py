@@ -314,7 +314,7 @@ def complete_customer_chat(
            "https://integrate.api.nvidia.com/v1/embeddings",
            headers=headers, 
            json=nvidia_payload, 
-           timeout=10.0
+           timeout=20.0 # 10-> 20 seconds timeout to handle potential delays in Nvidia API response
         )
         
         if response.status_code == 200:
