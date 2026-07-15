@@ -535,6 +535,7 @@ def get_worker_summary(
 )
 def complete_worker_chat(
     worker_chat_id: int, 
+    payload: schema.WorkerCompleteChatIn,  # Expects location (latitude, longitude)
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
