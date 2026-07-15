@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from src.core import model
 import logging
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +55,20 @@ def get_all_jobs_for_customer(db: Session, customer_id: int, skip: int = 0, limi
     ).offset(skip).limit(limit).all()
 
 def get_jobs_by_status(db: Session, customer_id: int, status: str, skip: int = 0, limit: int = 50):
-    """Fetch jobs for a customer filtered directly by status at the database level."""
-    return db.query(model.Job).filter(
+    """Fetch only specific job fields for a customer filtered by status."""
+    return db.query(
+        model.Job.booking_chat_id,
+        model.Job.title,
+        model.Job.description,
+        model.Job.status,
+        model.Job.contact_name,
+        model.Job.contact_phone,
+        model.Job.attachments,
+        model.Job.address_text,
+        model.Job.latitude,  # Use these instead of the Geography object
+        model.Job.longitude,
+        model.Job.updated_at
+    ).filter(
         model.Job.customer_id == customer_id,
         model.Job.status == status
     ).offset(skip).limit(limit).all()
