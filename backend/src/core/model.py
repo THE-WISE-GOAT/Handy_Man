@@ -174,6 +174,7 @@ class WorkerProfile(Base):
     # AI Vector Column (CRUCIAL!)
     # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from the 'job_description'
     description_vector: Mapped[list[float]] = mapped_column(Vector(4096), nullable=True)
+    location = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)
 
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"
