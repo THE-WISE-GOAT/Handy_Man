@@ -103,6 +103,7 @@ const request = async (path, options = {}) => {
   }
 
   try {
+    console.log(`[apiClient] ${method} ${API_BASE_URL}${path}`);
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers: nextHeaders,
@@ -110,6 +111,8 @@ const request = async (path, options = {}) => {
       signal,
       ...rest
     });
+
+    console.log(`[apiClient] Response: ${response.status} ${response.statusText}`);
 
     const data = await safeParse(response);
 
@@ -142,6 +145,8 @@ const request = async (path, options = {}) => {
     if (error instanceof ApiClientError) {
       throw error;
     }
+
+    console.error(`[apiClient] Network error for ${method} ${API_BASE_URL}${path}:`, error);
 
     throw new ApiClientError(
       error?.message === 'Failed to fetch'
