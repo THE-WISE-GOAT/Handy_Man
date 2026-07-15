@@ -18,6 +18,7 @@ class CompleteChatIn(BaseModel):
     status: str = "pending"
     mode: str = "regular"
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
+    phone_number: Optional[str] = None
 
 class InitializeWorkerAppIn(BaseModel):
     pass
@@ -316,3 +317,5 @@ class FindHelpOut(BaseModel):
     
 class WorkerCompleteChatIn(BaseModel):
     location: LocationCoordinates
+    phone_number: Optional[str] = None
+    
