@@ -399,3 +399,48 @@ def reject_worker_application(
         )
 
     return {"message": "Application rejected.", "worker_id": worker_id, "reason": payload.reason}
+
+
+# ── 7. Update Worker Profile ──────────────────────────────────────────────────
+
+@router.patch(
+    "/my-profile",
+    response_model=schema.UpdateWorkerProfileOut,
+    summary="Update the current user's worker profile fields",
+)
+def update_my_worker_profile(
+    payload: schema.UpdateWorkerProfileIn,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    profile = _require_worker_profile(current_user.id, db)
+
+    update_data = payload.model_dump(exclude_unset=True)
+
+    for field, value in update_data.items():
+        if hasattr(profile, field):
+            setattr(profile, field, value)
+
+    try:
+        db.commit()
+        db.refresh(profile)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update worker profile.",
+        )
+
+    return {
+        "worker_id": profile.id,
+        "job_category": profile.job_category,
+        "category_tag": profile.category_tag,
+        "specialities": profile.specialities,
+        "years_experience": profile.years_experience,
+        "license_or_certification": profile.license_or_certification,
+        "job_description": profile.job_description,
+        "emergency_available": profile.emergency_available,
+        "phone_number": profile.phone_number,
+        "address_text": profile.address_text,
+        "message": "Profile updated successfully.",
+    }
