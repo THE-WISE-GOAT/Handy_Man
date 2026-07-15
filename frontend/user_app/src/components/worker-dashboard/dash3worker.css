@@ -115,3 +115,25 @@
   color: #555555;
   margin: 8px 0 0 4px;
 }
+
+.start-interview-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.start-interview-prompt h3 {
+  font-family: 'Courier New', monospace;
+  font-weight: 900;
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.start-interview-prompt .panel-desc {
+  max-width: 400px;
+  color: #555;
+}
