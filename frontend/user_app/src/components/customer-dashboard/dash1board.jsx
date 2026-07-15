@@ -30,7 +30,7 @@ export default function Dash1Board({ viewSlug }) {
     addChatMessage,
     activePostsCount,
     userCont,
-fetchPendingJobs,
+fetchBookingsPendingJobs,
     // Spatial state parameters from Zustand configuration
     userAddrText,
     userLng,
@@ -88,8 +88,8 @@ fetchedJobs,
   }, [viewSlug, slots, swapSlots]);
 
   useEffect(() => {
-    fetchPendingJobs();
-  }, [fetchPendingJobs]);
+    fetchBookingsPendingJobs();
+  }, [fetchBookingsPendingJobs]);
 
   useEffect(() => {
     const scrollContainer = scrollRef.current;
@@ -753,7 +753,7 @@ fetchedJobs,
       return (
         <div className="dashboard-card main-view">
           <h2>ACTIVE PENDING POSTS</h2>
-          <button onClick={fetchPendingJobs}>REFRESH LIST</button>
+          <button onClick={fetchBookingsPendingJobs}>REFRESH LIST</button>
           <ul>
             {fetchedJobs.map((job) => (
               <li key={job.id}>

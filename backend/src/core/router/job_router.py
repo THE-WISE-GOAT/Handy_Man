@@ -1,3 +1,4 @@
+# routers/job_router_3.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from src.core import model, job_manager
@@ -20,6 +21,7 @@ def get_jobs_by_status_endpoint(
     formatted_tasks = []
     for row in results:
         formatted_tasks.append({
+            "id": row.id,  # Expose the unique primary key to the frontend
             "booking_chat_id": row.booking_chat_id,
             "title": row.title,
             "description": row.description,
