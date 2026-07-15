@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 import requests, os
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
-from src.core import model, schema
+from src.core import model, schema, job_manager
 from src.ai.customer_chat_analyser_nvidia import (
     _nvidia_client,          # shared NIM client — no second API key needed
     build_fresh_history,
@@ -333,13 +333,10 @@ def complete_customer_chat(
             detail=f"Failed to connect to Nvidia API: {e}"
         )
         
-    # 4. Upsert CustomerChatData (Analytical Record)
-    logger.info("Upserting CustomerChatData...")
-    db_profile = db.query(model.CustomerChatData).filter(
-        model.CustomerChatData.booking_chat_id == booking_chat_id,
-        model.CustomerChatData.user_id == current_user.id
-    ).first()
-
+    # 4 & 5. Upsert separately via Job Manager
+    logger.info("Syncing Job and Analytical records...")
+    
+    # Data mapping
     customer_fields = {
         "is_complete": getattr(chat_session, "is_complete", False),
         "is_job_request": getattr(chat_session, "is_job_request", False),
@@ -349,25 +346,7 @@ def complete_customer_chat(
         "description_vector": embedding_vector 
     }
 
-    if db_profile:
-        for key, value in customer_fields.items():
-            setattr(db_profile, key, value)
-    else:
-        db_profile = model.CustomerChatData(
-            user_id=current_user.id,
-            booking_chat_id=booking_chat_id,
-            **customer_fields
-        )
-    db.add(db_profile)
-
-    # 5. Upsert Job Table (Live Operational Ticket)
-    logger.info("Upserting Jobs table...")
-    db_job = db.query(model.Job).filter(
-        model.Job.booking_chat_id == booking_chat_id
-    ).first()
-
     job_fields = {
-        "customer_id": current_user.id,
         "title": payload.title,
         "description": job_desc,
         "status": payload.status,
@@ -383,29 +362,17 @@ def complete_customer_chat(
         "description_vector": embedding_vector
     }
 
-    if db_job:
-        logger.info(f"Updating existing job record for chat_id {booking_chat_id}")
-        for key, value in job_fields.items():
-            setattr(db_job, key, value)
-    else:
-        logger.info(f"Creating new job record for chat_id {booking_chat_id}")
-        new_job = model.Job(booking_chat_id=booking_chat_id, **job_fields)
-        db.add(new_job)
-        
-    # 6. Single Atomic Commit with logging
+    # Atomic execution
     try:
+        job_manager.upsert_chat_data(db, booking_chat_id, current_user.id, customer_fields)
+        job_manager.upsert_job(db, booking_chat_id, current_user.id, job_fields)
         db.commit()
-        logger.info(f"Transaction committed successfully for booking_chat_id: {booking_chat_id}")
     except Exception as e:
         db.rollback()
-        logger.error(f"DATABASE COMMIT FAILED for booking_chat_id {booking_chat_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database write failure: {str(e)}"
-        )
-
+        logger.error(f"Persistence failed: {e}")
+        raise HTTPException(status_code=500, detail="Database update failed.")
+    
     return {"status": "success", "message": "Job created and vectorized successfully."}
-
 
 
 # ── 3. Retrieve conversation history ─────────────────────────────────────────

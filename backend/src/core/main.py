@@ -18,7 +18,8 @@ from src.core.router import (
     service_task, 
     chat_customer, 
     chat_worker,
-    connection_manager
+    connection_manager,
+    job_router
 )
 
 # 1. Define the startup logic using a SINGLE lifespan block
@@ -57,6 +58,7 @@ app.include_router(chat_customer.match_router)
 app.include_router(chat_worker.router)
 app.include_router(connection_manager.router)
 app.include_router(service_task.router)
+app.include_router(job_router.router)
 
 
 # 5. Core Alias Root Routes

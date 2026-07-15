@@ -295,4 +295,33 @@ export const createBookingsZlice = (set, get) => ({
       console.error("❌ Failed to process chat turn over secure transport:", error);
     }
   },
+
+  // Add this inside your createBookingsZlice function
+fetchPendingJobs: async () => {
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      // We point to a new endpoint specifically for status-filtered tasks
+      const response = await fetch("http://127.0.0.1:8000/jobs/status/pending", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP Error Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Assuming the backend returns { status: "success", tasks: [...] }
+      if (data.status === "success") {
+        set({ fetchedJobs: data.tasks });
+        set({ activePostsCount: data.tasks.length });
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch pending jobs:", error);
+    }
+  },
+
 });
