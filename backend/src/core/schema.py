@@ -312,3 +312,7 @@ class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used
     category: Optional[str] = None     # the category that was searched (if any)
     workers: List[WorkerMatchOut]
+    
+    
+class WorkerCompleteChatIn(BaseModel):
+    location: LocationCoordinates

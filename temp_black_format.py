@@ -27,6 +27,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     firstName: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     lastName: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    phonenumber: Mapped[Optional[str]] = mapped_column("phonenumber", String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default='TRUE')
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default="now()")
       
@@ -59,7 +60,9 @@ class UserRole(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
 
-class BookingChat(Base):  # (Base) — keep your existing base class
+
+
+class BookingChat(Base): 
     __tablename__ = "booking_chats"
     
     id: Mapped[int]= mapped_column(primary_key=True, index=True)
@@ -70,11 +73,14 @@ class BookingChat(Base):  # (Base) — keep your existing base class
     categories: Mapped[list[dict]]   = mapped_column(JSONB, nullable=True) # tell about job categories, this is a list of dictionaries, each dictionary contains the category name and the subcategories
     problem_description: Mapped[str | None] = mapped_column(Text, nullable=True) # just text about the job request
     
+    
+
 # needs top work on it
 class JobStatus(str, enum.Enum):
     OPEN = "open"
     MATCHED = "matched"
     COMPLETED = "completed"
+    
 
 # needs to work on it
 class Service_tasks(Base):
@@ -92,12 +98,14 @@ class Service_tasks(Base):
     default=JobStatus.OPEN # Python handles the default assignment smoothly
 )
     
+
 # needs to work on it
 class BidStatus(str, enum.Enum):
     SUBMITTED = "submitted"
     SELECTED = "selected"
     REJECTED = "rejected"
 
+# let's work on this later
 class Bids(Base):
     __tablename__ = "bids"
 
@@ -112,15 +120,7 @@ class Bids(Base):
     default=BidStatus.SUBMITTED # Python handles the default assignment smoothly
 )
     
-# in my point of view not needed
-class WorkerSkillsSchema(BaseModel):
-    primary_trades: List[str] = Field(default_factory=list, description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
-    specific_skills: List[str] = Field(default_factory=list, description="Specific tasks they can do, e.g., fixing leaks, installing ceiling fans, drywall patching")
-    years_of_experience: int = Field(default=0, description="Total years of experience as an integer")
-    special_tools: List[str] = Field(default_factory=list, description="Key tools they own, e.g., ladders, power drills, welding gear, snakes")
-    certifications: List[str] = Field(default_factory=list, description="Any professional licenses or certifications mentioned")
-    estimated_hourly_rate: Optional[float] = Field(None, description="Their preferred hourly rate if mentioned, otherwise null")
-    ai_confidence_summary: str = Field(default="", description="A brief paragraph summarizing their professional background and reliability based on the chat")
+
 
 #### models for the Worker Interview Session, this will be used to store the worker interview session data, including the chat history, the current stage of the interview, and the final outcome. 
 class WorkerInterviewSession(Base):
@@ -138,16 +138,24 @@ class WorkerInterviewSession(Base):
     has_verified_specialty: Mapped[bool | None]= mapped_column(Boolean, nullable=True) # after test they will be verifed
     scenario_score: Mapped[int | None]= mapped_column(Integer, nullable=True) # store score
     scenario_passed: Mapped[bool | None]= mapped_column(Boolean, nullable=True) # store passed or not
+    # Optional link to the canonical WorkerProfile created after a successful interview
+    worker_profile_id: Mapped[int | None] = mapped_column(ForeignKey("workers.id", ondelete="SET NULL"), nullable=True)
+    worker_profile: Mapped["WorkerProfile"] = relationship("WorkerProfile", back_populates="interview_sessions", lazy="selectin")
+
+    # Snapshot of profile data at interview time; keep small to avoid duplication
     profile: Mapped[dict | None]= mapped_column(JSONB, nullable=True) # this will store the final profile of the worker after the interview is complete
     created_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False) # this will store the time when the interview session is created
     updated_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False) # this will store the time when the interview session is updated
+
+
+
 
 ### model  for the Worker Profile, this will be used to store the worker profile data, including the skills, experience, and other relevant information. This will be used to match the worker with the job requests.
 class WorkerProfile(Base):
     __tablename__ = "workers"
 
         # Core Identifiers
-    id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     worker_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
     # Outer Metadata Fields
@@ -174,66 +182,29 @@ class WorkerProfile(Base):
     # AI Vector Column (CRUCIAL!)
     # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from the 'job_description'
     description_vector: Mapped[list[float]] = mapped_column(Vector(4096), nullable=True)
-    # Worker's operating location — needed for the 10km radius filter in find_help
-    location: Mapped[WKBElement] = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=True)
-
-    phone_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    address_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-
+    # Back-reference to interview sessions that produced or reference this profile
+    interview_sessions: Mapped[List["WorkerInterviewSession"]] = relationship("WorkerInterviewSession", back_populates="worker_profile", lazy="selectin")
+    
+    
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"
 
+    # Core Identifiers
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     booking_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+    
+    # Outer Metadata Fields
     is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_job_request: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    # Text, Numerical, and Description Fields
     problem_description: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # Nested Profile Content Fields (Stored as a native PostgreSQL JSONB Array)
+    # Stores: [{"category": str, "tags": [str], "is_custom_category": bool}, ...]
     categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
-    description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)   
-    location: Mapped[WKBElement] = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=True)
     
-class Job(Base):
-    __tablename__ = "jobs"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    
-    # ── Relational Foreign Keys ───────────────────────────────────────────────
-    customer_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    booking_chat_id: Mapped[Optional[int]] = mapped_column(ForeignKey("booking_chats.id", ondelete="SET NULL"), nullable=True, unique=True, index=True)
-    worker_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-
-    # ── Core Job Data ─────────────────────────────────────────────────────────
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False, index=True)
-    is_job_request: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
-
-    # ── NEW: Customer's Job-Specific Context ──────────────────────────────────
-    # The name of the person on-site (e.g., if the account holder books for a tenant or parent)
-    contact_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
-    
-    # Direct phone number or contact info specific to this service appointment
-    contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    
-    # Booking Mode: e.g., 'instant_dispatch', 'scheduled', 'emergency', 'remote_consult'
-    mode: Mapped[str] = mapped_column(String(50), default="instant_dispatch", nullable=False, index=True)
-
-    # Stores list of uploaded media objects: [{"url": "...", "type": "image"}, {"url": "...", "type": "video"}]
-    attachments: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
-
-    # ── Map & Geolocation Parameters ─────────────────────────────────────────
-    address_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    location: Mapped[Optional[WKBElement]] = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=True)
-
-    # ── Semantic Search / Smart Matching Data ─────────────────────────────────
-    description_vector: Mapped[Optional[List[float]]] = mapped_column(Vector(4096), nullable=True)
-
-    # ── Timestamps ────────────────────────────────────────────────────────────
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    # AI Vector Column
+    # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from 'problem_description'
+    description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
