@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from src.core import model
 import logging
 
+from sqlalchemy import text
 logger = logging.getLogger(__name__)
 
 # --- EXISTING UPSERT FUNCTIONS ---
@@ -85,3 +86,17 @@ def delete_job(db: Session, job_id: int, customer_id: int):
         # The router should call db.commit() to maintain transaction control.
         return True
     return False
+
+# job_manager.py
+
+
+from sqlalchemy import text
+
+def get_workers_by_category(category: str, db):
+    query = text("SELECT id, job_category AS category, latitude, longitude FROM workers WHERE LOWER(TRIM(job_category)) = LOWER(TRIM(:category))")
+    try:
+        result = db.execute(query, {"category": category})
+        return [dict(r._mapping) for r in result]
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return []

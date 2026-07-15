@@ -1,8 +1,49 @@
-// components/customer-dashboard/dash2board.jsx
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCustomerDashboardData } from './useCustomerDashboardData'; // Maps to your postingsZlice
+import { useCustomerDashboardData } from './useCustomerDashboardData';
 import './dash2board.css';
+
+// 1. IMPORT LEAFLET
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// 2. VITE-COMPATIBLE ICON IMPORTS
+import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
+import iconUrl from 'leaflet/dist/images/marker-icon.png';
+import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
+
+// Fix for default Leaflet icon paths in React + Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl,
+  iconUrl,
+  shadowUrl,
+});
+
+// Helper component to smoothly center the map when job coordinates change
+const MapUpdater = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center && center[0] && center[1]) {
+      map.setView(center, map.getZoom());
+    }
+  }, [center, map]);
+  return null;
+};
+
+const Card = ({ slug, title, position, onSelect, children }) => {
+  const isMain = position === "main";
+  return (
+    <div 
+      className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
+      onClick={!isMain ? () => onSelect(slug) : undefined}
+    >
+      <div className="card-header">••• {title}</div>
+      {children}
+    </div>
+  );
+};
 
 export default function Dash2Board({ viewSlug }) {
   const navigate = useNavigate();
@@ -15,13 +56,25 @@ export default function Dash2Board({ viewSlug }) {
     pendingJobs,
     selectedJob,
     setSelectedJob,
-    fetchPendingJobs
+    fetchPendingJobs,
+    // Extract state and actions
+    matchedWorkers,
+    fetchMatchedWorkers, // 👈 FIX: Extracted fetchMatchedWorkers action
+    selectedWorkerId,
+    setSelectedWorkerId
   } = useCustomerDashboardData();
 
   // ── INITIAL DATA FETCH ──
   useEffect(() => {
     fetchPendingJobs();
   }, [fetchPendingJobs]);
+
+  // ── FIX: FETCH MATCHED WORKERS WHEN SELECTED JOB CHANGES ──
+  useEffect(() => {
+    if (selectedJob && selectedJob.title) {
+      fetchMatchedWorkers(selectedJob.title);
+    }
+  }, [selectedJob, fetchMatchedWorkers]);
 
   // Route state synchronization layer
   useEffect(() => {
@@ -36,33 +89,23 @@ export default function Dash2Board({ viewSlug }) {
     navigate(`/customer/postings/${targetSlug}`);
   };
 
-  // Simplified shared card container component
-  const Card = ({ slug, title, position, children }) => {
-    const isMain = position === "main";
-    return (
-      <div 
-        className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
-        onClick={!isMain ? () => handleModuleSelect(slug) : undefined}
-      >
-        <div className="card-header">••• {title}</div>
-        {children}
-      </div>
-    );
-  };
-
   // ====================================================
-  // SUB-MODULE RENDERS (DETAIL VIEWS)
+  // SUB-MODULE RENDERS
   // ====================================================
 
   const renderBiddingsEngine = (position) => (
-    <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position}>
+    <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position} onSelect={handleModuleSelect}>
       {position === "main" ? (
         <div className="main-panel">
           <h2>ACTIVE BIDDINGS ENGINE</h2>
-          {/* DYNAMIC TITLE INJECTION */}
           <h3 style={{ color: "#007bff" }}>
             Bids for job: {selectedJob ? selectedJob.title : "No Job Selected"}
           </h3>
+          {selectedWorkerId && (
+            <h4 style={{ color: "#ff5722", margin: "5px 0 15px 0" }}>
+              Focusing Worker ID: {selectedWorkerId}
+            </h4>
+          )}
           <p className="panel-desc">Active incoming competitive service offers and rate valuation streams.</p>
           <div className="bids-box">
             {biddingsStream.map(bid => (
@@ -76,11 +119,12 @@ export default function Dash2Board({ viewSlug }) {
       ) : (
         <div className="preview-panel">
           {position === "sidebar" ? (
-            <>
-              <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
-              <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
-              <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
-            </>
+             <>
+             <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
+             <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
+             <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
+             {selectedWorkerId && <p className="card-summary" style={{color: "#ff5722"}}>Focus: Worker #{selectedWorkerId}</p>}
+           </>
           ) : (
             <span className="badge">Footer Slot: Bids for {selectedJob?.title || "N/A"}</span>
           )}
@@ -89,48 +133,102 @@ export default function Dash2Board({ viewSlug }) {
     </Card>
   );
 
-  const renderLiveMap = (position) => (
-    <Card slug="GeospatialLiveMap" title="GEOSPATIAL LIVE MAP" position={position}>
-      {position === "main" ? (
-        <div className="main-panel">
-          <h2>GEOSPATIAL ENGINE FULL DISPLAY</h2>
-          {/* DYNAMIC COORDINATES INJECTION */}
-          {selectedJob ? (
-            <div className="coordinates-display">
-              <p>Tracking coordinates for: <strong>{selectedJob.title}</strong></p>
-              <p>Latitude: {selectedJob.latitude}</p>
-              <p>Longitude: {selectedJob.longitude}</p>
+  const renderLiveMap = (position) => {
+    const centerPoint = selectedJob && selectedJob.latitude && selectedJob.longitude 
+      ? [parseFloat(selectedJob.latitude), parseFloat(selectedJob.longitude)]
+      : [27.7172, 85.3240];
+
+    return (
+      <Card slug="GeospatialLiveMap" title="GEOSPATIAL LIVE MAP" position={position} onSelect={handleModuleSelect}>
+        {position === "main" ? (
+          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <h2>GEOSPATIAL ENGINE FULL DISPLAY</h2>
+            
+            <div style={{ flex: 1, minHeight: '300px', borderRadius: '12px', overflow: 'hidden', marginTop: '10px' }}>
+              <MapContainer 
+                center={centerPoint} 
+                zoom={13} 
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                />
+                
+                <MapUpdater center={centerPoint} />
+
+                {/* Job Location Marker */}
+                {selectedJob && selectedJob.latitude && (
+                  <Marker position={centerPoint}>
+                    <Popup>
+                      <strong>{selectedJob.title}</strong><br/>
+                      Job Location
+                    </Popup>
+                  </Marker>
+                )}
+
+                {/* Worker Markers */}
+                {matchedWorkers.map(worker => {
+                  const lat = parseFloat(worker.latitude);
+                  const lng = parseFloat(worker.longitude);
+
+                  if (isNaN(lat) || isNaN(lng)) return null;
+
+                  return (
+                    <Marker 
+                      key={worker.id} 
+                      position={[lat, lng]}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedWorkerId(worker.id);
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <strong>Worker ID: {worker.id}</strong><br/>
+                        Category: {worker.category}<br/>
+                        <em>Click to focus</em>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+              </MapContainer>
             </div>
-          ) : (
-            <p>Awaiting job selection to display coordinates...</p>
-          )}
-        </div>
-      ) : (
-        <div className="preview-panel">
-          {position === "sidebar" ? (
-            <>
-              <span className="badge badge-highlight">Sidebar: GPS Map Node Tracker</span>
-              <p className="card-summary">
-                Lat: {selectedJob?.latitude || "N/A"} | Lng: {selectedJob?.longitude || "N/A"}
-              </p>
-            </>
-          ) : (
-            <span className="badge">Footer Slot: Map Tracking Active</span>
-          )}
-        </div>
-      )}
-    </Card>
-  );
+          </div>
+        ) : (
+          <div className="preview-panel">
+            {position === "sidebar" ? (
+              <>
+                <span className="badge badge-highlight">Sidebar: GPS Map Node Tracker</span>
+                <p className="card-summary">
+                  Lat: {selectedJob?.latitude || "N/A"} | Lng: {selectedJob?.longitude || "N/A"}
+                </p>
+                <p className="card-summary">
+                  Workers in Area: {matchedWorkers.length}
+                </p>
+              </>
+            ) : (
+              <span className="badge">Footer Slot: Map Tracking Active</span>
+            )}
+          </div>
+        )}
+      </Card>
+    );
+  };
 
   const renderReviewLogs = (position) => (
-    <Card slug="RatingsReviewLogs" title="RATINGS & REVIEW LOGS" position={position}>
+    <Card slug="RatingsReviewLogs" title="RATINGS & REVIEW LOGS" position={position} onSelect={handleModuleSelect}>
       {position === "main" ? (
         <div className="main-panel">
           <h2>VERIFIED FEEDBACK HISTORY LOGS</h2>
-          {/* DYNAMIC TITLE INJECTION */}
           <h3 style={{ color: "#007bff" }}>
-            Reviews of worker for job: {selectedJob ? selectedJob.title : "No Job Selected"}
+            Reviews for job: {selectedJob ? selectedJob.title : "No Job Selected"}
           </h3>
+          {selectedWorkerId && (
+            <h4 style={{ color: "#ff5722", margin: "5px 0 15px 0" }}>
+              Viewing records for Worker ID: {selectedWorkerId}
+            </h4>
+          )}
         </div>
       ) : (
         <div className="preview-panel">
@@ -148,16 +246,11 @@ export default function Dash2Board({ viewSlug }) {
     </Card>
   );
 
-  // ====================================================
-  // MASTER SELECTOR VIEW
-  // ====================================================
-
   const renderPostsDashboard = (position) => (
-    <Card slug="ActivePostsDashboard" title="ACTIVE POSTS DASHBOARD" position={position}>
+    <Card slug="ActivePostsDashboard" title="ACTIVE POSTS DASHBOARD" position={position} onSelect={handleModuleSelect}>
       {position === "main" ? (
         <div className="main-panel">
           <h2>ACTIVE POSTS PIPELINE NETWORK</h2>
-          {/* MASTER SELECTOR LIST */}
           <div className="jobs-selector-list" style={{ marginTop: '20px' }}>
             {pendingJobs.length === 0 ? (
               <p>No pending jobs found.</p>
@@ -168,7 +261,7 @@ export default function Dash2Board({ viewSlug }) {
                   <div 
                     key={job.id} 
                     onClick={(e) => {
-                      e.stopPropagation(); // Prevents triggering the module swap click
+                      e.stopPropagation(); 
                       setSelectedJob(job);
                     }}
                     style={{

@@ -30,6 +30,12 @@ export const createPostingsZlice = (set, get) => ({
   pendingJobs: [],
   selectedJob: null, // This acts as the global selector for all modules
   
+
+  matchedWorkers: [],
+  selectedWorkerId: null,
+
+
+
   // Dummy data for structure (will be augmented by selectedJob title in UI)
   biddingsStream: [
     { id: "bid-1", provider: "John Doe Plumbing", offer: "$120", status: "Incoming" },
@@ -76,5 +82,19 @@ export const createPostingsZlice = (set, get) => ({
     }
   },
 
+fetchMatchedWorkers: async (category) => {
+    if (!category) return;
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/jobs/workers/match?category=${encodeURIComponent(category)}`);
+      const data = await response.json();
+      if (data.status === "success") {
+        set({ matchedWorkers: data.workers });
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch matched workers:", error);
+    }
+  },
+
+  setSelectedWorkerId: (workerId) => set({ selectedWorkerId: workerId }),
   setSelectedJob: (job) => set({ selectedJob: job }),
 });

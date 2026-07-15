@@ -1,9 +1,12 @@
 # routers/job_router_3.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from src.core import model, job_manager
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
+
+# 1. Make sure to import get_db and your manager function
+from src.core.job_manager import get_workers_by_category # Adjust path to job_manager if needed
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -49,3 +52,14 @@ def delete_job_endpoint(
     
     db.commit()
     return {"status": "success", "message": "Job deleted successfully"}
+
+
+# In src/core/router/job_router.py
+@router.get("/workers/match")
+def match_workers(category: str, db: Session = Depends(get_db)):
+    if not category:
+        raise HTTPException(status_code=400, detail="Category parameter is required")
+    
+    # Now a standard synchronous call
+    workers = get_workers_by_category(category, db) 
+    return workers
