@@ -347,7 +347,6 @@ def complete_customer_chat(
     }
 
     job_fields = {
-        "customer_id": current_user.id,
         "title": payload.title,
         "description": job_desc,
         "status": payload.status,
