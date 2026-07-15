@@ -1,9 +1,6 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { API_BASE_URL } from "@shared/config/api";
+import React, { useEffect, useState } from "react";
 import { apiClient, normalizeApiError } from "@shared/api/client";
 import "./AdminUsersBoard.css";
-
-const REJECT_MODAL_ID = "reject-modal";
 
 export default function AdminApplicationsBoard({ viewSlug }) {
   const [applications, setApplications] = useState([]);
@@ -13,37 +10,20 @@ export default function AdminApplicationsBoard({ viewSlug }) {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+  const [expandedHistory, setExpandedHistory] = useState({});
 
   const loadApplications = async () => {
-    console.log("[AdminApplicationsBoard] Loading applications...");
     setIsLoading(true);
     setError("");
     try {
-      console.log("[AdminApplicationsBoard] Making API request to /worker-onboarding/admin/applications");
       const data = await apiClient.get("/worker-onboarding/admin/applications");
-      console.log("[AdminApplicationsBoard] API response:", data);
       setApplications(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("[AdminApplicationsBoard] API request failed:", err);
       const normalized = normalizeApiError(err, "Failed to load applications.");
-      let backendMsg = "";
-      if (err.status === 404) {
-        backendMsg = " Worker onboarding backend not available. Restart the backend server.";
-      } else if (err.status === 401) {
-        backendMsg = " Authentication required. Please log in as admin.";
-      } else if (err.status === 403) {
-        backendMsg = " Admin access required.";
-      } else if (err.status === 0 || err.message?.includes("Network error")) {
-        backendMsg = " Cannot reach the backend. Ensure it is running at http://localhost:8000.";
-      }
+      const backendMsg = err.status === 404
+        ? " Worker onboarding backend not available. Restart the backend server."
+        : "";
       setError(normalized.message + backendMsg);
-      console.error("[AdminApplicationsBoard] Load failed:", {
-        status: err.status,
-        message: err.message,
-        url: err.url,
-        apiBaseUrl: API_BASE_URL,
-        errors: err.errors,
-      });
     } finally {
       setIsLoading(false);
     }
@@ -90,15 +70,48 @@ export default function AdminApplicationsBoard({ viewSlug }) {
     }
   };
 
+  const toggleExpand = async (app) => {
+    if (expandedId === app.id) {
+      setExpandedId(null);
+      return;
+    }
+
+    setExpandedId(app.id);
+
+    if (!expandedHistory[app.id] && app.worker_chat_id) {
+      try {
+        const token = localStorage.getItem("handy_man_access_token");
+        const response = await fetch(
+          `http://127.0.0.1:8000/worker-interview/${app.worker_chat_id}/history`,
+          {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setExpandedHistory((prev) => ({
+            ...prev,
+            [app.id]: data.history || [],
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to load chat history:", err);
+      }
+    }
+  };
+
   const renderHistoryPreview = (history) => {
     if (!history || !Array.isArray(history)) return <p className="admin-section__empty">No interview history.</p>;
     const visible = history.filter((m) => m.role && m.role !== "system");
     if (visible.length === 0) return <p className="admin-section__empty">No interview history.</p>;
     return (
       <div className="admin-chat-preview">
-        {visible.slice(-6).map((msg, idx) => (
+        {visible.map((msg, idx) => (
           <div key={idx} className={`admin-chat-bubble admin-chat-bubble--${msg.role}`}>
-            <strong>{msg.role.toUpperCase()}:</strong> {msg.content}
+            <strong>{msg.role?.toUpperCase()}:</strong> {msg.content}
           </div>
         ))}
       </div>
@@ -127,10 +140,6 @@ export default function AdminApplicationsBoard({ viewSlug }) {
     );
   };
 
-  const toggleExpand = (id) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
-
   return (
     <div className="admin-board">
       <div className="admin-board__head">
@@ -155,7 +164,11 @@ export default function AdminApplicationsBoard({ viewSlug }) {
             <div className="admin-applications-list">
               {applications.map((app) => (
                 <div key={app.id} className="admin-application-card">
-                  <div className="admin-application-header">
+                  <div
+                    className="admin-application-header"
+                    onClick={() => toggleExpand(app)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <div className="admin-application-info">
                       <h3>
                         {app.firstName && app.lastName
@@ -182,36 +195,42 @@ export default function AdminApplicationsBoard({ viewSlug }) {
                     <div className="admin-application-actions">
                       <button
                         className="admin-btn admin-btn--approve"
-                        onClick={() => handleApprove(app.id)}
+                        onClick={(e) => { e.stopPropagation(); handleApprove(app.id); }}
                         disabled={actionLoading === `approve-${app.id}`}
                       >
                         {actionLoading === `approve-${app.id}` ? "Approving..." : "Approve"}
                       </button>
                       <button
                         className="admin-btn admin-btn--reject"
-                        onClick={() => handleRejectClick(app)}
+                        onClick={(e) => { e.stopPropagation(); handleRejectClick(app); }}
                         disabled={actionLoading === `reject-${app.id}`}
                       >
                         Reject
                       </button>
-                      <button
-                        className="admin-btn admin-btn--expand"
-                        onClick={() => toggleExpand(app.id)}
-                      >
-                        {expandedId === app.id ? "Hide Details" : "View Details"}
-                      </button>
+                      <span className="admin-expand-hint">
+                        {expandedId === app.id ? "▲ Hide" : "▼ View Details"}
+                      </span>
                     </div>
                   </div>
 
                   {expandedId === app.id && (
                     <div className="admin-application-details-grid">
                       <div className="admin-detail-section">
-                        <h4>AI Interview Transcript</h4>
-                        {renderHistoryPreview(app.history)}
+                        <h4>Worker Details</h4>
+                        {renderProfilePreview(app.profile)}
+                        {app.phone_number && (
+                          <p><strong>Phone:</strong> {app.phone_number}</p>
+                        )}
+                        {app.address_text && (
+                          <p><strong>Address:</strong> {app.address_text}</p>
+                        )}
+                        {app.latitude != null && app.longitude != null && (
+                          <p><strong>Location:</strong> {app.longitude.toFixed(4)}, {app.latitude.toFixed(4)}</p>
+                        )}
                       </div>
                       <div className="admin-detail-section">
-                        <h4>Extracted Profile</h4>
-                        {renderProfilePreview(app.profile)}
+                        <h4>AI Interview Transcript</h4>
+                        {renderHistoryPreview(expandedHistory[app.id])}
                       </div>
                     </div>
                   )}
