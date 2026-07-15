@@ -174,7 +174,8 @@ class WorkerProfile(Base):
     # AI Vector Column (CRUCIAL!)
     # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from the 'job_description'
     description_vector: Mapped[list[float]] = mapped_column(Vector(4096), nullable=True)
-    location = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)
+    # Worker's operating location — needed for the 10km radius filter in find_help
+    location: Mapped[WKBElement] = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=True)
 
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"
@@ -186,8 +187,8 @@ class CustomerChatData(Base):
     is_job_request: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     problem_description: Mapped[str] = mapped_column(Text, nullable=False)
     categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
-    description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
-    location = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)
+    description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)   
+    location: Mapped[WKBElement] = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=True)
     
 class Job(Base):
     __tablename__ = "jobs"
@@ -223,7 +224,7 @@ class Job(Base):
     address_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    location = Column(Geography(geometry_type='POINT', srid=4326), nullable=True)
+    location: Mapped[Optional[WKBElement]] = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=True)
 
     # ── Semantic Search / Smart Matching Data ─────────────────────────────────
     description_vector: Mapped[Optional[List[float]]] = mapped_column(Vector(4096), nullable=True)
