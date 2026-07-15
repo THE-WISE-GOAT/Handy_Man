@@ -6,7 +6,7 @@ from src.core.oauth2 import get_current_user
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-@router.get("/status/{status_val}", summary="Fetch jobs by status dynamically")
+@router.get("/status/{status_val}")
 def get_jobs_by_status_endpoint(
     status_val: str,
     skip: int = 0,
@@ -14,17 +14,26 @@ def get_jobs_by_status_endpoint(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user)
 ):
-    """
-    Fetches jobs for the current user, filtered dynamically by status.
-    Example: /jobs/status/pending, /jobs/status/completed
-    """
-    tasks = job_manager.get_jobs_by_status(db, current_user.id, status_val, skip, limit)
+    results = job_manager.get_jobs_by_status(db, current_user.id, status_val, skip, limit)
     
-    # Return in the format your frontend (bookingsZlice) expects
-    return {
-        "status": "success",
-        "tasks": tasks
-    }
+    # Convert Row objects to dictionaries manually
+    formatted_tasks = []
+    for row in results:
+        formatted_tasks.append({
+            "booking_chat_id": row.booking_chat_id,
+            "title": row.title,
+            "description": row.description,
+            "status": row.status,
+            "contact_name": row.contact_name,
+            "contact_phone": row.contact_phone,
+            "attachments": row.attachments,
+            "address_text": row.address_text,
+            "latitude": row.latitude,
+            "longitude": row.longitude,
+            "updated_at": row.updated_at
+        })
+    
+    return {"status": "success", "tasks": formatted_tasks}
 
 @router.delete("/{job_id}", summary="Delete a specific job")
 def delete_job_endpoint(
