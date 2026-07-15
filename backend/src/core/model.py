@@ -147,7 +147,7 @@ class WorkerProfile(Base):
     __tablename__ = "workers"
 
         # Core Identifiers
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     worker_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
     # Outer Metadata Fields
@@ -174,6 +174,11 @@ class WorkerProfile(Base):
     # AI Vector Column (CRUCIAL!)
     # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from the 'job_description'
     description_vector: Mapped[list[float]] = mapped_column(Vector(4096), nullable=True)
+
+    phone_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    address_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"

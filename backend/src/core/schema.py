@@ -19,6 +19,67 @@ class CompleteChatIn(BaseModel):
     mode: str = "regular"
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
 
+class InitializeWorkerAppIn(BaseModel):
+    pass
+
+class InitializeWorkerAppOut(BaseModel):
+    worker_id: int
+    user_id: int
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    worker_chat_id: int | None = None
+
+class SubmitWorkerAppIn(BaseModel):
+    worker_chat_id: int
+    phone_number: str | None = None
+    address_text: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+class SubmitWorkerAppOut(BaseModel):
+    worker_id: int
+    stage: str
+    message: str
+
+class WorkerAppStatusOut(BaseModel):
+    worker_id: int
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    rejection_reason: str | None = None
+    job_category: str
+    category_tag: str
+    specialities: List[str]
+    years_experience: int
+    worker_chat_id: int | None = None
+    phone_number: str | None = None
+    address_text: str | None = None
+
+class AdminPendingAppOut(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    email: str
+    firstName: str | None = None
+    lastName: str | None = None
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    rejection_reason: str | None = None
+    job_category: str
+    category_tag: str
+    specialities: List[str]
+    years_experience: int
+    worker_chat_id: int | None = None
+    phone_number: str | None = None
+    address_text: str | None = None
+    history: List[dict] | None = None
+    profile: dict | None = None
+
+class RejectWorkerIn(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=1000)
+
 class ChatMessageOut(BaseModel):
     """Returned after each chat turn (POST /dispatch/chat)."""
     booking_chat_id: int
