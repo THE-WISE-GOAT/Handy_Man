@@ -15,7 +15,7 @@ from src.core.router import (
     login, 
     user, 
     worker, 
-    service_task, 
+    # service_task, 
     chat_customer, 
     chat_worker,
     connection_manager,
@@ -57,7 +57,7 @@ app.include_router(chat_customer.router)
 app.include_router(chat_customer.match_router)
 app.include_router(chat_worker.router)
 app.include_router(connection_manager.router)
-app.include_router(service_task.router)
+# app.include_router(service_task.router)
 app.include_router(job_router.router)
 
 
