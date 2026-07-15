@@ -22,6 +22,36 @@ def get_current_user_info(current_user: model.User = Depends(get_current_user)):
     return current_user
 
 
+@router.put("/me", status_code=status.HTTP_200_OK, response_model=schema.UserOut)
+def update_current_user_info(
+    payload: schema.UpdateUserIn,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    update_data = payload.model_dump(exclude_unset=True)
+
+    if "password" in update_data:
+        hashed_password = hash_password(update_data["password"])
+        current_user.password = hashed_password
+        del update_data["password"]
+
+    for field, value in update_data.items():
+        if hasattr(current_user, field):
+            setattr(current_user, field, value)
+
+    try:
+        db.commit()
+        db.refresh(current_user)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update user profile.",
+        )
+
+    return current_user
+
+
 # Quick role promotion: instantly promote the current user to a Worker (role id 2)
 # by attaching the worker role. No interview/onboarding steps required.
 # Role id mapping: 1 = Customer, 2 = Worker, 3 = Admin.

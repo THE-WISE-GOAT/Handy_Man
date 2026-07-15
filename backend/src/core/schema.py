@@ -80,6 +80,40 @@ class AdminPendingAppOut(BaseModel):
 class RejectWorkerIn(BaseModel):
     reason: str = Field(..., min_length=1, max_length=1000)
 
+class UpdateWorkerProfileIn(BaseModel):
+    job_category: Optional[str] = None
+    category_tag: Optional[str] = None
+    specialities: Optional[List[str]] = None
+    specialized_tools_or_equipment: Optional[List[str]] = None
+    years_experience: Optional[int] = None
+    license_or_certification: Optional[str] = None
+    job_description: Optional[str] = None
+    emergency_available: Optional[bool] = None
+    phone_number: Optional[str] = None
+    address_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class UpdateWorkerProfileOut(BaseModel):
+    worker_id: int
+    job_category: str
+    category_tag: str
+    specialities: List[str]
+    years_experience: int
+    license_or_certification: str | None = None
+    job_description: str
+    emergency_available: bool
+    phone_number: str | None = None
+    address_text: str | None = None
+    message: str
+
+class UpdateUserIn(BaseModel):
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    email: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+
 class ChatMessageOut(BaseModel):
     """Returned after each chat turn (POST /dispatch/chat)."""
     booking_chat_id: int
