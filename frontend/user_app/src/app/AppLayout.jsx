@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@shared/context/AuthContext";
-import { apiClient } from "@shared/api/client";
+import { apiClient, normalizeApiError } from "@shared/api/client";
 import {
   FixFastNavbar,
   FixFastProfile,
@@ -21,31 +21,90 @@ export default function AppLayout({ role = "customer" }) {
   const navigate = useNavigate();
   const { user, logout, canAccessWorker, canAccessAdmin, refreshUser } = useAuth();
 
+  const [isWorkerApplicant, setIsWorkerApplicant] = useState(false);
+  const [checkingApplicant, setCheckingApplicant] = useState(false);
+  const [joinError, setJoinError] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
+
+  useEffect(() => {
+    if (role !== "worker") {
+      setIsWorkerApplicant(false);
+      return;
+    }
+
+    let active = true;
+    setCheckingApplicant(true);
+    // Default to restricted (applicant mode) until the backend confirms otherwise.
+    // This is a fail-closed approach: if the endpoint is missing or errors,
+    // the worker stays in restricted mode rather than gaining full access.
+    setIsWorkerApplicant(true);
+
+    apiClient
+      .get("/worker-onboarding/my-status")
+      .then((data) => {
+        if (active) setIsWorkerApplicant(!data.is_complete);
+      })
+      .catch((error) => {
+        if (active) {
+          console.error("[AppLayout] Applicant status check failed:", error);
+          if (error.status === 404) {
+            setJoinError(
+              "Worker onboarding backend is not available. Please restart the backend server."
+            );
+          }
+          // Keep isWorkerApplicant = true on error (fail closed)
+        }
+      })
+      .finally(() => {
+        if (active) setCheckingApplicant(false);
+      });
+    return () => { active = false; };
+  }, [role]);
+
+  const filteredWorkerNavItems = isWorkerApplicant
+    ? WORKER_NAV_ITEMS.filter((item) => item.id === "me" || item.id === "Me")
+    : WORKER_NAV_ITEMS;
+
   const navItems =
     role === "worker"
-      ? WORKER_NAV_ITEMS
+      ? filteredWorkerNavItems
       : role === "admin"
         ? ADMIN_NAV_ITEMS
         : CUSTOMER_NAV_ITEMS;
+
   const activePanel =
     navItems.find((item) =>
       location.pathname.startsWith(item.matchPrefix || item.path),
     )?.id || navItems[0]?.id;
 
   const handleJoinWorker = async () => {
+    console.log("[Join as Worker] button clicked");
+    setIsJoining(true);
+    setJoinError("");
     try {
-      await apiClient.post("/users/become-worker");
+      console.log("[Join as Worker] calling /worker-onboarding/initialize");
+      await apiClient.post("/worker-onboarding/initialize");
+      console.log("[Join as Worker] initialize succeeded");
       await refreshUser();
+      console.log("[Join as Worker] refreshUser succeeded, navigating to worker dashboard");
       navigate(getDefaultWorkerPath());
     } catch (error) {
-      console.error("Failed to join as worker:", error);
+      console.log("[Join as Worker] primary endpoint failed:", error);
+      const normalized = normalizeApiError(error, "Failed to join as worker.");
+      setJoinError(normalized.message);
+      alert(
+        "Failed to join as worker.\n\n" +
+        "Error: " + normalized.message + "\n\n" +
+        "Please ensure the backend is running and restarted after the latest code changes."
+      );
+    } finally {
+      setIsJoining(false);
     }
   };
 
   const profileActions = [];
 
   if (canAccessAdmin) {
-    // Admin users can reach every workspace — show the relevant switches per view.
     if (role === "admin") {
       profileActions.push(
         {
@@ -81,7 +140,6 @@ export default function AppLayout({ role = "customer" }) {
       );
     }
   } else {
-    // Non-admin users keep the original customer/worker switching behavior.
     if (role === "customer" && !canAccessWorker) {
       profileActions.push({
         label: "Join us as Worker",
@@ -154,7 +212,27 @@ export default function AppLayout({ role = "customer" }) {
       />
 
       <main className="fixfast-shell app-layout-shell">
-        <Outlet />
+        {joinError && (
+          <div style={{
+            position: "fixed", top: "1rem", right: "1rem", zIndex: 99999,
+            background: "#ffcccc", border: "2px solid #dc3545", borderRadius: "8px",
+            padding: "0.8rem 1rem", maxWidth: "400px", font: "inherit", fontSize: "0.85rem"
+          }}>
+            <strong>Error:</strong> {joinError}
+            <button
+              type="button"
+              onClick={() => setJoinError("")}
+              style={{ marginLeft: "0.8rem", border: "none", background: "transparent", cursor: "pointer", fontWeight: "bold" }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        {checkingApplicant && role === "worker" ? (
+          <p className="admin-status">Loading workspace…</p>
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   );
