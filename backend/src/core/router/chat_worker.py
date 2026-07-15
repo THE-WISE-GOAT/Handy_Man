@@ -551,6 +551,10 @@ def complete_worker_chat(
     profile_data = chat_session.profile if chat_session.profile else {}
     job_desc = profile_data.get("job_description", "")
     
+    lng = payload.location.longitude
+    lat = payload.location.latitude
+    wkt_point = f"POINT({lng} {lat})"
+    
     # Step 3: Get Vector Embedding from Nvidia
     embedding_vector = None
     if job_desc:
@@ -616,7 +620,10 @@ def complete_worker_chat(
         "has_verified_specialty": profile_data.get("has_verified_specialty", False),
         "scenario_passed": profile_data.get("scenario_passed", False),
         "scenario_score": profile_data.get("scenario_score", 0),
-        "description_vector": embedding_vector
+        "description_vector": embedding_vector,
+        "latitude": lat,
+        "longitude": lng,
+        "location": wkt_point,
     }
 
     if db_profile:
