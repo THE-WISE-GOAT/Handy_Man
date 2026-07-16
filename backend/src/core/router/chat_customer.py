@@ -662,7 +662,7 @@ def get_booking_summary(
 DEFAULT_SEARCH_RADIUS_METERS = 10_000  # 10 km — hard cutoff, not a soft preference
 
 
-# ── Helper: pick the primary category ────────────────────────────────────────
+# ── Helper: pick the primary category (display only, no longer used to filter) ─
 
 def _extract_primary_category(categories: list[dict]) -> str | None:
     """
@@ -670,6 +670,7 @@ def _extract_primary_category(categories: list[dict]) -> str | None:
     customer's extracted categories — categories[0]["category"], no
     normalization. categories is ordered most-central-trade-first.
 
+    Informational only now — not used to filter the worker search.
     Returns None if there are no extracted categories at all.
     """
     if not categories:
@@ -677,22 +678,19 @@ def _extract_primary_category(categories: list[dict]) -> str | None:
     return categories[0].get("category")
 
 
-# ── Helper: category (optional) + radius (mandatory) + vector rank ──────────
+# ── Helper: radius (mandatory) + vector rank ─────────────────────────────────
 
 def _search_workers(
     db: Session,
     query_vector: list[float],
     customer_location,
-    category_tag: str | None,
     radius_meters: int,
     limit: int,
 ):
     """
-    Single-query funnel:
-      1. category_tag exact match — skipped entirely when category_tag is None
-      2. ST_DWithin hard radius cutoff against the customer's job location
-      3. ORDER BY cosine_distance — closest meaning first
-    Steps 2 and 3 always run, regardless of whether step 1 was applied.
+    Single-query funnel, category removed:
+      1. ST_DWithin hard radius cutoff against the customer's job location
+      2. ORDER BY cosine_distance — closest meaning first
     """
     distance = model.WorkerProfile.description_vector.cosine_distance(query_vector)
 
@@ -710,14 +708,9 @@ def _search_workers(
                 radius_meters,
             ),
         )
+        .order_by(distance)
+        .limit(limit)
     )
-
-    if category_tag:
-        stmt = stmt.where(
-            func.lower(model.WorkerProfile.category_tag) == category_tag.lower()
-        )
-
-    stmt = stmt.order_by(distance).limit(limit)
     return db.execute(stmt).all()
 
 
@@ -767,34 +760,15 @@ def find_help(
 
     category = _extract_primary_category(job_data.categories or [])
 
-    # Step 1 only runs if a category was extracted. Steps 2+3 always run,
-    # against whichever candidate pool step 1 leaves them.
-    matches = []
-    used_category_filter = False
-    if category:
-        matches = _search_workers(
-            db,
-            query_vector=job_data.description_vector,
-            customer_location=job_data.location,
-            category_tag=category,
-            radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
-            limit=5,
-        )
-        used_category_filter = bool(matches)
-
-    if not matches:
-        # No category extracted, or no nearby worker carries that exact
-        # category_tag — drop the category filter, rank every worker
-        # inside the 10km radius by semantic similarity alone.
-        matches = _search_workers(
-            db,
-            query_vector=job_data.description_vector,
-            customer_location=job_data.location,
-            category_tag=None,
-            radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
-            limit=5,
-        )
-        used_category_filter = False
+    # Category filter removed — this now runs unconditionally as the only
+    # search path: radius cutoff, then pure semantic rank.
+    matches = _search_workers(
+        db,
+        query_vector=job_data.description_vector,
+        customer_location=job_data.location,
+        radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
+        limit=5,
+    )
 
     if not matches:
         raise HTTPException(
@@ -815,7 +789,7 @@ def find_help(
     ]
 
     return {
-        "matched_by_category": used_category_filter,
+        "matched_by_category": False,
         "category": category,
         "workers": workers,
     }
