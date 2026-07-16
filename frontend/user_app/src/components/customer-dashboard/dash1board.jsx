@@ -12,9 +12,8 @@ export default function Dash1Board({ viewSlug }) {
   const [mapReady, setMapReady] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [modalLat, setModalLat] = useState(27.7172); // Default to Kathmandu
-  const [modalLng, setModalLng] = useState(85.3240);
+  const [modalLng, setModalLng] = useState(85.324);
   const [modalAddrText, setModalAddrText] = useState("");
-
   const mapContainerRef = useRef(null);
   const leafletMapRef = useRef(null);
   const leafletMarkerRef = useRef(null);
@@ -31,14 +30,14 @@ export default function Dash1Board({ viewSlug }) {
     addChatMessage,
     activePostsCount,
     userCont,
-    
+fetchBookingsPendingJobs,
     // Spatial state parameters from Zustand configuration
     userAddrText,
     userLng,
     userLat,
     setUserAddrText,
     setUserCoordinates,
-
+fetchedJobs,
     userName,
     setUserName,
     setUserCont,
@@ -53,7 +52,7 @@ export default function Dash1Board({ viewSlug }) {
     is_complete,
     ai_response,
     current_tags,
-    categories
+    categories,
   } = useCustomerDashboardData();
 
   const scrollRef = useRef(null);
@@ -81,10 +80,16 @@ export default function Dash1Board({ viewSlug }) {
   useEffect(() => {
     if (!viewSlug) return;
     if (slots.main !== viewSlug) {
-      const targetSlot = Object.keys(slots).find((key) => slots[key] === viewSlug);
+      const targetSlot = Object.keys(slots).find(
+        (key) => slots[key] === viewSlug,
+      );
       if (targetSlot) swapSlots(targetSlot);
     }
   }, [viewSlug, slots, swapSlots]);
+
+  useEffect(() => {
+    fetchBookingsPendingJobs();
+  }, [fetchBookingsPendingJobs]);
 
   useEffect(() => {
     const scrollContainer = scrollRef.current;
@@ -112,7 +117,7 @@ export default function Dash1Board({ viewSlug }) {
         setModalAddrText(userAddrText || "");
       } else {
         setModalLat(27.7172);
-        setModalLng(85.3240);
+        setModalLng(85.324);
         setModalAddrText("");
       }
 
@@ -153,30 +158,42 @@ export default function Dash1Board({ viewSlug }) {
       html: `<div style="font-size: 30px; transform: translate(-3px, -24px); filter: drop-shadow(2px 3px 0px rgba(0,0,0,0.6));">📍</div>`,
       className: "cute-custom-pin",
       iconSize: [30, 30],
-      iconAnchor: [15, 30]
+      iconAnchor: [15, 30],
     });
 
     // Initialize Map Viewport instance
-    const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([modalLat, modalLng], 14);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    const map = L.map(mapContainerRef.current, { zoomControl: false }).setView(
+      [modalLat, modalLng],
+      14,
+    );
+    L.control.zoom({ position: "bottomright" }).addTo(map);
     leafletMapRef.current = map;
 
     // Append Clean OSM Carto Tiles
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; OpenStreetMap contributors'
+      attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
     // Append Interactively Draggable Marker Pin Point
-    const marker = L.marker([modalLat, modalLng], { icon: stylizedPinIcon, draggable: true }).addTo(map);
+    const marker = L.marker([modalLat, modalLng], {
+      icon: stylizedPinIcon,
+      draggable: true,
+    }).addTo(map);
     leafletMarkerRef.current = marker;
 
     // Reverse Geocode Handler Routine
     const runReverseGeocode = async (lat, lng) => {
       try {
-        const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+        );
         if (resp.ok) {
           const data = await resp.json();
-          const cleanString = data.display_name.split(",").slice(0, 3).join(",").toUpperCase();
+          const cleanString = data.display_name
+            .split(",")
+            .slice(0, 3)
+            .join(",")
+            .toUpperCase();
           setModalAddrText(cleanString.trim());
         }
       } catch (err) {
@@ -213,11 +230,16 @@ export default function Dash1Board({ viewSlug }) {
   // Handle Search Input Submission (Restricted to Nepal)
   const executeModalAddressSearch = async (e) => {
     e.preventDefault();
-    if (!modalSearchQuery.trim() || !leafletMapRef.current || !leafletMarkerRef.current) return;
+    if (
+      !modalSearchQuery.trim() ||
+      !leafletMapRef.current ||
+      !leafletMarkerRef.current
+    )
+      return;
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(modalSearchQuery)}&countrycodes=np&limit=1`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(modalSearchQuery)}&countrycodes=np&limit=1`,
       );
       if (response.ok) {
         const results = await response.json();
@@ -228,15 +250,21 @@ export default function Dash1Board({ viewSlug }) {
 
           setModalLat(newLat);
           setModalLng(newLng);
-          
-          const title = firstResult.display_name.split(",").slice(0, 3).join(",").toUpperCase();
+
+          const title = firstResult.display_name
+            .split(",")
+            .slice(0, 3)
+            .join(",")
+            .toUpperCase();
           setModalAddrText(title.trim());
 
           // Transition map viewport smoothly to target
           leafletMapRef.current.setView([newLat, newLng], 15);
           leafletMarkerRef.current.setLatLng([newLat, newLng]);
         } else {
-          alert("NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.");
+          alert(
+            "NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.",
+          );
         }
       }
     } catch (err) {
@@ -244,10 +272,12 @@ export default function Dash1Board({ viewSlug }) {
     }
   };
 
-  // Live Tracking Hardware Handler within Modal 
+  // Live Tracking Hardware Handler within Modal
   const handleModalLiveTracking = () => {
     if (!navigator.geolocation) {
-      alert("GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.");
+      alert(
+        "GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.",
+      );
       return;
     }
 
@@ -264,20 +294,26 @@ export default function Dash1Board({ viewSlug }) {
 
         try {
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
           );
           if (!response.ok) throw new Error("Reverse lookup failed");
           const data = await response.json();
-          const cleanString = data.display_name.split(",").slice(0, 3).join(",").toUpperCase();
+          const cleanString = data.display_name
+            .split(",")
+            .slice(0, 3)
+            .join(",")
+            .toUpperCase();
           setModalAddrText(cleanString.trim());
         } catch (err) {
           setModalAddrText("CURRENT LIVE LOCATION");
         }
       },
       (error) => {
-        alert("LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.");
+        alert(
+          "LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.",
+        );
       },
-      { enableHighAccuracy: true, timeout: 7000 }
+      { enableHighAccuracy: true, timeout: 7000 },
     );
   };
 
@@ -301,8 +337,9 @@ export default function Dash1Board({ viewSlug }) {
       return (
         <div className="dashboard-card main-view">
           <span className="card-flag">
-            INTERACTIVE DISPATCH MANAGER 
-            {turns_remaining !== undefined && ` — TURNS LEFT: ${turns_remaining}`}
+            INTERACTIVE DISPATCH MANAGER
+            {turns_remaining !== undefined &&
+              ` — TURNS LEFT: ${turns_remaining}`}
           </span>
           <h2>AI CHAT TERMINAL</h2>
           <div className="chat-box">
@@ -316,10 +353,16 @@ export default function Dash1Board({ viewSlug }) {
             <input
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder={is_complete ? "Conversation finalized." : "Instruct AI..."}
+              placeholder={
+                is_complete ? "Conversation finalized." : "Instruct AI..."
+              }
               disabled={is_complete}
             />
-            <button type="submit" className="chat-btn" disabled={is_complete || !chatInput.trim()}>
+            <button
+              type="submit"
+              className="chat-btn"
+              disabled={is_complete || !chatInput.trim()}
+            >
               Send
             </button>
           </form>
@@ -335,7 +378,9 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• AI CHAT TERMINAL</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge badge-highlight">Live Dispatch — Active Session</span>
+            <span className="badge badge-highlight">
+              Live Dispatch — Active Session
+            </span>
             <p className="card-summary">Logs Captured: {chatMessages.length}</p>
           </>
         ) : (
@@ -360,18 +405,37 @@ export default function Dash1Board({ viewSlug }) {
           }}
         >
           {/* ⬅️ LEFT SIDE COLUMN */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
-            <span className="card-flag" style={{ marginTop: "-14px" }}>EDIT OR CREATE JOB POSTING</span>
-            <h3 className="title" style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              minWidth: 0,
+            }}
+          >
+            <span className="card-flag" style={{ marginTop: "-14px" }}>
+              EDIT OR CREATE JOB POSTING
+            </span>
+            <h3
+              className="title"
+              style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}
+            >
               <span>·•TITLE:</span>
-              <input 
+              <input
                 type="text"
                 value={jobTitleDraft}
                 onChange={(e) => setJobTitle(e.target.value)}
                 spellCheck={false}
                 style={{
-                  outline: "none", border: "none", background: "transparent", font: "inherit",
-                  color: "inherit", padding: 0, margin: 0, width: "100%", 
+                  outline: "none",
+                  border: "none",
+                  background: "transparent",
+                  font: "inherit",
+                  color: "inherit",
+                  padding: 0,
+                  margin: 0,
+                  width: "100%",
                 }}
               />
               <span style={{ whiteSpace: "nowrap", flexShrink: 0 }}>•·</span>
@@ -383,24 +447,65 @@ export default function Dash1Board({ viewSlug }) {
               value={jobDescriptionDraft}
               onChange={(e) => setJobDescription(e.target.value)}
               style={{
-                border: "2px dashed #000000", borderRadius: "4px", padding: "10px",
-                outline: "none", flex: 1, width: "100%", boxSizing: "border-box",
+                border: "2px dashed #000000",
+                borderRadius: "4px",
+                padding: "10px",
+                outline: "none",
+                flex: 1,
+                width: "100%",
+                boxSizing: "border-box",
               }}
             />
           </div>
 
           {/* ➡️ RIGHT SIDE COLUMN */}
-          <div style={{ width: "35%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, flexShrink: 0 }}>
-            <h3 className="title" dir="rtl" style={{ marginBottom: "4px" }}>AttACHMENTs</h3>
+          <div
+            style={{
+              width: "35%",
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              flexShrink: 0,
+            }}
+          >
+            <h3 className="title" dir="rtl" style={{ marginBottom: "4px" }}>
+              AttACHMENTs
+            </h3>
 
-            <div style={{ position: "relative", display: "flex", alignItems: "center", width: "100%" }}>
+            <div
+              style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
               <button
                 type="button"
-                onClick={() => { if (scrollRef.current) scrollRef.current.scrollBy({ left: -120, behavior: "smooth" }); }}
+                onClick={() => {
+                  if (scrollRef.current)
+                    scrollRef.current.scrollBy({
+                      left: -120,
+                      behavior: "smooth",
+                    });
+                }}
                 style={{
-                  position: "absolute", left: "-5px", zIndex: 10, background: "#000", color: "#fff",
-                  border: "none", borderRadius: "50%", width: "22px", height: "22px", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px",
+                  position: "absolute",
+                  left: "-5px",
+                  zIndex: 10,
+                  background: "#000",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "22px",
+                  height: "22px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "bold",
+                  fontSize: "12px",
                 }}
               >
                 ‹
@@ -409,9 +514,18 @@ export default function Dash1Board({ viewSlug }) {
               <div
                 ref={scrollRef}
                 style={{
-                  display: "flex", flexDirection: "row", gap: "8px", overflowX: "auto", overflowY: "hidden",
-                  scrollbarWidth: "none", WebkitOverflowScrolling: "touch", width: "100%", padding: "6px 15px",
-                  cursor: "grab", userSelect: "none", whiteSpace: "nowrap",
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: "8px",
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  scrollbarWidth: "none",
+                  WebkitOverflowScrolling: "touch",
+                  width: "100%",
+                  padding: "6px 15px",
+                  cursor: "grab",
+                  userSelect: "none",
+                  whiteSpace: "nowrap",
                 }}
                 onMouseDown={(e) => {
                   isDown.current = true;
@@ -421,8 +535,16 @@ export default function Dash1Board({ viewSlug }) {
                     scrollLeftState.current = scrollRef.current.scrollLeft;
                   }
                 }}
-                onMouseLeave={() => { isDown.current = false; if (scrollRef.current) scrollRef.current.style.cursor = "grab"; }}
-                onMouseUp={() => { isDown.current = false; if (scrollRef.current) scrollRef.current.style.cursor = "grab"; }}
+                onMouseLeave={() => {
+                  isDown.current = false;
+                  if (scrollRef.current)
+                    scrollRef.current.style.cursor = "grab";
+                }}
+                onMouseUp={() => {
+                  isDown.current = false;
+                  if (scrollRef.current)
+                    scrollRef.current.style.cursor = "grab";
+                }}
                 onMouseMove={(e) => {
                   if (!isDown.current || !scrollRef.current) return;
                   e.preventDefault();
@@ -435,13 +557,31 @@ export default function Dash1Board({ viewSlug }) {
                   <div
                     key={file.id}
                     style={{
-                      display: "inline-flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                      minWidth: "65px", maxWidth: "65px", height: "65px", border: "1px solid #000", borderRadius: "4px",
-                      background: "#f9f9f9", fontSize: "11px", padding: "4px", boxSizing: "border-box",
+                      display: "inline-flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      minWidth: "65px",
+                      maxWidth: "65px",
+                      height: "65px",
+                      border: "1px solid #000",
+                      borderRadius: "4px",
+                      background: "#f9f9f9",
+                      fontSize: "11px",
+                      padding: "4px",
+                      boxSizing: "border-box",
                     }}
                   >
                     <span style={{ fontWeight: "bold" }}>[{file.type}]</span>
-                    <span style={{ fontSize: "9px", textOverflow: "ellipsis", overflow: "hidden", width: "100%", textAlign: "center" }}>
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        textOverflow: "ellipsis",
+                        overflow: "hidden",
+                        width: "100%",
+                        textAlign: "center",
+                      }}
+                    >
                       {file.name}
                     </span>
                   </div>
@@ -450,19 +590,40 @@ export default function Dash1Board({ viewSlug }) {
 
               <button
                 type="button"
-                onClick={() => { if (scrollRef.current) scrollRef.current.scrollBy({ left: 120, behavior: "smooth" }); }}
+                onClick={() => {
+                  if (scrollRef.current)
+                    scrollRef.current.scrollBy({
+                      left: 120,
+                      behavior: "smooth",
+                    });
+                }}
                 style={{
-                  position: "absolute", right: "-5px", zIndex: 10, background: "#000", color: "#fff",
-                  border: "none", borderRadius: "50%", width: "22px", height: "22px", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px",
+                  position: "absolute",
+                  right: "-5px",
+                  zIndex: 10,
+                  background: "#000",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "22px",
+                  height: "22px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "bold",
+                  fontSize: "12px",
                 }}
               >
                 ›
               </button>
             </div>
 
-            <h3 className="title" dir="rtl" style={{ marginTop: "10px" }}> UsER INFo </h3>
-            <div className="user-info" style={{ lineHeight: '35px' }}>
+            <h3 className="title" dir="rtl" style={{ marginTop: "10px" }}>
+              {" "}
+              UsER INFo{" "}
+            </h3>
+            <div className="user-info" style={{ lineHeight: "35px" }}>
               <span style={{ display: "inline-flex", alignItems: "baseline" }}>
                 <span>NAME:</span>
                 <input
@@ -471,8 +632,16 @@ export default function Dash1Board({ viewSlug }) {
                   onChange={(e) => setUserName(e.target.value)}
                   spellCheck={false}
                   style={{
-                    outline: "none", border: "none", background: "transparent", font: "inherit",
-                    color: "inherit", padding: 0, margin: 0, width: "auto", minWidth: "50px", maxWidth: "100%",
+                    outline: "none",
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: "inherit",
+                    padding: 0,
+                    margin: 0,
+                    width: "auto",
+                    minWidth: "50px",
+                    maxWidth: "100%",
                   }}
                 />
               </span>
@@ -485,37 +654,45 @@ export default function Dash1Board({ viewSlug }) {
                   onChange={(e) => setUserCont(e.target.value)}
                   spellCheck={false}
                   style={{
-                    outline: "none", border: "none", background: "transparent", font: "inherit",
-                    color: "inherit", padding: 0, margin: 0, width: "auto", minWidth: "50px", maxWidth: "100%",
+                    outline: "none",
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: "inherit",
+                    padding: 0,
+                    margin: 0,
+                    width: "auto",
+                    minWidth: "50px",
+                    maxWidth: "100%",
                   }}
                 />
               </span>
 
               {/* 🗺️ CLEAN SINGLE-CLICK INTERACTIVE ADDRESS MODULE */}
-              <div 
+              <div
                 onClick={() => setIsMapOpen(true)}
-                style={{ 
-                  display: "inline-flex", 
-                  alignItems: "baseline", 
+                style={{
+                  display: "inline-flex",
+                  alignItems: "baseline",
                   cursor: "pointer",
                   width: "100%",
                   whiteSpace: "nowrap",
-                  overflow: "hidden"
+                  overflow: "hidden",
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = 0.75}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = 1}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.75)}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}
               >
                 <span style={{ flexShrink: 0 }}>ADDRESS:</span>
-                <span 
+                <span
                   style={{
-                    paddingLeft: "4px", 
-                    textTransform: "uppercase", 
-                    overflow: "hidden", 
-                    textOverflow: "ellipsis", 
-                    whiteSpace: "nowrap", 
+                    paddingLeft: "4px",
+                    textTransform: "uppercase",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
                     color: "mediumblue",
                     textDecoration: "underline",
-                    fontWeight: "bold"
+                    fontWeight: "bold",
                   }}
                   title={userAddrText || "CLICK TO SET LOCATION"}
                 >
@@ -526,7 +703,7 @@ export default function Dash1Board({ viewSlug }) {
 
             <button
               type="button"
-              onClick={() => console.log("🚨 Emergency toggle triggered")} 
+              onClick={() => console.log("🚨 Emergency toggle triggered")}
               className="title"
               dir="rtl"
               name="emergency"
@@ -536,7 +713,7 @@ export default function Dash1Board({ viewSlug }) {
 
             <button
               type="button"
-              onClick={() => createJob()} 
+              onClick={() => createJob()}
               className="title"
               dir="rtl"
               name="post"
@@ -556,12 +733,15 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• JOB DESCRIPTION WORKSPACE</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge">Sidebar: Description Live Glance — Draft Mode</span>
+            <span className="badge">
+              Sidebar: Description Live Glance — Draft Mode
+            </span>
             <p className="card-summary"></p>
           </>
         ) : (
           <span className="badge">
-            Footer: Draft character footprint: {jobDescriptionDraft.length} chars
+            Footer: Draft character footprint: {jobDescriptionDraft.length}{" "}
+            chars
           </span>
         )}
       </div>
@@ -572,8 +752,15 @@ export default function Dash1Board({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card main-view">
-          <h2>YOUR ACTIVE POSTS MAIN HUB</h2>
-          <p>Full active dispatch control configuration deck view.</p>
+          <h2>ACTIVE PENDING POSTS</h2>
+          <button onClick={fetchBookingsPendingJobs}>REFRESH LIST</button>
+          <ul>
+            {fetchedJobs.map((job) => (
+              <li key={job.id}>
+                {job.title} - {job.status} - {job.description}
+              </li>
+            ))}
+          </ul>
         </div>
       );
     }
@@ -586,11 +773,17 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• YOUR ACTIVE POSTS</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge badge-highlight">Network Pipeline Active</span>
-            <p className="card-summary">Live Trackable: {activePostsCount} Positions</p>
+            <span className="badge badge-highlight">
+              Network Pipeline Active
+            </span>
+            <p className="card-summary">
+              Live Trackable: {activePostsCount} Positions
+            </p>
           </>
         ) : (
-          <span className="badge">Posts Monitor sleeping below — {activePostsCount} items queued</span>
+          <span className="badge">
+            Posts Monitor sleeping below — {activePostsCount} items queued
+          </span>
         )}
       </div>
     );
@@ -618,47 +811,90 @@ export default function Dash1Board({ viewSlug }) {
 
       {/* 🎯 NEO-BRUTALIST CUTE MAP PICKER POPUP MODAL */}
       {isMapOpen && (
-        <div 
+        <div
           style={{
-            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-            backgroundColor: "rgba(0, 0, 0, 0.4)", zIndex: 99999, display: "flex",
-            alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(3px)",
           }}
         >
-          <div 
+          <div
             style={{
-              background: "#ffffff", border: "3px solid #000000", borderRadius: "16px",
-              boxShadow: "8px 8px 0px #000000", width: "450px", maxWidth: "90%",
-              padding: "20px", display: "flex", flexDirection: "column", gap: "12px",
-              fontFamily: "inherit"
+              background: "#ffffff",
+              border: "3px solid #000000",
+              borderRadius: "16px",
+              boxShadow: "8px 8px 0px #000000",
+              width: "450px",
+              maxWidth: "90%",
+              padding: "20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              fontFamily: "inherit",
             }}
           >
             {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-              <span style={{ fontWeight: "bold", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  textTransform: "uppercase",
+                  letterSpacing: "1px",
+                }}
+              >
                 🗺️ CHOOSE DELIVERY PIN (NEPAL)
               </span>
             </div>
 
             {/* Address Search Form + Current Location Pin Trigger Button */}
             <div style={{ display: "flex", gap: "6px", width: "100%" }}>
-              <form onSubmit={executeModalAddressSearch} style={{ display: "flex", gap: "6px", flex: 1 }}>
-                <input 
+              <form
+                onSubmit={executeModalAddressSearch}
+                style={{ display: "flex", gap: "6px", flex: 1 }}
+              >
+                <input
                   type="text"
                   placeholder="SEARCH LALITPUR, THAMEL, ETC..."
                   value={modalSearchQuery}
                   onChange={(e) => setModalSearchQuery(e.target.value)}
                   style={{
-                    flex: 1, border: "2px solid #000000", borderRadius: "6px",
-                    padding: "6px 10px", outline: "none", font: "inherit", fontSize: "11px"
+                    flex: 1,
+                    border: "2px solid #000000",
+                    borderRadius: "6px",
+                    padding: "6px 10px",
+                    outline: "none",
+                    font: "inherit",
+                    fontSize: "11px",
                   }}
                 />
-                <button 
+                <button
                   type="submit"
                   style={{
-                    background: "#000000", color: "#ffffff", border: "none",
-                    borderRadius: "6px", padding: "0 12px", font: "inherit",
-                    fontSize: "11px", fontWeight: "bold", cursor: "pointer"
+                    background: "#000000",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "0 12px",
+                    font: "inherit",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
                   }}
                 >
                   FIND
@@ -671,32 +907,61 @@ export default function Dash1Board({ viewSlug }) {
                 onClick={handleModalLiveTracking}
                 title="Snap to My Current Position"
                 style={{
-                  background: "#e0f2fe", border: "2px solid #000000", borderRadius: "6px",
-                  padding: "0 10px", cursor: "pointer", fontSize: "14px", display: "flex",
-                  alignItems: "center", justifyContent: "center", boxShadow: "2px 2px 0px #000000"
+                  background: "#e0f2fe",
+                  border: "2px solid #000000",
+                  borderRadius: "6px",
+                  padding: "0 10px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "2px 2px 0px #000000",
                 }}
-                onMouseDown={(e) => e.currentTarget.style.transform = "translate(1px, 1px)"}
-                onMouseUp={(e) => e.currentTarget.style.transform = "none"}
+                onMouseDown={(e) =>
+                  (e.currentTarget.style.transform = "translate(1px, 1px)")
+                }
+                onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
               >
                 📍
               </button>
             </div>
 
             {/* Leaflet Surface Container Mount Node */}
-            <div 
-              ref={mapContainerRef} 
-              style={{ 
-                width: "100%", height: "260px", border: "2px solid #000000", 
-                borderRadius: "8px", background: "#f0f0f0", position: "relative",
-                boxShadow: "inset 2px 2px 5px rgba(0,0,0,0.1)"
+            <div
+              ref={mapContainerRef}
+              style={{
+                width: "100%",
+                height: "260px",
+                border: "2px solid #000000",
+                borderRadius: "8px",
+                background: "#f0f0f0",
+                position: "relative",
+                boxShadow: "inset 2px 2px 5px rgba(0,0,0,0.1)",
               }}
             />
 
             {/* Resolved Preview Description Output Text Block */}
-            <div style={{ fontSize: "11px", background: "#f9f9f9", padding: "8px", border: "1px dashed #000", borderRadius: "6px" }}>
+            <div
+              style={{
+                fontSize: "11px",
+                background: "#f9f9f9",
+                padding: "8px",
+                border: "1px dashed #000",
+                borderRadius: "6px",
+              }}
+            >
               <strong style={{ color: "#333" }}>SELECTED ADDRESS:</strong>
-              <div style={{ textTransform: "uppercase", marginTop: "2px", fontWeight: "bold", wordBreak: "break-word" }}>
-                {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
+              <div
+                style={{
+                  textTransform: "uppercase",
+                  marginTop: "2px",
+                  fontWeight: "bold",
+                  wordBreak: "break-word",
+                }}
+              >
+                {modalAddrText ||
+                  "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
               </div>
             </div>
 
@@ -706,35 +971,56 @@ export default function Dash1Board({ viewSlug }) {
                 type="button"
                 onClick={() => setIsMapOpen(false)}
                 style={{
-                  flex: 1, padding: "8px", background: "#f0f0f0", border: "2px solid #000",
-                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer", boxShadow: "2px 2px 0px #000"
+                  flex: 1,
+                  padding: "8px",
+                  background: "#f0f0f0",
+                  border: "2px solid #000",
+                  borderRadius: "8px",
+                  font: "inherit",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  boxShadow: "2px 2px 0px #000",
                 }}
-                onMouseDown={(e) => e.currentTarget.style.transform = "translate(2px, 2px)"}
-                onMouseUp={(e) => e.currentTarget.style.transform = "none"}
+                onMouseDown={(e) =>
+                  (e.currentTarget.style.transform = "translate(2px, 2px)")
+                }
+                onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
               >
                 CANCEL
               </button>
-              
+
               <button
                 type="button"
                 onClick={() => {
-                  setUserAddrText(modalAddrText || `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`);
+                  setUserAddrText(
+                    modalAddrText ||
+                      `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`,
+                  );
                   setUserCoordinates(modalLng, modalLat);
                   setIsMapOpen(false);
                 }}
                 style={{
-                  flex: 1, padding: "8px", background: "palegreen", border: "2px solid #000",
-                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer", boxShadow: "2px 2px 0px #000", color: "darkslategray"
+                  flex: 1,
+                  padding: "8px",
+                  background: "palegreen",
+                  border: "2px solid #000",
+                  borderRadius: "8px",
+                  font: "inherit",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  boxShadow: "2px 2px 0px #000",
+                  color: "darkslategray",
                 }}
-                onMouseDown={(e) => e.currentTarget.style.transform = "translate(2px, 2px)"}
-                onMouseUp={(e) => e.currentTarget.style.transform = "none"}
+                onMouseDown={(e) =>
+                  (e.currentTarget.style.transform = "translate(2px, 2px)")
+                }
+                onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
               >
                 CONFIRM LOCATION
               </button>
             </div>
-
           </div>
         </div>
       )}

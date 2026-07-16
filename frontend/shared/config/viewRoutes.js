@@ -195,14 +195,14 @@ export const WORKER_VIEWS = {
 
 export const CUSTOMER_SECTIONS = {
   Bookings: { id: "bookings", label: "Bookings", defaultViewId: "AI_CHAT" },
-  Postings: { id: "postings", label: "Postings", defaultViewId: "ACTIVE_BIDDINGS" },
+  Postings: { id: "postings", label: "Postings", defaultViewId: "ACTIVE_POSTS" },
   More: { id: "more", label: "More", defaultViewId: "CALENDAR" },
 };
 
 export const WORKER_SECTIONS = {
+  Me: { id: "me", label: "Me", defaultViewId: "INTERVIEW" },
   WorkSpace: { id: "workspace", label: "WorkSpace", defaultViewId: "MAP" },
   Scheduled: { id: "scheduled", label: "Scheduled", defaultViewId: "CALENDAR" },
-  Me: { id: "me", label: "Me", defaultViewId: "INTERVIEW" },
   Mics: { id: "mics", label: "Mics", defaultViewId: "EMPTY_VIEW" }
 };
 

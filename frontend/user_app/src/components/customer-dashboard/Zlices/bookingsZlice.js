@@ -44,24 +44,54 @@ export const createBookingsZlice = (set, get) => ({
     bottom: "YourActivePosts",
   },
 
-  fetchCustomerJobs: async () => {
+fetchBookingsPendingJobs: async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/jobs/my-tasks");
+
+      console.log("hellooooo");
+      const token = localStorage.getItem("handy_man_access_token");
+      // We point to a new endpoint specifically for status-filtered tasks
+      const response = await fetch("http://127.0.0.1:8000/jobs/status/pending", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP Error Status: ${response.status}`);
       }
 
       const data = await response.json();
-
+      
+      // Assuming the backend returns { status: "success", tasks: [...] }
       if (data.status === "success") {
         set({ fetchedJobs: data.tasks });
         set({ activePostsCount: data.tasks.length });
       }
     } catch (error) {
-      console.error("❌ Frontend fetch failure:", error);
+      console.error("❌ Failed to fetch pending jobs:", error);
     }
   },
+  // fetchCustomerJobs: async () => {
+  //   try {
+  //     const response = await fetch("http://127.0.0.1:8000/jobs/my-tasks");
+
+  //     if (!response.ok) {
+  //       throw new Error(`HTTP Error Status: ${response.status}`);
+  //     }
+
+  //     const data = await response.json();
+
+  //     if (data.status === "success") {
+  //       set({ fetchedJobs: data.tasks });
+  //       set({ activePostsCount: data.tasks.length });
+  //     }
+  //   } catch (error) {
+  //     console.error("❌ Frontend fetch failure:", error);
+  //   }
+  // },
+// Add this inside createBookingsZlice
+
 
  createJob: async () => {
     const { 
@@ -71,7 +101,8 @@ export const createBookingsZlice = (set, get) => ({
       userLng, 
       userLat,
       userName,
-      userCont
+      userCont,
+      fetchPendingJobs
     } = get();
 
     if (!booking_chat_id) {
@@ -110,9 +141,10 @@ export const createBookingsZlice = (set, get) => ({
       if (!response.ok) {
         throw new Error(`Posting pipeline rejected by server: ${response.status}`);
       }
-      
+
       const data = await response.json();
       if (data.status === "success") {
+        
         console.log("🚀 Success! Job verified, vectorized by Nvidia, and stored securely.");
         // Optional: Reset drafts or trigger UI success view changes here
       }
@@ -121,6 +153,7 @@ export const createBookingsZlice = (set, get) => ({
     } finally {
       set({ isSubmitting: false });
     }
+      await fetchPendingJobs();
   },
 
   swapSlots: (clickedSlotName) =>
@@ -295,4 +328,7 @@ export const createBookingsZlice = (set, get) => ({
       console.error("❌ Failed to process chat turn over secure transport:", error);
     }
   },
+
+  // Add this inside your createBookingsZlice function
+
 });

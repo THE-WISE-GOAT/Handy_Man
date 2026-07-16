@@ -18,6 +18,102 @@ class CompleteChatIn(BaseModel):
     status: str = "pending"
     mode: str = "regular"
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
+    phone_number: Optional[str] = None
+
+class InitializeWorkerAppIn(BaseModel):
+    pass
+
+class InitializeWorkerAppOut(BaseModel):
+    worker_id: int
+    user_id: int
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    worker_chat_id: int | None = None
+
+class SubmitWorkerAppIn(BaseModel):
+    worker_chat_id: int
+    phone_number: str | None = None
+    address_text: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+class SubmitWorkerAppOut(BaseModel):
+    worker_id: int
+    stage: str
+    message: str
+
+class WorkerAppStatusOut(BaseModel):
+    worker_id: int
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    rejection_reason: str | None = None
+    job_category: str
+    category_tag: str
+    specialities: List[str]
+    years_experience: int
+    worker_chat_id: int | None = None
+    phone_number: str | None = None
+    address_text: str | None = None
+
+class AdminPendingAppOut(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    email: str
+    firstName: str | None = None
+    lastName: str | None = None
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    rejection_reason: str | None = None
+    job_category: str
+    category_tag: str
+    specialities: List[str]
+    years_experience: int
+    worker_chat_id: int | None = None
+    phone_number: str | None = None
+    address_text: str | None = None
+    history: List[dict] | None = None
+    profile: dict | None = None
+
+class RejectWorkerIn(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=1000)
+
+class UpdateWorkerProfileIn(BaseModel):
+    job_category: Optional[str] = None
+    category_tag: Optional[str] = None
+    specialities: Optional[List[str]] = None
+    specialized_tools_or_equipment: Optional[List[str]] = None
+    years_experience: Optional[int] = None
+    license_or_certification: Optional[str] = None
+    job_description: Optional[str] = None
+    emergency_available: Optional[bool] = None
+    phone_number: Optional[str] = None
+    address_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class UpdateWorkerProfileOut(BaseModel):
+    worker_id: int
+    job_category: str
+    category_tag: str
+    specialities: List[str]
+    years_experience: int
+    license_or_certification: str | None = None
+    job_description: str
+    emergency_available: bool
+    phone_number: str | None = None
+    address_text: str | None = None
+    message: str
+
+class UpdateUserIn(BaseModel):
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    email: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
 
 class ChatMessageOut(BaseModel):
     """Returned after each chat turn (POST /dispatch/chat)."""
@@ -217,3 +313,9 @@ class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used
     category: Optional[str] = None     # the category that was searched (if any)
     workers: List[WorkerMatchOut]
+    
+    
+class WorkerCompleteChatIn(BaseModel):
+    location: LocationCoordinates
+    phone_number: Optional[str] = None
+    

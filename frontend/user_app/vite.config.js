@@ -22,8 +22,17 @@ export default defineConfig({
       clientPort: hmrClientPort,
       protocol: hmrProtocol,
     },
+    // Explicitly allow Vite to serve outside the standard root for shared folders
+    fs: {
+      allow: [
+        path.resolve(__dirname),
+        path.resolve(__dirname, "../shared"),
+      ],
+    },
   },
   resolve: {
+    // 1. FORCE Vite to resolve duplicate dependencies to a single instance
+    dedupe: ["react", "react-dom", "react-router-dom"],
     alias: {
       "@shared": path.resolve(__dirname, "../shared"),
       // Explicitly direct outside files to find your core packages locally

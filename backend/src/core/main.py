@@ -15,10 +15,12 @@ from src.core.router import (
     login, 
     user, 
     worker, 
-    service_task, 
+    # service_task, 
     chat_customer, 
     chat_worker,
-    connection_manager
+    connection_manager,
+    job_router,
+    worker_onboarding,
 )
 
 # 1. Define the startup logic using a SINGLE lifespan block
@@ -38,13 +40,21 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # 3. CORS Configuration
-origins = ["*"]
+origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:3000",
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # 4. Include Routers sequentially (Exactly ONCE)
@@ -56,7 +66,9 @@ app.include_router(chat_customer.router)
 app.include_router(chat_customer.match_router)
 app.include_router(chat_worker.router)
 app.include_router(connection_manager.router)
-app.include_router(service_task.router)
+# app.include_router(service_task.router)
+app.include_router(job_router.router)
+app.include_router(worker_onboarding.router)
 
 
 # 5. Core Alias Root Routes
