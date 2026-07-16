@@ -18,6 +18,16 @@ def get_jobs_by_status_endpoint(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user)
 ):
+    #results = job_manager.get_jobs_by_status(db, current_user.id, status_val, skip, limit)
+    from fastapi import HTTPException, status
+
+# Inside your get_jobs_by_status_endpoint:
+    if not current_user:
+        raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated"
+        )
+
     results = job_manager.get_jobs_by_status(db, current_user.id, status_val, skip, limit)
     
     # Convert Row objects to dictionaries manually
