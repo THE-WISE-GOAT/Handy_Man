@@ -13,7 +13,6 @@ export default function Dash1Worker({ viewSlug }) {
     mapStatus,
     bidsPipelineText,
     jobSpecsText,
-    connectToDispatch,
   } = useWorkerDashboardData();
 
   // Route state synchronization layer
@@ -35,9 +34,6 @@ export default function Dash1Worker({ viewSlug }) {
     navigate(`/worker/workspace/${targetSlug}`);
   };
 
-  useEffect(() => {
-    connectToDispatch();
-  }, [connectToDispatch]);
 
   // ====================================================
   // SUB-MODULE RENDERS
