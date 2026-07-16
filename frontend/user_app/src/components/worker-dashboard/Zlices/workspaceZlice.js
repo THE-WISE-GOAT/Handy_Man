@@ -39,27 +39,7 @@ export const createWorkspaceZlice = (set, get) => ({
   workerProfession: "plumber",
   socket: null,
 
-  connectToDispatch: () => {
-    const { workerProfession } = get();
 
-    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${workerProfession}`);
-
-    socket.onopen = () => {
-      console.log(`Connected as ${workerProfession}`);
-    };
-
-    socket.onmessage = (event) => {
-      const job = JSON.parse(event.data);
-
-      console.log("Incoming Job:", job);
-    };
-
-    socket.onclose = () => {
-      console.log("Websocket disconnected");
-    };
-
-    set({ socket });
-  },
 
 
 });
