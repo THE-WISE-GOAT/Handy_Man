@@ -57,9 +57,13 @@ export default function Dash2Board({ viewSlug }) {
     selectedJob,
     setSelectedJob,
     fetchPendingJobs,
-    // Extract state and actions
-    matchedWorkers,
-    fetchMatchedWorkers, // 👈 FIX: Extracted fetchMatchedWorkers action
+    
+    // NOTE: Removed global matchedCount/interestedCount from here
+    // as they are now mapped directly onto the job objects.
+
+    // --- COMMENTED OUT MATCHING STATE & ACTIONS ---
+    // matchedWorkers,
+    // fetchMatchedWorkers, 
     selectedWorkerId,
     setSelectedWorkerId
   } = useCustomerDashboardData();
@@ -68,13 +72,6 @@ export default function Dash2Board({ viewSlug }) {
   useEffect(() => {
     fetchPendingJobs();
   }, [fetchPendingJobs]);
-
-  // ── FIX: FETCH MATCHED WORKERS WHEN SELECTED JOB CHANGES ──
-  useEffect(() => {
-    if (selectedJob && selectedJob.title) {
-      fetchMatchedWorkers(selectedJob.title);
-    }
-  }, [selectedJob, fetchMatchedWorkers]);
 
   // Route state synchronization layer
   useEffect(() => {
@@ -166,32 +163,6 @@ export default function Dash2Board({ viewSlug }) {
                     </Popup>
                   </Marker>
                 )}
-
-                {/* Worker Markers */}
-                {matchedWorkers.map(worker => {
-                  const lat = parseFloat(worker.latitude);
-                  const lng = parseFloat(worker.longitude);
-
-                  if (isNaN(lat) || isNaN(lng)) return null;
-
-                  return (
-                    <Marker 
-                      key={worker.id} 
-                      position={[lat, lng]}
-                      eventHandlers={{
-                        click: () => {
-                          setSelectedWorkerId(worker.id);
-                        },
-                      }}
-                    >
-                      <Popup>
-                        <strong>Worker ID: {worker.id}</strong><br/>
-                        Category: {worker.category}<br/>
-                        <em>Click to focus</em>
-                      </Popup>
-                    </Marker>
-                  );
-                })}
               </MapContainer>
             </div>
           </div>
@@ -202,9 +173,6 @@ export default function Dash2Board({ viewSlug }) {
                 <span className="badge badge-highlight">Sidebar: GPS Map Node Tracker</span>
                 <p className="card-summary">
                   Lat: {selectedJob?.latitude || "N/A"} | Lng: {selectedJob?.longitude || "N/A"}
-                </p>
-                <p className="card-summary">
-                  Workers in Area: {matchedWorkers.length}
                 </p>
               </>
             ) : (
@@ -248,6 +216,26 @@ export default function Dash2Board({ viewSlug }) {
 
   const renderPostsDashboard = (position) => (
     <Card slug="ActivePostsDashboard" title="ACTIVE POSTS DASHBOARD" position={position} onSelect={handleModuleSelect}>
+      
+      {/* ADDED INLINE STYLE FOR BLINKING DOT */}
+      <style>
+        {`
+          @keyframes blinkDot {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+          .status-indicator-dot {
+            animation: blinkDot 1.5s infinite ease-in-out;
+            width: 8px;
+            height: 8px;
+            background-color: #f44336; /* Red */
+            border-radius: 50%;
+            display: inline-block;
+          }
+        `}
+      </style>
+
       {position === "main" ? (
         <div className="main-panel">
           <h2>ACTIVE POSTS PIPELINE NETWORK</h2>
@@ -275,6 +263,34 @@ export default function Dash2Board({ viewSlug }) {
                       transition: 'all 0.2s ease-in-out'
                     }}
                   >
+                    {/* NEW: JOB-SPECIFIC WORKER & INTEREST METRICS ABOVE TITLE */}
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '20px', 
+                      marginBottom: '8px', 
+                      fontSize: '0.85em', 
+                      fontWeight: 'bold' 
+                    }}>
+                      
+                      {/* Matched Professionals Indicator */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#555' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                        {/* Pulling the count specific to this job from the mapped array */}
+                        <span>{job.matchedCount || 0} matched professionals</span>
+                      </div>
+
+                      {/* Interested Workers Indicator */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#d32f2f' }}>
+                        <span className="status-indicator-dot"></span>
+                        {/* Pulling the count specific to this job from the mapped array */}
+                        <span>{job.interestedCount || 0} interested</span>
+                      </div>
+                      
+                    </div>
+
+                    {/* Original Job Title & Description */}
                     <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
                     <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
                   </div>
