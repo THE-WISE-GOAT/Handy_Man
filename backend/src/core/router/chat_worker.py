@@ -529,12 +529,57 @@ def get_worker_summary(
 
 
 
+def _get_address_from_coords(lat: float, lng: float) -> str:
+    """
+    Detects the physical location address text from latitude and longitude coordinates.
+    """
+    # FIX: Point to the actual OpenStreetMap Nominatim reverse geocoding API endpoint
+    url = "https://nominatim.openstreetmap.org/reverse"
+    
+    params = {
+        "lat": lat,
+        "lon": lng,
+        "format": "json",
+        "addressdetails": 1
+    }
+    
+    headers = {
+        # CRITICAL FIX: Nominatim demands a distinct application name and contact point
+        # to prevent automatic system blocking. Replace with your actual email.
+        "User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"
+    }
+    
+    try:
+        # Increased timeout to 8.0 seconds to give the free API tier time to respond
+        response = requests.get(url, params=params, headers=headers, timeout=8.0)
+        
+        if response.status_code == 200:
+            data = response.json()
+            # If the API succeeds, grab the precise real address text string
+            if "display_name" in data:
+                return data["display_name"]
+            else:
+                print(f"[Geocode Error] 'display_name' field missing in JSON response")
+        else:
+            # This logs the explicit error code to your terminal console for visibility
+            print(f"[Geocode Error] Server responded with code: {response.status_code}")
+            
+    except Exception as e:
+        # This will print the actual technical network error in your terminal console
+        print(f"[Geocode Exception] Network failure details: {e}")
+        
+    # Only fall back to this coordinate text string if the API call genuinely fails
+    return f"Location ({lat}, {lng})"
+
+
+
 @router.post(
     "/{worker_chat_id}/complete",
     summary="Complete the AI chat, extract profile keys, generate embedding, and save to DB",
 )
 def complete_worker_chat(
     worker_chat_id: int, 
+    payload: schema.WorkerCompleteChatIn,  # Expects location (latitude, longitude)
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
@@ -550,15 +595,20 @@ def complete_worker_chat(
     profile_data = chat_session.profile if chat_session.profile else {}
     job_desc = profile_data.get("job_description", "")
     
+    lng = payload.location.longitude
+    lat = payload.location.latitude
+    wkt_point = f"POINT({lng} {lat})"
+    
     # Step 3: Get Vector Embedding from Nvidia
     embedding_vector = None
     if job_desc:
         try:
             headers = {
-            "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
-            "Content-Type": "application/json"
+                "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
+                "Content-Type": "application/json"
             }
-            payload = {
+            # FIX: Renamed 'payload' to 'nvidia_payload' to prevent variable overriding
+            nvidia_payload = {
                 "model": "nvidia/nv-embed-v1",
                 "input": [job_desc],
                 "input_type": "passage",
@@ -568,7 +618,7 @@ def complete_worker_chat(
             response = requests.post(
                "https://integrate.api.nvidia.com/v1/embeddings",
                headers=headers, 
-               json=payload, 
+               json=nvidia_payload,  # Use renamed variable here
                timeout=20.0
             )
             
@@ -585,18 +635,19 @@ def complete_worker_chat(
                 detail=f"Failed to connect to Nvidia API: {e}"
             )
     else:
-        # Optional: Raise error if a job description was mandatory for your app logic
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Job description is missing. Cannot generate vector profile."
         )
         
-    # Step 2: Check if WorkerProfile already exists (to prevent duplicate primary key crashes)
+    # Step 2: Check if WorkerProfile already exists
     db_profile = db.query(model.WorkerProfile).filter(
         model.WorkerProfile.worker_chat_id == worker_chat_id,
         model.WorkerProfile.user_id == current_user.id
     ).first()
 
+    address_text = _get_address_from_coords(lat, lng)
+    
     # Define the dictionary of key-value data extracted from JSON summary
     profile_fields = {
         "stage": chat_session.stage,
@@ -615,26 +666,27 @@ def complete_worker_chat(
         "has_verified_specialty": profile_data.get("has_verified_specialty", False),
         "scenario_passed": profile_data.get("scenario_passed", False),
         "scenario_score": profile_data.get("scenario_score", 0),
-        "description_vector": embedding_vector
+        "description_vector": embedding_vector,
+        "latitude": lat,
+        "longitude": lng,
+        "location": wkt_point,
+        "phone_number": payload.phone_number,  # This will now correctly reference your Pydantic input model
+        "address_text": address_text
     }
 
     if db_profile:
-        # If record exists, update its values (Upsert)
         for key, value in profile_fields.items():
             setattr(db_profile, key, value)
     else:
-        # If record does not exist, create a new one
         db_profile = model.WorkerProfile(
             user_id=current_user.id,
             worker_chat_id=worker_chat_id,
             **profile_fields
         )
     db.add(db_profile)
-        
     db.commit()
     
     return {"status": "success", "message": "Worker profile structured and saved successfully."}
-
     
     
     

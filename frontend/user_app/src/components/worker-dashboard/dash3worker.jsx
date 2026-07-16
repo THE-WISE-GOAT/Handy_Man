@@ -6,15 +6,9 @@ import "./dash3worker.css";
 export default function Dash3Worker({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
+  const [activeModule, setActiveModule] = useState("interview");
 
   const {
-    meSlots,
-    swapMeSlots,
-    interviewStatusText,
-    profileCredentialsText,
-    envConfigParametersText,
-    scrapedTagsMatchText,
-
     // onboarding state
     applicantStage,
     isApplicantComplete,
@@ -48,6 +42,24 @@ export default function Dash3Worker({ viewSlug }) {
     modalLng,
     modalAddrText,
 
+    // editable profile state
+    editableProfile,
+    isSavingProfile,
+    profileSaveMessage,
+    setEditableProfile,
+    setIsSavingProfile,
+    setProfileSaveMessage,
+
+    // user base info state
+    userProfile,
+    isEditingUserInfo,
+    isSavingUserInfo,
+    userInfoSaveMessage,
+    setUserProfile,
+    setIsEditingUserInfo,
+    setIsSavingUserInfo,
+    setUserInfoSaveMessage,
+
     // actions
     setPhoneNumber,
     setAddressText,
@@ -70,6 +82,9 @@ export default function Dash3Worker({ viewSlug }) {
     sendWorkerMessage,
     fetchWorkerSummary,
     submitApplication,
+    updateWorkerProfile,
+    loadUserProfile,
+    updateUserProfile,
     loadApplicantStatus,
     setApplicationSubmitted,
   } = useWorkerDashboardData();
@@ -77,12 +92,16 @@ export default function Dash3Worker({ viewSlug }) {
   const mapContainerRef = useRef(null);
   const leafletMapRef = useRef(null);
   const leafletMarkerRef = useRef(null);
-  const scrollRef = useRef(null);
 
   // Load applicant status on mount
   useEffect(() => {
     loadApplicantStatus();
   }, [loadApplicantStatus]);
+
+  // Load user base info on mount
+  useEffect(() => {
+    loadUserProfile();
+  }, [loadUserProfile]);
 
   // Refetch status after application is submitted
   useEffect(() => {
@@ -92,19 +111,20 @@ export default function Dash3Worker({ viewSlug }) {
     }
   }, [applicationSubmitted, loadApplicantStatus]);
 
-  // Route state synchronization
+  // Sync activeModule with URL slug
   useEffect(() => {
     if (!viewSlug) return;
-    const currentSlots = meSlots || {};
-    if (currentSlots.main !== viewSlug) {
-      const targetSlot = Object.keys(currentSlots).find(
-        (key) => currentSlots[key] === viewSlug
-      );
-      if (targetSlot) {
-        swapMeSlots(targetSlot);
-      }
+    const slugToModule = {
+      MeInterview: "interview",
+      MeProfile: "profile",
+      MeConfiguration: "extraction",
+      MeCollectedTags: "status",
+    };
+    const mod = slugToModule[viewSlug];
+    if (mod && mod !== activeModule) {
+      setActiveModule(mod);
     }
-  }, [viewSlug, meSlots, swapMeSlots]);
+  }, [viewSlug]);
 
   // ====================================================
   // MAP ASSET LOADER (reused from customer dashboard)
@@ -302,6 +322,20 @@ export default function Dash3Worker({ viewSlug }) {
   };
 
   // ====================================================
+  // PROFILE EDIT HANDLERS
+  // ====================================================
+  const handleProfileChange = (field, value) => {
+    setEditableProfile((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveProfile = async () => {
+    await updateWorkerProfile();
+  };
+
+  // ====================================================
   // RENDER: Under Review / Rejected State
   // ====================================================
   const renderStatusView = () => {
@@ -346,17 +380,31 @@ export default function Dash3Worker({ viewSlug }) {
   };
 
   // ====================================================
-  // RENDER: Onboarding Interview (main slot)
+  // RENDER: AI Chat Terminal
   // ====================================================
-  const renderOnboardingMain = () => {
+  const renderChatTerminal = ({ isActive }) => {
+    if (!isActive) {
+      return (
+        <div className="dashboard-card module-preview" onClick={() => setActiveModule("interview")}>
+          <div className="card-header">••• AI INTERVIEW TERMINAL</div>
+          <div className="main-panel">
+            <p className="panel-desc">Click to open the AI interview terminal</p>
+            <span className="badge">
+              {chatMessages.length > 1 ? `${chatMessages.length} messages` : "Not started"}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
     if (renderStatusView()) return renderStatusView();
 
     const hasActiveChat = chatMessages.length > 1 || isChatComplete || isAiGenerating;
 
     return (
       <div className="dashboard-card slot-main">
-        <div className="card-header">••• WORKER ONBOARDING INTERVIEW</div>
-        <div className="main-panel onboarding-main-panel">
+        <div className="card-header">••• AI INTERVIEW TERMINAL</div>
+        <div className="main-panel chat-terminal-panel">
           {!hasActiveChat && !applicationSubmitted ? (
             <div className="start-interview-prompt">
               <h3>Ready to begin your onboarding interview?</h3>
@@ -373,136 +421,361 @@ export default function Dash3Worker({ viewSlug }) {
               </button>
             </div>
           ) : (
-            <div className="onboarding-layout">
-              {/* LEFT: AI Chat Terminal */}
-              <div className="onboarding-chat-section">
-                <h3>AI Interview Terminal</h3>
-                {turnsRemaining !== undefined && (
-                  <span className="turns-badge">TURNS LEFT: {turnsRemaining}</span>
+            <>
+              {turnsRemaining !== undefined && (
+                <span className="turns-badge">TURNS LEFT: {turnsRemaining}</span>
+              )}
+              <div className="chat-box">
+                {chatMessages.map((m) => (
+                  <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
+                    <strong>{m.sender.toUpperCase()}:</strong> {m.text}
+                  </p>
+                ))}
+                {isAiGenerating && (
+                  <p className="chat-msg chat-msg--assistant">
+                    <strong>ASSISTANT:</strong> <em>typing...</em>
+                  </p>
                 )}
-                <div className="chat-box">
-                  {chatMessages.map((m) => (
-                    <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
-                      <strong>{m.sender.toUpperCase()}:</strong> {m.text}
-                    </p>
-                  ))}
-                  {isAiGenerating && (
-                    <p className="chat-msg chat-msg--assistant">
-                      <strong>ASSISTANT:</strong> <em>typing...</em>
-                    </p>
-                  )}
-                </div>
-                <form onSubmit={handleSendChat} className="chat-form">
-                  <input
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder={isChatComplete ? "Conversation finalized." : "Instruct AI..."}
-                    disabled={isChatComplete || isAiGenerating}
-                  />
-                  <button
-                    type="submit"
-                    className="chat-btn"
-                    disabled={isChatComplete || isAiGenerating || !chatInput.trim()}
-                  >
-                    Send
-                  </button>
-                </form>
               </div>
+              <form onSubmit={handleSendChat} className="chat-form">
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder={isChatComplete ? "Conversation finalized." : "Instruct AI..."}
+                  disabled={isChatComplete || isAiGenerating}
+                />
+                <button
+                  type="submit"
+                  className="chat-btn"
+                  disabled={isChatComplete || isAiGenerating || !chatInput.trim()}
+                >
+                  Send
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-              {/* RIGHT: Live Extraction + Location + Submit */}
-              <div className="onboarding-sidebar-section">
-                {/* Live Extraction Module */}
-                <div className="extraction-panel">
-                  <h3>Live Extraction</h3>
-                  {extractedProfile ? (
-                    <div className="extracted-data">
-                      <div className="extracted-row">
-                        <span className="extracted-label">Job Category:</span>
-                        <span className="extracted-value">{extractedProfile.job_category || "—"}</span>
-                      </div>
-                      <div className="extracted-row">
-                        <span className="extracted-label">Category Tag:</span>
-                        <span className="extracted-value">{extractedProfile.category_tag || "—"}</span>
-                      </div>
-                      <div className="extracted-row">
-                        <span className="extracted-label">Specialities:</span>
-                        <span className="extracted-value">
-                          {extractedProfile.specialities?.length > 0
-                            ? extractedProfile.specialities.join(", ")
-                            : "—"}
-                        </span>
-                      </div>
-                      <div className="extracted-row">
-                        <span className="extracted-label">Years Experience:</span>
-                        <span className="extracted-value">{extractedProfile.years_experience ?? "—"}</span>
-                      </div>
-                      <div className="extracted-row">
-                        <span className="extracted-label">Tools:</span>
-                        <span className="extracted-value">
-                          {extractedProfile.specialized_tools_or_equipment?.length > 0
-                            ? extractedProfile.specialized_tools_or_equipment.join(", ")
-                            : "—"}
-                        </span>
-                      </div>
-                      <div className="extracted-row">
-                        <span className="extracted-label">License:</span>
-                        <span className="extracted-value">{extractedProfile.license_or_certification || "—"}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="panel-desc">
-                      {isChatComplete
-                        ? "Finalizing profile extraction..."
-                        : "Profile data will appear here as the AI interview progresses."}
-                    </p>
-                  )}
+  // ====================================================
+  // RENDER: Extraction & Submission Module
+  // ====================================================
+  const renderExtractionModule = ({ isActive }) => {
+    if (!isActive) {
+      return (
+        <div className="dashboard-card module-preview" onClick={() => setActiveModule("extraction")}>
+          <div className="card-header">••• EXTRACTION & SUBMISSION</div>
+          <div className="main-panel">
+            <p className="panel-desc">Click to view extraction details and submit</p>
+            <span className="badge">
+              {extractedProfile ? extractedProfile.job_category || "Profile ready" : "Awaiting extraction"}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dashboard-card slot-main">
+        <div className="card-header">••• EXTRACTION & SUBMISSION</div>
+        <div className="main-panel sidebar-content">
+          {/* Live Extraction Module */}
+          <div className="extraction-panel">
+            <h3>Live Extraction</h3>
+            {extractedProfile ? (
+              <div className="extracted-data">
+                <div className="extracted-row">
+                  <span className="extracted-label">Job Category:</span>
+                  <span className="extracted-value">{extractedProfile.job_category || "—"}</span>
+                </div>
+                <div className="extracted-row">
+                  <span className="extracted-label">Category Tag:</span>
+                  <span className="extracted-value">{extractedProfile.category_tag || "—"}</span>
+                </div>
+                <div className="extracted-row">
+                  <span className="extracted-label">Specialities:</span>
+                  <span className="extracted-value">
+                    {extractedProfile.specialities?.length > 0
+                      ? extractedProfile.specialities.join(", ")
+                      : "—"}
+                  </span>
+                </div>
+                <div className="extracted-row">
+                  <span className="extracted-label">Years Experience:</span>
+                  <span className="extracted-value">{extractedProfile.years_experience ?? "—"}</span>
+                </div>
+                <div className="extracted-row">
+                  <span className="extracted-label">Tools:</span>
+                  <span className="extracted-value">
+                    {extractedProfile.specialized_tools_or_equipment?.length > 0
+                      ? extractedProfile.specialized_tools_or_equipment.join(", ")
+                      : "—"}
+                  </span>
+                </div>
+                <div className="extracted-row">
+                  <span className="extracted-label">License:</span>
+                  <span className="extracted-value">{extractedProfile.license_or_certification || "—"}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="panel-desc">
+                {isChatComplete
+                  ? "Finalizing profile extraction..."
+                  : "Profile data will appear here as the AI interview progresses."}
+              </p>
+            )}
+          </div>
+
+          {/* Location Module */}
+          <div className="location-panel">
+            <h3>Location & Contact</h3>
+            <div className="location-form">
+              <label>
+                Phone Number
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="+977 98XXXXXXXX"
+                />
+              </label>
+              <label>
+                Address
+                <input
+                  type="text"
+                  value={addressText}
+                  onChange={(e) => setAddressText(e.target.value)}
+                  placeholder="Click map to set address"
+                  readOnly
+                />
+              </label>
+              <button
+                type="button"
+                className="map-open-btn"
+                onClick={() => setIsMapOpen(true)}
+              >
+                📍 {addressText ? "Change Location" : "Pin Your Location"}
+              </button>
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          {!applicationSubmitted && !isApplicantRejected && (
+            <button
+              type="button"
+              className="submit-app-btn"
+              onClick={handleSubmitApplication}
+              disabled={isSubmittingApplication || isChatComplete === false}
+            >
+              {isSubmittingApplication ? "Submitting..." : "Send Application"}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ====================================================
+  // RENDER: Worker Profile Module
+  // ====================================================
+  const renderProfileModule = ({ isActive }) => {
+    const displayName = [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" ") || userProfile.username || "Worker";
+    const locationLine = [addressText, phoneNumber].filter(Boolean).join(" | ") || "No location set";
+    const primaryTag = extractedProfile?.job_category || editableProfile.job_category || "";
+
+    if (!isActive) {
+      return (
+        <div className="dashboard-card module-preview" onClick={() => setActiveModule("profile")}>
+          <div className="card-header">••• WORKER PROFILE</div>
+          <div className="main-panel">
+            <p className="panel-desc">Click to view full profile</p>
+            <div className="profile-preview-tags">
+              <span className="badge badge-highlight">{displayName}</span>
+              <span className="badge">ID: {userProfile.id || "—"}</span>
+              {primaryTag && <span className="badge">{primaryTag}</span>}
+            </div>
+            <p className="card-summary">{locationLine}</p>
+          </div>
+        </div>
+      );
+    }
+
+    const renderEmpty = (label, value) => (
+      <div className="profile-detail-row">
+        <span className="profile-detail-label">{label}:</span>
+        <span className="profile-detail-value profile-detail-value--empty">{value || "None"}</span>
+      </div>
+    );
+
+    return (
+      <div className="dashboard-card slot-main">
+        <div className="card-header">••• WORKER PROFILE</div>
+        <div className="main-panel profile-editor">
+          {/* ========== BASE USER INFO (EDITABLE) ========== */}
+          <div className="profile-section">
+            <div className="profile-section-header">
+              <h3>Personal Information</h3>
+              {!isEditingUserInfo ? (
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => setIsEditingUserInfo(true)}
+                  title="Edit personal information"
+                >
+                  ✏️
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="icon-btn icon-btn--cancel"
+                  onClick={() => {
+                    setIsEditingUserInfo(false);
+                    setUserInfoSaveMessage(null);
+                  }}
+                  title="Cancel editing"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {!isEditingUserInfo ? (
+              <div className="profile-read-only">
+                <div className="profile-detail-row">
+                  <span className="profile-detail-label">Name:</span>
+                  <span className="profile-detail-value">{displayName}</span>
+                </div>
+                <div className="profile-detail-row">
+                  <span className="profile-detail-label">User ID:</span>
+                  <span className="profile-detail-value">{userProfile.id || "—"}</span>
+                </div>
+                <div className="profile-detail-row">
+                  <span className="profile-detail-label">Email:</span>
+                  <span className="profile-detail-value">{userProfile.email || "—"}</span>
+                </div>
+                <div className="profile-detail-row">
+                  <span className="profile-detail-label">Address:</span>
+                  <span className="profile-detail-value">{addressText || "—"}</span>
+                </div>
+                <div className="profile-detail-row">
+                  <span className="profile-detail-label">Phone:</span>
+                  <span className="profile-detail-value">{phoneNumber || "—"}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="profile-edit-form">
+                <div className="profile-field">
+                  <label>First Name</label>
+                  <input
+                    type="text"
+                    value={userProfile.firstName}
+                    onChange={(e) => setUserProfile((prev) => ({ ...prev, firstName: e.target.value }))}
+                  />
+                </div>
+                <div className="profile-field">
+                  <label>Last Name</label>
+                  <input
+                    type="text"
+                    value={userProfile.lastName}
+                    onChange={(e) => setUserProfile((prev) => ({ ...prev, lastName: e.target.value }))}
+                  />
+                </div>
+                <div className="profile-field">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    value={userProfile.email}
+                    onChange={(e) => setUserProfile((prev) => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+                <div className="profile-field">
+                  <label>Username</label>
+                  <input
+                    type="text"
+                    value={userProfile.username}
+                    onChange={(e) => setUserProfile((prev) => ({ ...prev, username: e.target.value }))}
+                  />
+                </div>
+                <div className="profile-field">
+                  <label>New Password {userProfile.password ? "(leave blank to keep current)" : ""}</label>
+                  <input
+                    type="password"
+                    value={userProfile.password || ""}
+                    onChange={(e) => setUserProfile((prev) => ({ ...prev, password: e.target.value }))}
+                    placeholder="Enter new password"
+                  />
                 </div>
 
-                {/* Location Module */}
-                <div className="location-panel">
-                  <h3>Location & Contact</h3>
-                  <div className="location-form">
-                    <label>
-                      Phone Number
-                      <input
-                        type="tel"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        placeholder="+977 98XXXXXXXX"
-                      />
-                    </label>
-                    <label>
-                      Address
-                      <input
-                        type="text"
-                        value={addressText}
-                        onChange={(e) => setAddressText(e.target.value)}
-                        placeholder="Click map to set address"
-                        readOnly
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="map-open-btn"
-                      onClick={() => setIsMapOpen(true)}
-                    >
-                      📍 {addressText ? "Change Location" : "Pin Your Location"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Submit Button */}
-                {!applicationSubmitted && !isApplicantRejected && (
+                <div className="profile-actions">
                   <button
                     type="button"
                     className="submit-app-btn"
-                    onClick={handleSubmitApplication}
-                    disabled={isSubmittingApplication || isChatComplete === false}
+                    onClick={updateUserProfile}
+                    disabled={isSavingUserInfo}
                   >
-                    {isSubmittingApplication ? "Submitting..." : "Send Application"}
+                    {isSavingUserInfo ? "Saving..." : "Save Changes"}
                   </button>
-                )}
+                  {userInfoSaveMessage && (
+                    <span className={`profile-save-message ${userInfoSaveMessage.includes("Failed") ? "profile-save-message--error" : "profile-save-message--success"}`}>
+                      {userInfoSaveMessage}
+                    </span>
+                  )}
+                </div>
               </div>
+            )}
+          </div>
+
+          {/* ========== WORKER SPECIFIC DETAILS (READ-ONLY) ========== */}
+          <div className="profile-section profile-section--worker">
+            <div className="profile-section-header">
+              <h3>Worker Details</h3>
+              <span className="badge badge--readonly">Read-Only</span>
+            </div>
+            <div className="profile-read-only-grid">
+              {renderEmpty("Job Category", extractedProfile?.job_category || editableProfile.job_category)}
+              {renderEmpty("Category Tag", extractedProfile?.category_tag || editableProfile.category_tag)}
+              {renderEmpty("Specialities", (extractedProfile?.specialities || editableProfile.specialities || [])?.length > 0 ? (extractedProfile?.specialities || editableProfile.specialities || []).join(", ") : "None")}
+              {renderEmpty("Tools", (extractedProfile?.specialized_tools_or_equipment || editableProfile.specialized_tools_or_equipment || [])?.length > 0 ? (extractedProfile?.specialized_tools_or_equipment || editableProfile.specialized_tools_or_equipment || []).join(", ") : "None")}
+              {renderEmpty("Years Experience", extractedProfile?.years_experience ?? editableProfile.years_experience)}
+              {renderEmpty("License / Certification", extractedProfile?.license_or_certification || editableProfile.license_or_certification)}
+              {renderEmpty("Job Description", extractedProfile?.job_description || editableProfile.job_description)}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderStatusModule = ({ isActive }) => {
+    if (!isActive) {
+      return (
+        <div className="dashboard-card module-preview" onClick={() => setActiveModule("status")}>
+          <div className="card-header">••• INTERVIEW STATUS</div>
+          <div className="main-panel">
+            <p className="panel-desc">Click to view interview status</p>
+            <span className="badge">Stage: {applicantStage}</span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dashboard-card slot-main">
+        <div className="card-header">••• INTERVIEW STATUS</div>
+        <div className="main-panel">
+          <h3>Current Stage: {applicantStage}</h3>
+          <div className="status-badges">
+            {isApplicantComplete && <span className="badge badge-highlight">Complete</span>}
+            {isApplicantRejected && <span className="badge badge--rejected">Rejected</span>}
+            {!isApplicantComplete && !isApplicantRejected && (
+              <span className="badge">In Progress</span>
+            )}
+          </div>
+          {rejectionReason && (
+            <div className="rejection-reason-box">
+              <strong>Reason:</strong> {rejectionReason}
             </div>
           )}
         </div>
@@ -511,69 +784,43 @@ export default function Dash3Worker({ viewSlug }) {
   };
 
   // ====================================================
-  // RENDER: Location Module (sidebar slot)
+  // RESOLVE MODULE BY ACTIVE STATE
   // ====================================================
-  const renderLocationSidebar = () => (
-    <div
-      className={`dashboard-card asleep-view sidebar-slot clickable`}
-      onClick={() => handleModuleSelect("MeInterview")}
-    >
-      <div className="card-header">••• LOCATION MODULE</div>
-      {addressText ? (
-        <>
-          <span className="badge badge-highlight">Location Pinned</span>
-          <p className="card-summary">{addressText}</p>
-        </>
-      ) : (
-        <span className="badge">Click to pin your location on the map</span>
-      )}
-    </div>
-  );
+  const modules = [
+    { key: "interview", label: "AI Interview Terminal" },
+    { key: "extraction", label: "Extraction & Submission" },
+    { key: "profile", label: "Worker Profile" },
+    { key: "status", label: "Interview Status" },
+  ];
 
-  // ====================================================
-  // RENDER: Extraction Sidebar
-  // ====================================================
-  const renderExtractionSidebar = () => (
-    <div
-      className={`dashboard-card asleep-view sidebar-slot clickable`}
-      onClick={() => handleModuleSelect("MeInterview")}
-    >
-      <div className="card-header">••• LIVE EXTRACTION</div>
-      {extractedProfile ? (
-        <>
-          <span className="badge badge-highlight">Profile Extracted</span>
-          <p className="card-summary">
-            {extractedProfile.job_category} • {extractedProfile.years_experience} yrs exp
-          </p>
-        </>
-      ) : (
-        <span className="badge">AI extraction in progress...</span>
-      )}
-    </div>
-  );
+  const activeModuleConfig = modules.find((m) => m.key === activeModule);
+  const inactiveModules = modules.filter((m) => m.key !== activeModule);
 
-  // ====================================================
-  // RESOLVE MODULE
-  // ====================================================
-  const resolveModuleBySlot = (slotKey) => {
-    const currentSlots = meSlots || {};
-    switch (currentSlots[slotKey]) {
-      case "MeInterview":
-        return renderOnboardingMain();
-      case "MeProfile":
-        return renderLocationSidebar();
-      case "MeConfiguration":
-        return renderExtractionSidebar();
-      case "MeCollectedTags":
-        return (
-          <div
-            className={`dashboard-card asleep-view ${slotKey}-slot clickable`}
-            onClick={() => handleModuleSelect("MeCollectedTags")}
-          >
-            <div className="card-header">••• ITEM LABELING CLASSIFICATION LOGS</div>
-            <span className="badge">Interview status: {applicantStage}</span>
-          </div>
-        );
+  const renderActiveModule = () => {
+    switch (activeModule) {
+      case "interview":
+        return renderChatTerminal({ isActive: true });
+      case "extraction":
+        return renderExtractionModule({ isActive: true });
+      case "profile":
+        return renderProfileModule({ isActive: true });
+      case "status":
+        return renderStatusModule({ isActive: true });
+      default:
+        return renderChatTerminal({ isActive: true });
+    }
+  };
+
+  const renderInactiveModule = (mod) => {
+    switch (mod.key) {
+      case "interview":
+        return renderChatTerminal({ isActive: false });
+      case "extraction":
+        return renderExtractionModule({ isActive: false });
+      case "profile":
+        return renderProfileModule({ isActive: false });
+      case "status":
+        return renderStatusModule({ isActive: false });
       default:
         return null;
     }
@@ -700,27 +947,18 @@ export default function Dash3Worker({ viewSlug }) {
   // ====================================================
   // MAIN RENDER
   // ====================================================
-  const mainContent = resolveModuleBySlot("main");
-  const sidebarContent = resolveModuleBySlot("sidebar");
-  const bottomLeftContent = resolveModuleBySlot("bottomLeft");
-  const bottomRightContent = resolveModuleBySlot("bottomRight");
-
   return (
     <div className="worker-me-canvas-grid">
       <div className="grid-area-main">
-        {mainContent || <div className="dashboard-card slot-main"><div className="main-panel"><p className="panel-desc">Loading onboarding module…</p></div></div>}
+        {renderActiveModule()}
       </div>
 
       <div className="grid-area-sidebar">
-        {sidebarContent || <div className="dashboard-card asleep-view sidebar-slot"><div className="card-header">••• SIDEBAR</div><span className="badge">Loading…</span></div>}
-      </div>
-
-      <div className="grid-area-bottom-left">
-        {bottomLeftContent || <div className="dashboard-card asleep-view bottomLeft-slot"><div className="card-header">••• BOTTOM LEFT</div><span className="badge">Loading…</span></div>}
-      </div>
-
-      <div className="grid-area-bottom-right">
-        {bottomRightContent || <div className="dashboard-card asleep-view bottomRight-slot"><div className="card-header">••• BOTTOM RIGHT</div><span className="badge">Loading…</span></div>}
+        {inactiveModules.map((mod) => (
+          <div key={mod.key} className="module-preview-wrapper">
+            {renderInactiveModule(mod)}
+          </div>
+        ))}
       </div>
 
       {renderMapModal()}

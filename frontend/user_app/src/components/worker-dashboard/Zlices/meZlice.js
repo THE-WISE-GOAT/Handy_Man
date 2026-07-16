@@ -71,7 +71,39 @@ export const createMeZlice = (set, get) => ({
   modalAddrText: "",
 
   // ==========================================
-  // 4. ACTIONS
+  // 4. EDITABLE PROFILE STATE
+  // ==========================================
+  editableProfile: {
+    job_category: "",
+    category_tag: "",
+    specialities: [],
+    specialized_tools_or_equipment: [],
+    years_experience: 0,
+    license_or_certification: "",
+    job_description: "",
+    emergency_available: false,
+    phone_number: "",
+    address_text: "",
+  },
+  isSavingProfile: false,
+  profileSaveMessage: null,
+
+  // ==========================================
+  // 5. USER BASE INFO STATE
+  // ==========================================
+  userProfile: {
+    firstName: "",
+    lastName: "",
+    email: "",
+    username: "",
+    id: null,
+  },
+  isEditingUserInfo: false,
+  isSavingUserInfo: false,
+  userInfoSaveMessage: null,
+
+  // ==========================================
+  // 6. ACTIONS
   // ==========================================
 
   setApplicantStage: (stage) => set({ applicantStage: stage }),
@@ -103,6 +135,15 @@ export const createMeZlice = (set, get) => ({
   setModalLat: (val) => set({ modalLat: val }),
   setModalLng: (val) => set({ modalLng: val }),
   setModalAddrText: (val) => set({ modalAddrText: val }),
+
+  setEditableProfile: (val) => set({ editableProfile: val }),
+  setIsSavingProfile: (val) => set({ isSavingProfile: val }),
+  setProfileSaveMessage: (val) => set({ profileSaveMessage: val }),
+
+  setUserProfile: (val) => set({ userProfile: val }),
+  setIsEditingUserInfo: (val) => set({ isEditingUserInfo: val }),
+  setIsSavingUserInfo: (val) => set({ isSavingUserInfo: val }),
+  setUserInfoSaveMessage: (val) => set({ userInfoSaveMessage: val }),
 
   addChatMessage: (text, sender = "user") =>
     set((state) => ({
@@ -208,7 +249,6 @@ export const createMeZlice = (set, get) => ({
         ],
       }));
 
-      // If interview completed, fetch the summary for live extraction
       if (data.is_complete) {
         get().fetchWorkerSummary();
       }
@@ -242,6 +282,23 @@ export const createMeZlice = (set, get) => ({
           isApplicantRejected: data.is_rejected,
           rejectionReason: data.rejection_reason,
         });
+
+        if (data.profile) {
+          set({
+            editableProfile: {
+              job_category: data.profile.job_category || "",
+              category_tag: data.profile.category_tag || "",
+              specialities: data.profile.specialities || [],
+              specialized_tools_or_equipment: data.profile.specialized_tools_or_equipment || [],
+              years_experience: data.profile.years_experience || 0,
+              license_or_certification: data.profile.license_or_certification || "",
+              job_description: data.profile.job_description || "",
+              emergency_available: data.profile.emergency_available || false,
+              phone_number: get().phoneNumber || "",
+              address_text: get().addressText || "",
+            },
+          });
+        }
       }
     } catch (error) {
       console.error("Failed to fetch worker summary:", error);
@@ -289,6 +346,106 @@ export const createMeZlice = (set, get) => ({
       console.error("Failed to submit application:", error);
     } finally {
       set({ isSubmittingApplication: false });
+    }
+  },
+
+  // Update worker profile (PATCH)
+  updateWorkerProfile: async () => {
+    const { workerId, editableProfile } = get();
+
+    if (!workerId) {
+      console.error("No worker_id found.");
+      return;
+    }
+
+    set({ isSavingProfile: true, profileSaveMessage: null });
+
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      const response = await fetch(
+        `http://127.0.0.1:8000/worker-onboarding/my-profile`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify(editableProfile),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Update failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      set({ profileSaveMessage: data.message || "Profile updated successfully." });
+    } catch (error) {
+      console.error("Failed to update worker profile:", error);
+      set({ profileSaveMessage: "Failed to update profile." });
+    } finally {
+      set({ isSavingProfile: false });
+    }
+  },
+
+  // Fetch current user base info
+  loadUserProfile: async () => {
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      const response = await fetch("http://127.0.0.1:8000/users/me", {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        set({
+          userProfile: {
+            firstName: data.firstName || data.first_name || "",
+            lastName: data.lastName || data.last_name || "",
+            email: data.email || "",
+            username: data.username || "",
+            id: data.id || null,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load user profile:", error);
+    }
+  },
+
+  // Update user base info (PUT /users/me)
+  updateUserProfile: async () => {
+    const { userProfile } = get();
+
+    set({ isSavingUserInfo: true, userInfoSaveMessage: null });
+
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      const response = await fetch("http://127.0.0.1:8000/users/me", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(userProfile),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Update failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      set({
+        userInfoSaveMessage: data.message || "User profile updated successfully.",
+        isEditingUserInfo: false,
+      });
+    } catch (error) {
+      console.error("Failed to update user profile:", error);
+      set({ userInfoSaveMessage: "Failed to update user profile." });
+    } finally {
+      set({ isSavingUserInfo: false });
     }
   },
 
