@@ -31,6 +31,7 @@ import requests, os
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema, job_manager, manager
+from src.core.router.matching_manager import create_matches_for_job
 from src.ai.customer_chat_analyser_nvidia import (
     _nvidia_client,          # shared NIM client — no second API key needed
     build_fresh_history,
@@ -418,6 +419,16 @@ async def complete_customer_chat(
         db.rollback()
         logger.error(f"Persistence failed: {e}")
         raise HTTPException(status_code=500, detail="Database update failed.")
+    
+    job = db.execute(
+        select(model.Job).where(model.Job.booking_chat_id == booking_chat_id)
+    ).scalar_one_or_none()
+
+    if job:
+        try:
+            create_matches_for_job(db, job)
+        except Exception as e:
+            logger.error(f"Semantic matching failed: {e}")
     
     category, _ = _extract_primary_category(job_data.categories or [])
     
