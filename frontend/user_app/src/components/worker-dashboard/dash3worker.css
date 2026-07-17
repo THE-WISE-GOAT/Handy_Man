@@ -10,7 +10,7 @@
   height: calc(100vh - 120px);
   padding: 16px;
   box-sizing: border-box;
-  background-color: #e5e5e5;
+  background-color: #0D0D0D;
 }
 
 .grid-area-main {
@@ -38,15 +38,15 @@
    2. SIMPLIFIED CARD CORE STYLES
    ========================================================================== */
 .dashboard-card {
-  background-color: #ffffff;
-  border: 2px solid #1a1a1a;
-  border-radius: 24px;
+  background-color: #1F1F1F;
+  border: 1px solid rgba(245, 245, 247, 0.14);
+  border-radius: 12px;
   width: 100%;
   display: flex;
   flex-direction: column;
   padding: 24px;
   box-sizing: border-box;
-  transition: transform 0.15s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .clickable {
@@ -54,15 +54,16 @@
 }
 
 .clickable:hover {
-  transform: scale(0.995);
-  background-color: #fafafa;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 107, 26, 0.3);
 }
 
 .card-header {
-  font-family: 'Courier New', monospace;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 0.75rem;
-  font-weight: bold;
-  color: #888888;
+  font-weight: 700;
+  color: #7A7A7A;
   margin-bottom: 12px;
   text-transform: uppercase;
 }
@@ -77,9 +78,9 @@
 }
 
 .module-preview:hover {
-  transform: scale(0.995);
-  background-color: #fafafa;
-  border-color: #333;
+  transform: translateY(-2px);
+  border-color: rgba(255, 107, 26, 0.4);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 
 .module-preview .main-panel {
@@ -92,7 +93,7 @@
 
 .module-preview .panel-desc {
   font-size: 0.85rem;
-  color: #555;
+  color: #7A7A7A;
   margin: 0;
 }
 
@@ -107,22 +108,24 @@
    4. INNER ELEMENT PRESENTATION WORKPLACE
    ========================================================================== */
 .main-panel h2 {
-  font-family: 'Courier New', monospace;
-  font-weight: 900;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 800;
   font-size: 1.8rem;
   margin: 0 0 8px 0;
+  color: #FFFFFF;
 }
 
 .main-panel h3 {
-  font-family: 'Courier New', monospace;
-  font-weight: 900;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 800;
   font-size: 1.2rem;
   margin: 0 0 8px 0;
+  color: #FFFFFF;
 }
 
 .panel-desc {
   font-size: 0.95rem;
-  color: #333333;
+  color: #7A7A7A;
   margin-bottom: 16px;
 }
 
@@ -136,26 +139,30 @@
 .badge {
   display: inline-block;
   padding: 10px 18px;
-  border: 2px solid #1a1a1a;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 14px;
   font-size: 0.85rem;
-  font-weight: bold;
-  background-color: #ffffff;
+  font-weight: 700;
+  background-color: rgba(31, 31, 31, 0.6);
   width: fit-content;
+  color: #F5F5F7;
 }
 
 .badge-highlight {
-  background-color: #fcfcfc;
+  background-color: rgba(255, 107, 26, 0.12);
+  color: #FF6B1A;
+  border-color: rgba(255, 107, 26, 0.3);
 }
 
 .badge--rejected {
-  background-color: #ffcccc;
-  color: #8b0000;
+  background-color: rgba(220, 53, 69, 0.15);
+  color: #ff6b6b;
+  border-color: rgba(220, 53, 69, 0.3);
 }
 
 .card-summary {
   font-size: 0.85rem;
-  color: #555555;
+  color: #7A7A7A;
   margin: 8px 0 0 4px;
 }
 
@@ -170,15 +177,16 @@
 }
 
 .start-interview-prompt h3 {
-  font-family: 'Courier New', monospace;
-  font-weight: 900;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 800;
   font-size: 1.3rem;
   margin: 0;
+  color: #FFFFFF;
 }
 
 .start-interview-prompt .panel-desc {
   max-width: 400px;
-  color: #555;
+  color: #7A7A7A;
 }
 
 /* ==========================================================================
@@ -194,19 +202,20 @@
 .turns-badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;
-  border: 1.5px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 6px;
   font-size: 0.72rem;
-  font-weight: bold;
-  background: #ffd700;
+  font-weight: 700;
+  background: rgba(255, 107, 26, 0.12);
+  color: #FF6B1A;
   margin-left: 0.5rem;
 }
 
 .chat-box {
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 8px;
   padding: 0.8rem;
-  background: #fafafa;
+  background: rgba(31, 31, 31, 0.4);
   min-height: 200px;
   max-height: 400px;
   overflow-y: auto;
@@ -221,19 +230,22 @@
 }
 
 .chat-msg--user {
-  background: #e8f0ff;
-  border-left: 3px solid #00008b;
+  background: rgba(59, 130, 246, 0.15);
+  border-left: 3px solid #3b82f6;
+  color: #F5F5F7;
 }
 
 .chat-msg--assistant {
-  background: #f0f0f0;
-  border-left: 3px solid #555;
+  background: rgba(31, 31, 31, 0.4);
+  border-left: 3px solid #7A7A7A;
+  color: #F5F5F7;
 }
 
 .chat-msg--system {
-  background: #fffbea;
-  border-left: 3px solid #ffd700;
+  background: rgba(255, 107, 26, 0.1);
+  border-left: 3px solid #FF6B1A;
   font-style: italic;
+  color: #F5F5F7;
 }
 
 .chat-form {
@@ -243,28 +255,34 @@
 
 .chat-form input {
   flex: 1;
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 6px;
   padding: 0.5rem;
   font: inherit;
   font-size: 0.85rem;
+  background: rgba(31, 31, 31, 0.4);
+  color: #FFFFFF;
 }
 
 .chat-btn {
   padding: 0.5rem 1rem;
-  border: 2px solid #000;
+  border: 1px solid #FF6B1A;
   border-radius: 6px;
-  background: #000;
-  color: #fff;
+  background: #FF6B1A;
+  color: #FFFFFF;
   font: inherit;
-  font-weight: bold;
+  font-weight: 700;
   cursor: pointer;
-  box-shadow: 2px 2px 0px #000;
+  transition: var(--fixfast-ease);
+}
+
+.chat-btn:hover {
+  background: #e85d14;
+  border-color: #e85d14;
 }
 
 .chat-btn:active {
   transform: translate(1px, 1px);
-  box-shadow: 1px 1px 0px #000;
 }
 
 .chat-btn:disabled {
@@ -283,10 +301,10 @@
 
 .extraction-panel,
 .location-panel {
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 245, 0.14);
   border-radius: 8px;
   padding: 0.8rem;
-  background: #fff;
+  background: rgba(31, 31, 31, 0.4);
 }
 
 .extraction-panel h3,
@@ -295,6 +313,7 @@
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  color: #FFFFFF;
 }
 
 .extracted-data {
@@ -309,16 +328,17 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.2rem 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(245, 245, 247, 0.06);
 }
 
 .extracted-label {
-  font-weight: bold;
+  font-weight: 700;
   text-transform: capitalize;
+  color: #F5F5F7;
 }
 
 .extracted-value {
-  color: var(--fixfast-muted, #5b6068);
+  color: #7A7A7A;
   text-align: right;
   word-break: break-word;
 }
@@ -334,62 +354,76 @@
   flex-direction: column;
   gap: 0.2rem;
   font-size: 0.78rem;
-  font-weight: bold;
+  font-weight: 700;
   text-transform: uppercase;
+  color: #F5F5F7;
 }
 
 .location-form input {
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 6px;
   padding: 0.4rem;
   font: inherit;
   font-size: 0.85rem;
+  background: rgba(31, 31, 31, 0.4);
+  color: #FFFFFF;
 }
 
 .location-form input[readonly] {
-  background: #f5f5f5;
+  background: rgba(31, 31, 31, 0.6);
   cursor: pointer;
 }
 
 .map-open-btn {
   padding: 0.5rem;
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 6px;
-  background: #e0f2fe;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
   font: inherit;
   font-size: 0.85rem;
-  font-weight: bold;
+  font-weight: 700;
   cursor: pointer;
-  box-shadow: 2px 2px 0px #000;
+  transition: var(--fixfast-ease);
+}
+
+.map-open-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .map-open-btn:active {
   transform: translate(1px, 1px);
-  box-shadow: 1px 1px 0px #000;
 }
 
 .submit-app-btn {
   padding: 0.7rem;
-  border: 2px solid #000;
+  border: 1px solid rgba(74, 222, 128, 0.3);
   border-radius: 8px;
-  background: #28a745;
-  color: #fff;
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
   font: inherit;
   font-size: 0.9rem;
-  font-weight: bold;
+  font-weight: 700;
   cursor: pointer;
-  box-shadow: 3px 3px 0px #000;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  transition: var(--fixfast-ease);
+}
+
+.submit-app-btn:hover {
+  background: rgba(74, 222, 128, 0.25);
+  border-color: rgba(74, 222, 128, 0.5);
 }
 
 .submit-app-btn:active {
   transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0px #000;
 }
 
 .submit-app-btn:disabled {
-  background: #ccc;
+  background: rgba(122, 122, 122, 0.15);
+  color: #7A7A7A;
+  border-color: rgba(122, 122, 122, 0.3);
   cursor: not-allowed;
 }
 
@@ -403,14 +437,14 @@
 }
 
 .profile-section {
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 12px;
   padding: 1rem;
-  background: #fff;
+  background: rgba(31, 31, 31, 0.4);
 }
 
 .profile-section--worker {
-  background: #fafafa;
+  background: rgba(31, 31, 31, 0.3);
 }
 
 .profile-section-header {
@@ -422,36 +456,43 @@
 
 .profile-section-header h3 {
   margin: 0;
-  font-family: 'Courier New', monospace;
-  font-weight: 900;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 800;
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: #FFFFFF;
 }
 
 .icon-btn {
   background: transparent;
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 8px;
   padding: 0.3rem 0.6rem;
   cursor: pointer;
   font-size: 0.85rem;
-  box-shadow: 2px 2px 0px #000;
+  transition: var(--fixfast-ease);
+  color: #F5F5F7;
+}
+
+.icon-btn:hover {
+  border-color: var(--fixfast-yellow);
+  color: var(--fixfast-yellow);
 }
 
 .icon-btn:active {
   transform: translate(1px, 1px);
-  box-shadow: 1px 1px 0px #000;
 }
 
 .icon-btn--cancel {
-  background: #ffcccc;
-  color: #8b0000;
+  background: rgba(220, 53, 69, 0.15);
+  color: #ff6b6b;
+  border-color: rgba(220, 53, 69, 0.3);
 }
 
 .badge--readonly {
-  background: #e0e0e0;
-  color: #333;
+  background: rgba(122, 122, 122, 0.2);
+  color: #7A7A7A;
   font-size: 0.72rem;
   padding: 0.2rem 0.5rem;
 }
@@ -473,14 +514,14 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.3rem 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(245, 245, 247, 0.06);
 }
 
 .profile-detail-label {
   font-size: 0.78rem;
-  font-weight: bold;
+  font-weight: 700;
   text-transform: uppercase;
-  color: #555;
+  color: #7A7A7A;
   flex-shrink: 0;
 }
 
@@ -488,10 +529,11 @@
   font-size: 0.85rem;
   text-align: right;
   word-break: break-word;
+  color: #F5F5F7;
 }
 
 .profile-detail-value--empty {
-  color: #999;
+  color: #7A7A7A;
   font-style: italic;
 }
 
@@ -509,17 +551,19 @@
 
 .profile-edit-form .profile-field label {
   font-size: 0.75rem;
-  font-weight: bold;
+  font-weight: 700;
   text-transform: uppercase;
-  color: #555;
+  color: #7A7A7A;
 }
 
 .profile-edit-form .profile-field input {
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 6px;
   padding: 0.4rem;
   font: inherit;
   font-size: 0.85rem;
+  background: rgba(31, 31, 31, 0.4);
+  color: #FFFFFF;
 }
 
 .profile-actions {
@@ -531,15 +575,15 @@
 
 .profile-save-message {
   font-size: 0.85rem;
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .profile-save-message--success {
-  color: #155724;
+  color: #4ade80;
 }
 
 .profile-save-message--error {
-  color: #721c24;
+  color: #ff6b6b;
 }
 
 /* ==========================================================================
@@ -555,25 +599,26 @@
 .status-badge {
   display: inline-block;
   padding: 0.4rem 0.8rem;
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 8px;
   font-size: 0.85rem;
-  font-weight: bold;
+  font-weight: 700;
   margin-top: 0.5rem;
 }
 
 .status-badge--review {
-  background: #fff3cd;
-  color: #856404;
+  background: rgba(255, 177, 0, 0.15);
+  color: #FF6B1A;
+  border-color: rgba(255, 177, 0, 0.3);
 }
 
 .rejection-reason-box {
   margin-top: 1rem;
   padding: 0.8rem;
-  border: 2px solid #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
   border-radius: 8px;
-  background: #fff5f5;
-  color: #721c24;
+  background: rgba(220, 53, 69, 0.1);
+  color: #ff6b6b;
   font-size: 0.85rem;
 }
 
@@ -632,18 +677,20 @@
 
 .profile-field label {
   font-size: 0.75rem;
-  font-weight: bold;
+  font-weight: 700;
   text-transform: uppercase;
-  color: #555;
+  color: #7A7A7A;
 }
 
 .profile-field input,
 .profile-field textarea {
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 6px;
   padding: 0.4rem;
   font: inherit;
   font-size: 0.85rem;
+  background: rgba(31, 31, 31, 0.4);
+  color: #FFFFFF;
   resize: vertical;
 }
 
@@ -659,15 +706,15 @@
 
 .profile-save-message {
   font-size: 0.85rem;
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .profile-save-message--success {
-  color: #155724;
+  color: #4ade80;
 }
 
 .profile-save-message--error {
-  color: #721c24;
+  color: #ff6b6b;
 }
 
 .status-badges {
@@ -680,25 +727,26 @@
 .status-badge {
   display: inline-block;
   padding: 0.4rem 0.8rem;
-  border: 2px solid #000;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 8px;
   font-size: 0.85rem;
-  font-weight: bold;
+  font-weight: 700;
   margin-top: 0.5rem;
 }
 
 .status-badge--review {
-  background: #fff3cd;
-  color: #856404;
+  background: rgba(255, 177, 0, 0.15);
+  color: #FF6B1A;
+  border-color: rgba(255, 177, 0, 0.3);
 }
 
 .rejection-reason-box {
   margin-top: 1rem;
   padding: 0.8rem;
-  border: 2px solid #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
   border-radius: 8px;
-  background: #fff5f5;
-  color: #721c24;
+  background: rgba(220, 53, 69, 0.1);
+  color: #ff6b6b;
   font-size: 0.85rem;
 }
 

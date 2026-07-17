@@ -10,14 +10,14 @@
   height: calc(100vh - 120px);
   padding: 16px;
   box-sizing: border-box;
-  background-color: #e5e5e5;
+  background-color: #0D0D0D;
 }
 
 .grid-main {
   grid-column: 1;
   grid-row: 1;
   display: flex;
-  min-width: 0; /* Enforces strict 1fr allocation boundary */
+  min-width: 0;
 }
 
 .grid-bottom {
@@ -38,18 +38,18 @@
    2. CARD SHELLS AND SLOTS
    ========================================================================== */
 .dashboard-card {
-  background-color: #ffffff;
-  border: 2px solid #1a1a1a;
-  border-radius: 24px;
+  background-color: #1F1F1F;
+  border: 1px solid rgba(245, 245, 247, 0.14);
+  border-radius: 12px;
   width: 100%;
   display: flex;
   flex-direction: column;
   padding: 25px;
   box-sizing: border-box;
-  transition: transform 0.15s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   padding-top: 18px;
   padding-left: 18px;
-  min-width: 0; /* Keeps card contained inside the grid layout track */
+  min-width: 0;
 }
 
 .clickable {
@@ -58,17 +58,18 @@
 
 .clickable:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 107, 26, 0.3);
 }
 
 button[name="emergency"] {
   margin-top: auto;
   align-self: center;
-  background: #e9e9ed;
+  background: rgba(220, 53, 69, 0.15);
   border-radius: 19px;
-  color: #ff9292;
+  color: #ff6b6b;
   width: 100%;
-  border: 3px dashed white;
+  border: 1px solid rgba(220, 53, 69, 0.3);
   font-variant: inherit;
   font-weight: inherit;
   font-stretch: inherit;
@@ -84,14 +85,20 @@ button[name="emergency"] {
   cursor: pointer;
   text-align: center;
   height: 10%;
+  transition: var(--fixfast-ease);
+}
+
+button[name="emergency"]:hover {
+  background: rgba(220, 53, 69, 0.25);
+  border-color: rgba(220, 53, 69, 0.5);
 }
 
 button[name="post"] {
   margin: 5px 0px 0px;
   align-self: center;
-  color: #40cd00;
+  color: #4ade80;
   border-radius: 19px;
-  border: medium dashed white;
+  border: 1px solid rgba(74, 222, 128, 0.3);
   width: 100%;
   font-style: inherit;
   font-variant: inherit;
@@ -109,6 +116,12 @@ button[name="post"] {
   cursor: pointer;
   text-align: center;
   height: 10%;
+  transition: var(--fixfast-ease);
+}
+
+button[name="post"]:hover {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.5);
 }
 
 .main-view {
@@ -117,12 +130,12 @@ button[name="post"] {
 }
 
 .main-view h2 {
-  font-family: 'Courier New', monospace;
-  font-weight: 1;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 800;
   font-size: 2rem;
   margin-top: -12px;
   letter-spacing: -0.05em;
-  color: #000000;
+  color: #FFFFFF;
   margin-left: -9px;
   margin-bottom: 0px;
 }
@@ -141,10 +154,10 @@ button[name="post"] {
    3. INTERNAL COMMON UTILITIES
    ========================================================================== */
 .card-header {
-  font-family: 'Courier New', monospace;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 0.8rem;
-  font-weight: bold;
-  color: #888888;
+  font-weight: 700;
+  color: #7A7A7A;
   margin-bottom: 16px;
   text-transform: uppercase;
 }
@@ -152,7 +165,7 @@ button[name="post"] {
 .card-flag {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #888888;
+  color: #7A7A7A;
   letter-spacing: 0.05em;
   margin-bottom: 4px;
 }
@@ -160,23 +173,24 @@ button[name="post"] {
 .badge {
   display: inline-block;
   padding: 10px 16px;
-  border: 1.5px solid #1a1a1a;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 12px;
   font-size: 0.85rem;
   font-weight: 700;
   width: fit-content;
-  background-color: #ffffff;
-  color: #1a1a1a;
+  background-color: rgba(31, 31, 31, 0.6);
+  color: #F5F5F7;
 }
 
 .badge-highlight {
-  background-color: #fcfcfc;
-  color: #000000;
+  background-color: rgba(255, 107, 26, 0.12);
+  color: #FF6B1A;
+  border-color: rgba(255, 107, 26, 0.3);
 }
 
 .card-summary {
   font-size: 0.85rem;
-  color: #555555;
+  color: #7A7A7A;
   margin: 12px 0 0 4px;
 }
 
@@ -192,7 +206,7 @@ button[name="post"] {
   font-family: inherit;
   font-size: 1.1rem;
   line-height: 1.6;
-  color: #1a1a1a;
+  color: #FFFFFF;
   outline: none;
   margin-top: -4px;
 }
@@ -200,10 +214,10 @@ button[name="post"] {
 .chat-box {
   flex: 1;
   overflow-y: auto;
-  border: 1.5px solid #1a1a1a;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 16px;
   padding: 16px;
-  background-color: #fafafa;
+  background-color: rgba(31, 31, 31, 0.4);
   margin-bottom: 16px;
   max-height: 350px;
 }
@@ -217,29 +231,38 @@ button[name="post"] {
   flex: 1;
   width: 100%;
   padding: 14px 20px;
-  border: 2px solid #1a1a1a;
+  border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 16px;
   font-size: 1rem;
   outline: none;
   box-sizing: border-box;
+  background: rgba(31, 31, 31, 0.4);
+  color: #FFFFFF;
 }
 
 .chat-btn {
   padding: 0 24px;
-  background-color: #1a1a1a;
-  color: #ffffff;
-  border: 2px solid #1a1a1a;
+  background-color: #FF6B1A;
+  color: #FFFFFF;
+  border: 1px solid #FF6B1A;
   border-radius: 16px;
   font-weight: bold;
   cursor: pointer;
+  transition: var(--fixfast-ease);
+}
+
+.chat-btn:hover {
+  background-color: #e85d14;
+  border-color: #e85d14;
 }
 
 .title {
   padding: 0px;
-  font-family: 'Courier New';
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 30px;
   margin-top: -8px;
-  text-shadow: 0.5px 0px 0px #000;
-  font-weight: 1;
+  text-shadow: 0.5px 0px 0px rgba(255, 255, 255, 0.1);
+  font-weight: 800;
   margin-bottom: 0px;
+  color: #FFFFFF;
 }

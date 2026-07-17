@@ -494,8 +494,8 @@ fetchedJobs,
                   position: "absolute",
                   left: "-5px",
                   zIndex: 10,
-                  background: "#000",
-                  color: "#fff",
+                  background: "#FF6B1A",
+                  color: "#FFFFFF",
                   border: "none",
                   borderRadius: "50%",
                   width: "22px",
@@ -601,8 +601,8 @@ fetchedJobs,
                   position: "absolute",
                   right: "-5px",
                   zIndex: 10,
-                  background: "#000",
-                  color: "#fff",
+                  background: "#FF6B1A",
+                  color: "#FFFFFF",
                   border: "none",
                   borderRadius: "50%",
                   width: "22px",
@@ -828,10 +828,10 @@ fetchedJobs,
         >
           <div
             style={{
-              background: "#ffffff",
-              border: "3px solid #000000",
+              background: "#1F1F1F",
+              border: "1px solid rgba(245, 245, 247, 0.14)",
               borderRadius: "16px",
-              boxShadow: "8px 8px 0px #000000",
+              boxShadow: "0 8px 16px rgba(0, 0, 0, 0.4)",
               width: "450px",
               maxWidth: "90%",
               padding: "20px",
@@ -875,26 +875,28 @@ fetchedJobs,
                   onChange={(e) => setModalSearchQuery(e.target.value)}
                   style={{
                     flex: 1,
-                    border: "2px solid #000000",
+                    border: "1px solid rgba(245, 245, 247, 0.14)",
                     borderRadius: "6px",
                     padding: "6px 10px",
                     outline: "none",
                     font: "inherit",
                     fontSize: "11px",
+                    background: "rgba(31, 31, 31, 0.4)",
+                    color: "#FFFFFF",
                   }}
                 />
                 <button
                   type="submit"
                   style={{
-                    background: "#000000",
-                    color: "#ffffff",
+                    background: "#FF6B1A",
+                    color: "#FFFFFF",
                     border: "none",
                     borderRadius: "6px",
                     padding: "0 12px",
                     font: "inherit",
                     fontSize: "11px",
                     fontWeight: "bold",
-                    cursor: "pointer",
+                    cursor: "pointer"
                   }}
                 >
                   FIND
@@ -907,8 +909,8 @@ fetchedJobs,
                 onClick={handleModalLiveTracking}
                 title="Snap to My Current Position"
                 style={{
-                  background: "#e0f2fe",
-                  border: "2px solid #000000",
+                  background: "rgba(59, 130, 246, 0.15)",
+                  border: "1px solid rgba(59, 130, 246, 0.3)",
                   borderRadius: "6px",
                   padding: "0 10px",
                   cursor: "pointer",
@@ -916,7 +918,6 @@ fetchedJobs,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "2px 2px 0px #000000",
                 }}
                 onMouseDown={(e) =>
                   (e.currentTarget.style.transform = "translate(1px, 1px)")
@@ -933,11 +934,10 @@ fetchedJobs,
               style={{
                 width: "100%",
                 height: "260px",
-                border: "2px solid #000000",
+                border: "1px solid rgba(245, 245, 247, 0.14)",
                 borderRadius: "8px",
-                background: "#f0f0f0",
+                background: "rgba(31, 31, 31, 0.4)",
                 position: "relative",
-                boxShadow: "inset 2px 2px 5px rgba(0,0,0,0.1)",
               }}
             />
 
@@ -945,13 +945,13 @@ fetchedJobs,
             <div
               style={{
                 fontSize: "11px",
-                background: "#f9f9f9",
+                background: "rgba(31, 31, 31, 0.4)",
                 padding: "8px",
-                border: "1px dashed #000",
+                border: "1px dashed rgba(245, 245, 247, 0.14)",
                 borderRadius: "6px",
               }}
             >
-              <strong style={{ color: "#333" }}>SELECTED ADDRESS:</strong>
+              <strong style={{ color: "#F5F5F7" }}>SELECTED ADDRESS:</strong>
               <div
                 style={{
                   textTransform: "uppercase",
@@ -973,14 +973,14 @@ fetchedJobs,
                 style={{
                   flex: 1,
                   padding: "8px",
-                  background: "#f0f0f0",
-                  border: "2px solid #000",
+                  background: "rgba(31, 31, 31, 0.4)",
+                  border: "1px solid rgba(245, 245, 247, 0.14)",
                   borderRadius: "8px",
                   font: "inherit",
                   fontSize: "13px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  boxShadow: "2px 2px 0px #000",
+                  color: "#F5F5F7",
                 }}
                 onMouseDown={(e) =>
                   (e.currentTarget.style.transform = "translate(2px, 2px)")
@@ -1003,15 +1003,14 @@ fetchedJobs,
                 style={{
                   flex: 1,
                   padding: "8px",
-                  background: "palegreen",
-                  border: "2px solid #000",
+                  background: "rgba(74, 222, 128, 0.15)",
+                  border: "1px solid rgba(74, 222, 128, 0.3)",
                   borderRadius: "8px",
                   font: "inherit",
                   fontSize: "13px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  boxShadow: "2px 2px 0px #000",
-                  color: "darkslategray",
+                  color: "#4ade80",
                 }}
                 onMouseDown={(e) =>
                   (e.currentTarget.style.transform = "translate(2px, 2px)")

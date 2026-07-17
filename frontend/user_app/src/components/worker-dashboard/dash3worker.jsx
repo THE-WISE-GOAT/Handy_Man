@@ -833,21 +833,21 @@ export default function Dash3Worker({ viewSlug }) {
     if (!isMapOpen) return null;
 
     return (
-      <div
-        style={{
-          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-          backgroundColor: "rgba(0, 0, 0, 0.4)", zIndex: 99999, display: "flex",
-          alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
-        }}
-      >
         <div
           style={{
-            background: "#ffffff", border: "3px solid #000000", borderRadius: "16px",
-            boxShadow: "8px 8px 0px #000000", width: "450px", maxWidth: "90%",
-            padding: "20px", display: "flex", flexDirection: "column", gap: "12px",
-            fontFamily: "inherit"
+            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+            backgroundColor: "rgba(0, 0, 0, 0.6)", zIndex: 99999, display: "flex",
+            alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
           }}
         >
+          <div
+            style={{
+              background: "#1F1F1F", border: "1px solid rgba(245, 245, 247, 0.14)", borderRadius: "16px",
+              boxShadow: "0 8px 16px rgba(0, 0, 0, 0.4)", width: "450px", maxWidth: "90%",
+              padding: "20px", display: "flex", flexDirection: "column", gap: "12px",
+              fontFamily: "inherit"
+            }}
+          >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
             <span style={{ fontWeight: "bold", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>
               🗺️ CHOOSE DELIVERY PIN (NEPAL)
@@ -862,14 +862,15 @@ export default function Dash3Worker({ viewSlug }) {
                 value={modalSearchQuery}
                 onChange={(e) => setModalSearchQuery(e.target.value)}
                 style={{
-                  flex: 1, border: "2px solid #000000", borderRadius: "6px",
-                  padding: "6px 10px", outline: "none", font: "inherit", fontSize: "11px"
+                  flex: 1, border: "1px solid rgba(245, 245, 247, 0.14)", borderRadius: "6px",
+                  padding: "6px 10px", outline: "none", font: "inherit", fontSize: "11px",
+                  background: "rgba(31, 31, 31, 0.4)", color: "#FFFFFF"
                 }}
               />
               <button
                 type="submit"
                 style={{
-                  background: "#000000", color: "#ffffff", border: "none",
+                  background: "#FF6B1A", color: "#FFFFFF", border: "none",
                   borderRadius: "6px", padding: "0 12px", font: "inherit",
                   fontSize: "11px", fontWeight: "bold", cursor: "pointer"
                 }}
@@ -882,11 +883,11 @@ export default function Dash3Worker({ viewSlug }) {
               type="button"
               onClick={handleModalLiveTracking}
               title="Snap to My Current Position"
-              style={{
-                background: "#e0f2fe", border: "2px solid #000000", borderRadius: "6px",
-                padding: "0 10px", cursor: "pointer", fontSize: "14px", display: "flex",
-                alignItems: "center", justifyContent: "center", boxShadow: "2px 2px 0px #000000"
-              }}
+                style={{
+                  background: "rgba(59, 130, 246, 0.15)", border: "1px solid rgba(59, 130, 246, 0.3)", borderRadius: "6px",
+                  padding: "0 10px", cursor: "pointer", fontSize: "14px", display: "flex",
+                  alignItems: "center", justifyContent: "center"
+                }}
               onMouseDown={(e) => e.currentTarget.style.transform = "translate(1px, 1px)"}
               onMouseUp={(e) => e.currentTarget.style.transform = "none"}
             >
@@ -897,14 +898,13 @@ export default function Dash3Worker({ viewSlug }) {
           <div
             ref={mapContainerRef}
             style={{
-              width: "100%", height: "260px", border: "2px solid #000000",
-              borderRadius: "8px", background: "#f0f0f0", position: "relative",
-              boxShadow: "inset 2px 2px 5px rgba(0,0,0,0.1)"
+              width: "100%", height: "260px", border: "1px solid rgba(245, 245, 247, 0.14)",
+              borderRadius: "8px", background: "rgba(31, 31, 31, 0.4)", position: "relative",
             }}
           />
 
-          <div style={{ fontSize: "11px", background: "#f9f9f9", padding: "8px", border: "1px dashed #000", borderRadius: "6px" }}>
-            <strong style={{ color: "#333" }}>SELECTED ADDRESS:</strong>
+          <div style={{ fontSize: "11px", background: "rgba(31, 31, 31, 0.4)", padding: "8px", border: "1px dashed rgba(245, 245, 247, 0.14)", borderRadius: "6px" }}>
+            <strong style={{ color: "#F5F5F7" }}>SELECTED ADDRESS:</strong>
             <div style={{ textTransform: "uppercase", marginTop: "2px", fontWeight: "bold", wordBreak: "break-word" }}>
               {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
             </div>
@@ -914,11 +914,11 @@ export default function Dash3Worker({ viewSlug }) {
             <button
               type="button"
               onClick={() => setIsMapOpen(false)}
-              style={{
-                flex: 1, padding: "8px", background: "#f0f0f0", border: "2px solid #000",
-                borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                cursor: "pointer", boxShadow: "2px 2px 0px #000"
-              }}
+                style={{
+                  flex: 1, padding: "8px", background: "rgba(31, 31, 31, 0.4)", border: "1px solid rgba(245, 245, 247, 0.14)",
+                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
+                  cursor: "pointer", color: "#F5F5F7"
+                }}
               onMouseDown={(e) => e.currentTarget.style.transform = "translate(2px, 2px)"}
               onMouseUp={(e) => e.currentTarget.style.transform = "none"}
             >
@@ -928,11 +928,11 @@ export default function Dash3Worker({ viewSlug }) {
             <button
               type="button"
               onClick={confirmMapLocation}
-              style={{
-                flex: 1, padding: "8px", background: "palegreen", border: "2px solid #000",
-                borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                cursor: "pointer", boxShadow: "2px 2px 0px #000", color: "darkslategray"
-              }}
+                style={{
+                  flex: 1, padding: "8px", background: "rgba(74, 222, 128, 0.15)", border: "1px solid rgba(74, 222, 128, 0.3)",
+                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
+                  cursor: "pointer", color: "#4ade80"
+                }}
               onMouseDown={(e) => e.currentTarget.style.transform = "translate(2px, 2px)"}
               onMouseUp={(e) => e.currentTarget.style.transform = "none"}
             >

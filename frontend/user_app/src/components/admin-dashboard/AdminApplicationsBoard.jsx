@@ -243,21 +243,21 @@ export default function AdminApplicationsBoard({ viewSlug }) {
 
       {/* Reject Modal */}
       {rejectTarget && (
-        <div
-          style={{
-            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-            backgroundColor: "rgba(0, 0, 0, 0.5)", zIndex: 99999, display: "flex",
-            alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
-          }}
-        >
           <div
             style={{
-              background: "#ffffff", border: "3px solid #000000", borderRadius: "16px",
-              boxShadow: "8px 8px 0px #000000", width: "400px", maxWidth: "90%",
-              padding: "24px", display: "flex", flexDirection: "column", gap: "12px",
-              fontFamily: "inherit"
+              position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+              backgroundColor: "rgba(0, 0, 0, 0.6)", zIndex: 99999, display: "flex",
+              alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
             }}
           >
+            <div
+              style={{
+                background: "#1F1F1F", border: "1px solid rgba(245, 245, 247, 0.14)", borderRadius: "16px",
+                boxShadow: "0 8px 16px rgba(0, 0, 0, 0.4)", width: "400px", maxWidth: "90%",
+                padding: "24px", display: "flex", flexDirection: "column", gap: "12px",
+                fontFamily: "inherit"
+              }}
+            >
             <h3 style={{ margin: 0 }}>Reject Application</h3>
             <p style={{ margin: 0, fontSize: "0.85rem" }}>
               Rejecting application from <strong>{rejectTarget.username}</strong>.
@@ -269,8 +269,9 @@ export default function AdminApplicationsBoard({ viewSlug }) {
               placeholder="Enter rejection reason..."
               rows={4}
               style={{
-                width: "100%", border: "2px solid #000", borderRadius: "8px",
-                padding: "10px", font: "inherit", fontSize: "0.85rem", resize: "vertical"
+                width: "100%", border: "1px solid rgba(245, 245, 247, 0.14)", borderRadius: "8px",
+                padding: "10px", font: "inherit", fontSize: "0.85rem", resize: "vertical",
+                background: "rgba(31, 31, 31, 0.4)", color: "#FFFFFF"
               }}
             />
             <div style={{ display: "flex", gap: "10px" }}>
@@ -278,9 +279,9 @@ export default function AdminApplicationsBoard({ viewSlug }) {
                 type="button"
                 onClick={() => { setRejectTarget(null); setRejectReason(""); }}
                 style={{
-                  flex: 1, padding: "10px", background: "#f0f0f0", border: "2px solid #000",
+                  flex: 1, padding: "10px", background: "rgba(31, 31, 31, 0.4)", border: "1px solid rgba(245, 245, 247, 0.14)",
                   borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer"
+                  cursor: "pointer", color: "#F5F5F7"
                 }}
               >
                 Cancel
@@ -290,9 +291,9 @@ export default function AdminApplicationsBoard({ viewSlug }) {
                 onClick={handleRejectConfirm}
                 disabled={!rejectReason.trim() || actionLoading === `reject-${rejectTarget.id}`}
                 style={{
-                  flex: 1, padding: "10px", background: "#ffcccc", border: "2px solid #000",
+                  flex: 1, padding: "10px", background: "rgba(220, 53, 69, 0.15)", border: "1px solid rgba(220, 53, 69, 0.3)",
                   borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer"
+                  cursor: "pointer", color: "#ff6b6b"
                 }}
               >
                 {actionLoading === `reject-${rejectTarget.id}` ? "Rejecting..." : "Confirm Reject"}

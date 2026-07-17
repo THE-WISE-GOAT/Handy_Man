@@ -9,10 +9,10 @@ function FullScreenLoader() {
         minHeight: "100vh",
         display: "grid",
         placeItems: "center",
-        background: "#f4f7f6",
+        background: "#0D0D0D",
       }}
     >
-      <div style={{ fontFamily: "monospace", color: "#333" }}>
+      <div style={{ fontFamily: "monospace", color: "#F5F5F7" }}>
         Checking session...
       </div>
     </div>

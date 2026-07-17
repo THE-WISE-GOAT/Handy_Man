@@ -260,9 +260,9 @@ const profile = await login({
                     marginTop: '1rem',
                     padding: '12px 14px',
                     borderRadius: '8px',
-                    backgroundColor: statusType === 'success' ? '#eafaf1' : '#eee',
-                    color: statusType === 'success' ? '#27ae60' : '#333',
-                    borderLeft: statusType === 'success' ? 'none' : '5px solid #dc3545',
+                    backgroundColor: statusType === 'success' ? 'rgba(74, 222, 128, 0.15)' : 'rgba(220, 53, 69, 0.1)',
+                    color: statusType === 'success' ? '#4ade80' : '#ff6b6b',
+                    borderLeft: statusType === 'success' ? '3px solid #4ade80' : '3px solid #ff6b6b',
                     textAlign: statusType === 'success' ? 'center' : 'left',
                     lineHeight: '1.5',
                     gridColumn: '1 / -1'

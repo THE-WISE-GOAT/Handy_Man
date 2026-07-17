@@ -215,14 +215,14 @@ export default function AppLayout({ role = "customer" }) {
         {joinError && (
           <div style={{
             position: "fixed", top: "1rem", right: "1rem", zIndex: 99999,
-            background: "#ffcccc", border: "2px solid #dc3545", borderRadius: "8px",
-            padding: "0.8rem 1rem", maxWidth: "400px", font: "inherit", fontSize: "0.85rem"
+            background: "rgba(220, 53, 69, 0.15)", border: "1px solid rgba(220, 53, 69, 0.3)", borderRadius: "8px",
+            padding: "0.8rem 1rem", maxWidth: "400px", font: "inherit", fontSize: "0.85rem", color: "#ff6b6b"
           }}>
             <strong>Error:</strong> {joinError}
             <button
               type="button"
               onClick={() => setJoinError("")}
-              style={{ marginLeft: "0.8rem", border: "none", background: "transparent", cursor: "pointer", fontWeight: "bold" }}
+              style={{ marginLeft: "0.8rem", border: "none", background: "transparent", cursor: "pointer", fontWeight: "bold", color: "#ff6b6b" }}
             >
               ✕
             </button>
