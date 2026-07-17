@@ -13,7 +13,6 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 
-// Fix for default Leaflet icon paths in React + Vite
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl,
@@ -21,7 +20,31 @@ L.Icon.Default.mergeOptions({
   shadowUrl,
 });
 
-// Helper component to smoothly center the map when job coordinates change
+// --- CUSTOM SVG WORKER ICONS ---
+
+const personSvg = `
+  <svg viewBox="0 0 24 24" fill="currentColor" width="30px" height="30px">
+    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+  </svg>
+`;
+
+const staticWorkerIcon = L.divIcon({
+  className: 'custom-worker-icon',
+  html: `<div style="color: #7300ff; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -15]
+});
+
+const blinkingWorkerIcon = L.divIcon({
+  className: 'custom-worker-icon blinking-red-icon',
+  html: `<div style="display: flex; justify-content: center; align-items: center;">${personSvg}</div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -15]
+});
+
+
 const MapUpdater = ({ center }) => {
   const map = useMap();
   useEffect(() => {
@@ -40,7 +63,9 @@ const Card = ({ slug, title, position, onSelect, children }) => {
       onClick={!isMain ? () => onSelect(slug) : undefined}
     >
       <div className="card-header">••• {title}</div>
-      {children}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {children}
+      </div>
     </div>
   );
 };
@@ -51,29 +76,23 @@ export default function Dash2Board({ viewSlug }) {
     postingsSlots,
     swapPostingsSlots,
     biddingsStream,
-    feedbackRating,
-    pipelineStatus,
     pendingJobs,
     selectedJob,
     setSelectedJob,
     fetchPendingJobs,
     
-    // NOTE: Removed global matchedCount/interestedCount from here
-    // as they are now mapped directly onto the job objects.
+    matchedWorkersMap,
+    workerLocations,          // Extracted coordinates map
+    toggleWorkerInterest,     // Extracted for testing the animation
 
-    // --- COMMENTED OUT MATCHING STATE & ACTIONS ---
-    // matchedWorkers,
-    // fetchMatchedWorkers, 
     selectedWorkerId,
     setSelectedWorkerId
   } = useCustomerDashboardData();
 
-  // ── INITIAL DATA FETCH ──
   useEffect(() => {
     fetchPendingJobs();
   }, [fetchPendingJobs]);
 
-  // Route state synchronization layer
   useEffect(() => {
     if (!viewSlug) return;
     if (postingsSlots.main !== viewSlug) {
@@ -86,25 +105,15 @@ export default function Dash2Board({ viewSlug }) {
     navigate(`/customer/postings/${targetSlug}`);
   };
 
-  // ====================================================
-  // SUB-MODULE RENDERS
-  // ====================================================
-
   const renderBiddingsEngine = (position) => (
     <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position} onSelect={handleModuleSelect}>
       {position === "main" ? (
-        <div className="main-panel">
-          <h2>ACTIVE BIDDINGS ENGINE</h2>
-          <h3 style={{ color: "#007bff" }}>
+        <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <h2 style={{ flexShrink: 0 }}>ACTIVE BIDDINGS ENGINE</h2>
+          <h3 style={{ color: "#010509", flexShrink: 0 }}>
             Bids for job: {selectedJob ? selectedJob.title : "No Job Selected"}
           </h3>
-          {selectedWorkerId && (
-            <h4 style={{ color: "#ff5722", margin: "5px 0 15px 0" }}>
-              Focusing Worker ID: {selectedWorkerId}
-            </h4>
-          )}
-          <p className="panel-desc">Active incoming competitive service offers and rate valuation streams.</p>
-          <div className="bids-box">
+          <div className="bids-box" style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginTop: '10px' }}>
             {biddingsStream.map(bid => (
               <div key={bid.id} className="bid-row">
                 <span><strong>{bid.provider}</strong>: {bid.offer}</span>
@@ -120,7 +129,6 @@ export default function Dash2Board({ viewSlug }) {
              <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
              <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
              <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
-             {selectedWorkerId && <p className="card-summary" style={{color: "#ff5722"}}>Focus: Worker #{selectedWorkerId}</p>}
            </>
           ) : (
             <span className="badge">Footer Slot: Bids for {selectedJob?.title || "N/A"}</span>
@@ -135,34 +143,81 @@ export default function Dash2Board({ viewSlug }) {
       ? [parseFloat(selectedJob.latitude), parseFloat(selectedJob.longitude)]
       : [27.7172, 85.3240];
 
+    // Safely pull matched array mapped to current job to pinpoint network coordinates
+    const currentWorkers = selectedJob && matchedWorkersMap[selectedJob.id] 
+      ? matchedWorkersMap[selectedJob.id] 
+      : [];
+
     return (
       <Card slug="GeospatialLiveMap" title="GEOSPATIAL LIVE MAP" position={position} onSelect={handleModuleSelect}>
+        
+        {/* CSS Keyframes for the blinking red effect */}
+        <style>
+          {`
+            @keyframes blinkRedIcon {
+              0% { color: #f44336; transform: scale(1); filter: drop-shadow(0 0 2px rgba(244,67,54,0.6)); }
+              50% { color: #ff7961; transform: scale(1.3); filter: drop-shadow(0 0 10px rgba(244,67,54,1)); }
+              100% { color: #f44336; transform: scale(1); filter: drop-shadow(0 0 2px rgba(244,67,54,0.6)); }
+            }
+            .blinking-red-icon div {
+              animation: blinkRedIcon 1.2s infinite ease-in-out;
+            }
+          `}
+        </style>
+
         {position === "main" ? (
-          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <h2>GEOSPATIAL ENGINE FULL DISPLAY</h2>
-            
-            <div style={{ flex: 1, minHeight: '300px', borderRadius: '12px', overflow: 'hidden', marginTop: '10px' }}>
-              <MapContainer 
-                center={centerPoint} 
-                zoom={13} 
-                style={{ height: '100%', width: '100%' }}
-              >
+          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <h2 style={{ flexShrink: 0 }}>GEOSPATIAL ENGINE FULL DISPLAY</h2>
+            <div style={{ flex: 1, minHeight: 0, borderRadius: '12px', overflow: 'hidden', marginTop: '10px' }}>
+              <MapContainer center={centerPoint} zoom={13} style={{ height: '100%', width: '100%' }}>
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 />
-                
                 <MapUpdater center={centerPoint} />
-
-                {/* Job Location Marker */}
+                
+                {/* 1. Job Location Marker */}
                 {selectedJob && selectedJob.latitude && (
                   <Marker position={centerPoint}>
-                    <Popup>
-                      <strong>{selectedJob.title}</strong><br/>
-                      Job Location
-                    </Popup>
+                    <Popup><strong>{selectedJob.title}</strong><br/>Job Location</Popup>
                   </Marker>
                 )}
+
+                {/* 2. Worker Location Markers */}
+                {currentWorkers.map(worker => {
+                  const locInfo = workerLocations[worker.worker_chat_id];
+                  
+                  if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
+                  
+                  const workerPos = [locInfo.latitude, locInfo.longitude];
+                  const iconToUse = locInfo.is_interested ? blinkingWorkerIcon : staticWorkerIcon;
+
+                  return (
+                    <Marker key={`map-worker-${worker.worker_chat_id}`} position={workerPos} icon={iconToUse}>
+                      <Popup>
+                        <div style={{ textAlign: 'center' }}>
+                          <strong>{worker.username}</strong><br/>
+                          Match Score: {worker.match_score}%<br/>
+                          <button 
+                            onClick={() => toggleWorkerInterest(worker.worker_chat_id)}
+                            style={{ 
+                              marginTop: '8px', 
+                              padding: '4px 8px', 
+                              backgroundColor: '#007bff', 
+                              color: '#fff', 
+                              border: 'none', 
+                              borderRadius: '4px',
+                              cursor: 'pointer' 
+                            }}
+                          >
+                            Toggle Interest (Test)
+                          </button>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+
               </MapContainer>
             </div>
           </div>
@@ -171,9 +226,8 @@ export default function Dash2Board({ viewSlug }) {
             {position === "sidebar" ? (
               <>
                 <span className="badge badge-highlight">Sidebar: GPS Map Node Tracker</span>
-                <p className="card-summary">
-                  Lat: {selectedJob?.latitude || "N/A"} | Lng: {selectedJob?.longitude || "N/A"}
-                </p>
+                <p className="card-summary">Lat: {selectedJob?.latitude || "N/A"} | Lng: {selectedJob?.longitude || "N/A"}</p>
+                <p className="card-summary">Workers Rendered: {currentWorkers.length}</p>
               </>
             ) : (
               <span className="badge">Footer Slot: Map Tracking Active</span>
@@ -184,40 +238,105 @@ export default function Dash2Board({ viewSlug }) {
     );
   };
 
-  const renderReviewLogs = (position) => (
-    <Card slug="RatingsReviewLogs" title="RATINGS & REVIEW LOGS" position={position} onSelect={handleModuleSelect}>
-      {position === "main" ? (
-        <div className="main-panel">
-          <h2>VERIFIED FEEDBACK HISTORY LOGS</h2>
-          <h3 style={{ color: "#007bff" }}>
-            Reviews for job: {selectedJob ? selectedJob.title : "No Job Selected"}
-          </h3>
-          {selectedWorkerId && (
-            <h4 style={{ color: "#ff5722", margin: "5px 0 15px 0" }}>
-              Viewing records for Worker ID: {selectedWorkerId}
-            </h4>
-          )}
-        </div>
-      ) : (
-        <div className="preview-panel">
-          {position === "sidebar" ? (
-            <>
-              <span className="badge badge-highlight">Sidebar: Feedback Monitoring</span>
-              <p className="card-summary">Live Score Rating: {feedbackRating}</p>
-              <p className="card-summary">For: {selectedJob?.title || "N/A"}</p>
-            </>
-          ) : (
-            <span className="badge">Footer Slot: Reviews for {selectedJob?.title || "N/A"}</span>
-          )}
-        </div>
-      )}
-    </Card>
-  );
+  const renderReviewLogs = (position) => {
+    const currentWorkers = selectedJob && matchedWorkersMap[selectedJob.id] 
+      ? matchedWorkersMap[selectedJob.id] 
+      : [];
+
+    return (
+      <Card slug="RatingsReviewLogs" title="MATCHED PROFESSIONALS LOGS" position={position} onSelect={handleModuleSelect}>
+        {position === "main" ? (
+          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <h2 style={{ flexShrink: 0 }}>QUALIFIED WORKER NETWORK</h2>
+            
+            <h3 style={{ color: "#000000", flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>Matched Profiles For: {selectedJob ? selectedJob.title : "No Job Selected"}</span>
+              
+              {selectedJob?.matchCategory && (
+                <span style={{ 
+                  fontSize: '0.65em', 
+                  backgroundColor: selectedJob.matchedByCategory ? 'rgba(235, 244, 235, 0.15)' : 'rgba(255, 152, 0, 0.15)', 
+                  color: selectedJob.matchedByCategory ? '#4CAF50' : '#ff9800', 
+                  padding: '4px 8px', 
+                  borderRadius: '4px',
+                  border: `1px solid ${selectedJob.matchedByCategory ? '#4CAF50' : '#ff9800'}`
+                }}>
+                  {selectedJob.matchedByCategory 
+                    ? `Category Match: ${selectedJob.matchCategory}` 
+                    : `Semantic Radius Fallback`}
+                </span>
+              )}
+            </h3>
+
+            <div style={{ 
+              flex: 1, 
+              overflowY: 'scroll',
+              maxHeight: '23vw',
+              minHeight: 0, 
+              marginTop: '15px', 
+              paddingRight: '10px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '12px' 
+            }}>
+              {currentWorkers.length === 0 ? (
+                <p style={{ opacity: 0.7 }}>No professionals matched yet or scanning network...</p>
+              ) : (
+                currentWorkers.map(worker => (
+                  <div key={worker.worker_chat_id} style={{
+                    border: '1px solid #444',
+                    borderRadius: '8px',
+                    padding: '15px',
+                    backgroundColor: '#dbddda', 
+                    boxShadow: '0 2px 4px rgb(0, 0, 0)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <strong style={{ fontSize: '1.1em', color: '#090f09' }}>{worker.username}</strong>
+                      <span style={{ fontSize: '0.85em', color: '#0a0707af', border: '1px solid #555', padding: '2px 6px', borderRadius: '4px' }}>
+                        ID: {worker.worker_chat_id}
+                      </span>
+                    </div>
+
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: '#010201', fontStyle: 'italic', lineHeight: '1.4' }}>
+                      "{worker.job_description}"
+                    </p>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', fontSize: '0.85em' }}>
+                      <span style={{ 
+                        backgroundColor: 'rgba(0, 123, 255, 0.2)', 
+                        color: '#4db8ff', 
+                        padding: '4px 8px', 
+                        borderRadius: '4px',
+                        fontWeight: 'bold' 
+                      }}>
+                        Vector Match Score: {worker.match_score}%
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="preview-panel">
+            {position === "sidebar" ? (
+              <>
+                <span className="badge badge-highlight">Sidebar: Network Discovery</span>
+                <p className="card-summary">Scanning: {selectedJob?.title || "N/A"}</p>
+                <p className="card-summary">Available Matches: {currentWorkers.length}</p>
+              </>
+            ) : (
+              <span className="badge">Footer Slot: Matches for {selectedJob?.title || "N/A"}</span>
+            )}
+          </div>
+        )}
+      </Card>
+    );
+  };
 
   const renderPostsDashboard = (position) => (
     <Card slug="ActivePostsDashboard" title="ACTIVE POSTS DASHBOARD" position={position} onSelect={handleModuleSelect}>
       
-      {/* ADDED INLINE STYLE FOR BLINKING DOT */}
       <style>
         {`
           @keyframes blinkDot {
@@ -229,17 +348,32 @@ export default function Dash2Board({ viewSlug }) {
             animation: blinkDot 1.5s infinite ease-in-out;
             width: 8px;
             height: 8px;
-            background-color: #f44336; /* Red */
+            background-color: #f44336;
             border-radius: 50%;
             display: inline-block;
           }
+          ::-webkit-scrollbar { width: 8px; }
+          ::-webkit-scrollbar-track { background: transparent; }
+          ::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
+          ::-webkit-scrollbar-thumb:hover { background-color: #777; }
         `}
       </style>
 
       {position === "main" ? (
-        <div className="main-panel">
-          <h2>ACTIVE POSTS PIPELINE NETWORK</h2>
-          <div className="jobs-selector-list" style={{ marginTop: '20px' }}>
+        <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <h2 style={{ flexShrink: 0 }}>ACTIVE POSTS PIPELINE NETWORK</h2>
+          
+          <div className="jobs-selector-list" style={{ 
+            flex: 1, 
+            overflowY: 'scroll',
+            maxHeight: '23vw',
+            minHeight: 0,
+            marginTop: '20px', 
+            paddingRight: '10px', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '12px' 
+          }}>
             {pendingJobs.length === 0 ? (
               <p>No pending jobs found.</p>
             ) : (
@@ -255,7 +389,6 @@ export default function Dash2Board({ viewSlug }) {
                     style={{
                       border: isActive ? '2px solid #4CAF50' : '1px solid #555',
                       padding: '15px',
-                      margin: '10px 0',
                       cursor: 'pointer',
                       backgroundColor: isActive ? '#e8f5e9' : 'transparent',
                       color: isActive ? '#000' : 'inherit',
@@ -263,34 +396,19 @@ export default function Dash2Board({ viewSlug }) {
                       transition: 'all 0.2s ease-in-out'
                     }}
                   >
-                    {/* NEW: JOB-SPECIFIC WORKER & INTEREST METRICS ABOVE TITLE */}
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '20px', 
-                      marginBottom: '8px', 
-                      fontSize: '0.85em', 
-                      fontWeight: 'bold' 
-                    }}>
-                      
-                      {/* Matched Professionals Indicator */}
+                    <div style={{ display: 'flex', gap: '20px', marginBottom: '8px', fontSize: '0.85em', fontWeight: 'bold' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#555' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                         </svg>
-                        {/* Pulling the count specific to this job from the mapped array */}
                         <span>{job.matchedCount || 0} matched professionals</span>
                       </div>
-
-                      {/* Interested Workers Indicator */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#d32f2f' }}>
                         <span className="status-indicator-dot"></span>
-                        {/* Pulling the count specific to this job from the mapped array */}
                         <span>{job.interestedCount || 0} interested</span>
                       </div>
-                      
                     </div>
 
-                    {/* Original Job Title & Description */}
                     <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
                     <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
                   </div>

@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 import requests, os
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
-from src.core import model, schema, job_manager
+from src.core import model, schema, job_manager, manager
 from src.ai.customer_chat_analyser_nvidia import (
     _nvidia_client,          # shared NIM client — no second API key needed
     build_fresh_history,
@@ -308,7 +308,7 @@ def _get_address_from_coords(lat: float, lng: float) -> str:
     "/{booking_chat_id}/complete",
     summary="Complete the AI chat, extract job explained keys, generate embedding, and save to DB",
 )
-def complete_customer_chat(
+async def complete_customer_chat(
     booking_chat_id: int, 
     payload: schema.CompleteChatIn, 
     db: Session = Depends(get_db), 
@@ -419,7 +419,36 @@ def complete_customer_chat(
         logger.error(f"Persistence failed: {e}")
         raise HTTPException(status_code=500, detail="Database update failed.")
     
-    return {"status": "success", "message": "Job created and vectorized successfully."}
+    #fix no repeated searches
+    
+# ... (After db.commit() inside complete_customer_chat)
+    
+    # 1. Fetch matched workers dynamically
+    # We use the embedding_vector and location already generated in this function
+    matches = _search_workers(
+        db,
+        query_vector=embedding_vector,
+        customer_location=wkt_point,
+        category_tag=None, # Send to all relevant categories or filter by primary category
+        radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
+        limit=5,
+    )
+    
+    # 2. Extract IDs for the notification
+    # 'matches' returns (model.WorkerProfile, username, distance)
+    worker_ids = [worker.worker_chat_id for worker, _, _ in matches]
+    
+    # 3. Notify
+    job_payload = {
+        "booking_chat_id": booking_chat_id,
+        "title": payload.title,
+        "description": job_desc
+    }
+    
+    for worker_id in worker_ids:
+        await manager.send_job_notification(worker_id, job_payload)
+
+    return {"status": "success", "message": "Job created and dispatched to matched workers."}
 
 
 # ── 3. Retrieve conversation history ─────────────────────────────────────────
@@ -513,184 +542,44 @@ def get_booking_summary(
     }
 
 
-# # ── Helper: pick the primary category ────────────────────────────────────────
-
-# def _select_primary_category(categories: list[dict]) -> tuple[str | None, bool]:
-#     """
-#     Pick the primary (most central) trade from the customer's extracted
-#     categories and report whether it came from the static registry or
-#     the AI fallback.
-
-#     categories is ordered most-central-trade-first (see BookingSummaryOut
-#     docstring), so the first entry is authoritative for filtering.
-
-#     Returns (category_name, is_custom). category_name is None if the
-#     customer has no extracted categories at all.
-#     """
-#     if not categories:
-#         return None, False
-#     top = categories[0]
-#     return top.get("category"), bool(top.get("is_custom_category", False))
-
-
-# # ── Helper: cosine-similarity worker search ──────────────────────────────────
-
-# def _vector_search_workers(
-#     db: Session,
-#     query_vector: list[float],
-#     category: str | None,
-#     limit: int = 5,
-# ):
-#     """
-#     Rank WorkerProfile rows by cosine distance against `query_vector`.
-
-#     If `category` is given, restricts the candidate pool to workers whose
-#     job_category OR category_tag matches it (case-insensitive) before
-#     ranking — the "category found" fast path. If `category` is None,
-#     ranks across every eligible worker — the semantic-only fallback.
-
-#     Only considers workers who finished vetting, weren't rejected, and
-#     actually have an embedding to compare against.
-
-#     Returns a list of (WorkerProfile, username, cosine_distance) rows,
-#     closest first.
-#     """
-#     distance = model.WorkerProfile.description_vector.cosine_distance(query_vector)
-
-#     stmt = (
-#         select(model.WorkerProfile, model.User.username, distance.label("distance"))
-#         .join(model.User, model.User.id == model.WorkerProfile.user_id)
-#         .where(
-#             model.WorkerProfile.description_vector.isnot(None),
-#             model.WorkerProfile.is_complete.is_(True),
-#             model.WorkerProfile.is_rejected.is_(False),
-#         )
-#     )
-
-#     if category:
-#         stmt = stmt.where(
-#             or_(
-#                 func.lower(model.WorkerProfile.job_category) == category.lower(),
-#                 func.lower(model.WorkerProfile.category_tag) == category.lower(),
-#             )
-#         )
-
-#     stmt = stmt.order_by(distance).limit(limit)
-#     return db.execute(stmt).all()
-
-
-
-# @match_router.get(
-#     "/match/{booking_chat_id}/find-help",
-#     response_model=schema.FindHelpOut,
-#     summary="Find the top 5 matching workers for a completed job request",
-# )
-# def find_help(
-#     booking_chat_id: int,
-#     db: Session = Depends(get_db),
-#     current_user: model.User = Depends(get_current_user),
-# ):
-#     # ── SHIFTED DATA SOURCE: Now pulling from the live Jobs table ──
-#     job_data = db.execute(
-#         select(model.Job).where(
-#             model.Job.booking_chat_id == booking_chat_id,
-#             model.Job.customer_id == current_user.id,
-#         )
-#     ).scalar_one_or_none()
-
-#     if not job_data:
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail="No operational job data found for this booking_chat_id. "
-#                    "Call POST /dispatch/{booking_chat_id}/complete first.",
-#         )
-
-#     if job_data.description_vector is None:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="This job has no embedding yet — cannot search for workers.",
-#         )
-
-#     if not job_data.is_job_request:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="This chat session was not a dispatchable job request.",
-#         )
-
-#     category, is_custom = _select_primary_category(job_data.categories or [])
-#     used_category_filter = bool(category) and not is_custom
-
-#     matches = []
-#     if used_category_filter:
-#         matches = _vector_search_workers(
-#             db, job_data.description_vector, category=category, limit=5,
-#         )
-
-#     if not matches:
-#         used_category_filter = False
-#         matches = _vector_search_workers(
-#             db, job_data.description_vector, category=None, limit=5,
-#         )
-
-#     if not matches:
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail="No matching workers found.",
-#         )
-
-#     workers = [
-#         {
-#             "worker_chat_id": worker.worker_chat_id,
-#             "username": username,
-#             "job_category": worker.job_category,
-#             "category_tag": worker.category_tag,
-#             "job_description": worker.job_description,
-#             "match_score": max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(15.0 * (distance - 0.87)))) * 100.0, 2))),
-#         }
-#         for worker, username, distance in matches
-#     ]
-
-#     return {
-#         "matched_by_category": used_category_filter,
-#         "category": category,
-#         "workers": workers,
-#     }
-#-------------------------------------------------------------
-
 # ── Matching configuration ────────────────────────────────────────────────────
 
-DEFAULT_SEARCH_RADIUS_METERS = 10_000  # 10 km — hard cutoff, not a soft preference
+DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km — hard cutoff, not a soft preference
 
 
-# ── Helper: pick the primary category (display only, no longer used to filter) ─
+# ── Helper: pick the primary category ────────────────────────────────────────
 
-def _extract_primary_category(categories: list[dict]) -> str | None:
+def _extract_primary_category(categories: list[dict]) -> tuple[str | None, bool]:
     """
     Pull the primary (most central) trade name straight from the
-    customer's extracted categories — categories[0]["category"], no
-    normalization. categories is ordered most-central-trade-first.
+    customer's extracted categories. categories is ordered most-central-trade-first.
 
-    Informational only now — not used to filter the worker search.
-    Returns None if there are no extracted categories at all.
+    Returns (category_name, is_custom). category_name is None if the
+    customer has no extracted categories at all.
     """
     if not categories:
-        return None
-    return categories[0].get("category")
+        return None, False
+    
+    top = categories[0]
+    return top.get("category"), bool(top.get("is_custom_category", False))
 
 
-# ── Helper: radius (mandatory) + vector rank ─────────────────────────────────
+# ── Helper: category (optional) + radius (mandatory) + vector rank ──────────
 
 def _search_workers(
     db: Session,
     query_vector: list[float],
     customer_location,
+    category_tag: str | None,
     radius_meters: int,
     limit: int,
 ):
     """
-    Single-query funnel, category removed:
-      1. ST_DWithin hard radius cutoff against the customer's job location
-      2. ORDER BY cosine_distance — closest meaning first
+    Single-query funnel:
+      1. category_tag exact match — skipped entirely when category_tag is None
+      2. ST_DWithin hard radius cutoff against the customer's job location
+      3. ORDER BY cosine_distance — closest meaning first
+    Steps 2 and 3 always run, regardless of whether step 1 was applied.
     """
     distance = model.WorkerProfile.description_vector.cosine_distance(query_vector)
 
@@ -708,9 +597,17 @@ def _search_workers(
                 radius_meters,
             ),
         )
-        .order_by(distance)
-        .limit(limit)
     )
+
+    if category_tag:
+        stmt = stmt.where(
+            or_(
+                func.lower(model.WorkerProfile.job_category) == category_tag.lower(),
+                func.lower(model.WorkerProfile.category_tag) == category_tag.lower(),
+            )
+        )
+
+    stmt = stmt.order_by(distance).limit(limit)
     return db.execute(stmt).all()
 
 
@@ -758,22 +655,29 @@ def find_help(
             detail="This chat session was not a dispatchable job request.",
         )
 
-    category = _extract_primary_category(job_data.categories or [])
+    category, is_custom = _extract_primary_category(job_data.categories or [])
+    
+    # We remove the `and not is_custom` condition here so both false and true custom categories 
+    # query the database exactly the same way before falling back.
+    used_category_filter = bool(category) 
 
-    # Category filter removed — this now runs unconditionally as the only
-    # search path: radius cutoff, then pure semantic rank.
-    matches = _search_workers(
-        db,
-        query_vector=job_data.description_vector,
-        customer_location=job_data.location,
-        radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
-        limit=5,
-    )
+    matches = []
+    if used_category_filter:
+        matches = _search_workers(
+            db,
+            query_vector=job_data.description_vector,
+            customer_location=job_data.location,
+            category_tag=category,
+            radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
+            limit=5,
+        )
+        used_category_filter = bool(matches)
+
 
     if not matches:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No matching workers found within 10km.",
+            detail="No matching workers found within 60km.",
         )
 
     workers = [
@@ -783,13 +687,13 @@ def find_help(
             "job_category": worker.job_category,
             "category_tag": worker.category_tag,
             "job_description": worker.job_description,
-            "match_score": max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(15.0 * (distance - 0.87)))) * 100.0, 2))),
+            "match_score": max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2))),
         }
         for worker, username, distance in matches
     ]
 
     return {
-        "matched_by_category": False,
+        "matched_by_category": used_category_filter,
         "category": category,
         "workers": workers,
     }

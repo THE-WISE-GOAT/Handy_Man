@@ -38,9 +38,23 @@ export const createWorkspaceZlice = (set, get) => ({
 
   workerProfession: "plumber",
   socket: null,
+activeJob: null, // New state for the incoming job
 
+  connectToDispatch: (workerChatId, token) => {
+    // Connect using the token as a query param
+    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${workerChatId}?token=${token}`);
 
-
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === "NEW_JOB_NOTIFICATION") {
+        // This will update the state, which your React component will see
+        set({ activeJob: message.data });
+      }
+    };
+    
+    set({ socket });
+  },
+  
 
 });
 
