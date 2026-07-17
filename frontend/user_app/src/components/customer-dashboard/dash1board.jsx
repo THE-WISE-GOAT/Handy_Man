@@ -344,7 +344,7 @@ fetchedJobs,
           <h2>AI CHAT TERMINAL</h2>
           <div className="chat-box">
             {chatMessages.map((m) => (
-              <p key={m.id}>
+              <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
                 <strong>{m.sender.toUpperCase()}:</strong> {m.text}
               </p>
             ))}
@@ -447,7 +447,7 @@ fetchedJobs,
               value={jobDescriptionDraft}
               onChange={(e) => setJobDescription(e.target.value)}
               style={{
-                border: "2px dashed #000000",
+                border: "2px dashed var(--ind-border-strong)",
                 borderRadius: "4px",
                 padding: "10px",
                 outline: "none",
@@ -828,10 +828,10 @@ fetchedJobs,
         >
           <div
             style={{
-              background: "#1F1F1F",
-              border: "1px solid rgba(245, 245, 247, 0.14)",
+              background: "var(--ind-surface)",
+              border: "1px solid var(--ind-border)",
               borderRadius: "16px",
-              boxShadow: "0 8px 16px rgba(0, 0, 0, 0.4)",
+              boxShadow: "var(--ind-shadow-tight)",
               width: "450px",
               maxWidth: "90%",
               padding: "20px",
@@ -875,14 +875,14 @@ fetchedJobs,
                   onChange={(e) => setModalSearchQuery(e.target.value)}
                   style={{
                     flex: 1,
-                    border: "1px solid rgba(245, 245, 247, 0.14)",
+                    border: "1px solid var(--ind-border)",
                     borderRadius: "6px",
                     padding: "6px 10px",
                     outline: "none",
                     font: "inherit",
                     fontSize: "11px",
-                    background: "rgba(31, 31, 31, 0.4)",
-                    color: "#FFFFFF",
+                    background: "var(--ind-surface-alpha-40)",
+                    color: "var(--ind-white)"
                   }}
                 />
                 <button
@@ -934,9 +934,9 @@ fetchedJobs,
               style={{
                 width: "100%",
                 height: "260px",
-                border: "1px solid rgba(245, 245, 247, 0.14)",
+                border: "1px solid var(--ind-border)",
                 borderRadius: "8px",
-                background: "rgba(31, 31, 31, 0.4)",
+                background: "var(--ind-surface-alpha-40)",
                 position: "relative",
               }}
             />
@@ -945,13 +945,13 @@ fetchedJobs,
             <div
               style={{
                 fontSize: "11px",
-                background: "rgba(31, 31, 31, 0.4)",
+                background: "var(--ind-surface-alpha-40)",
                 padding: "8px",
-                border: "1px dashed rgba(245, 245, 247, 0.14)",
+                border: "1px dashed var(--ind-border)",
                 borderRadius: "6px",
               }}
             >
-              <strong style={{ color: "#F5F5F7" }}>SELECTED ADDRESS:</strong>
+              <strong style={{ color: "var(--text-secondary)" }}>SELECTED ADDRESS:</strong>
               <div
                 style={{
                   textTransform: "uppercase",
@@ -973,14 +973,14 @@ fetchedJobs,
                 style={{
                   flex: 1,
                   padding: "8px",
-                  background: "rgba(31, 31, 31, 0.4)",
-                  border: "1px solid rgba(245, 245, 247, 0.14)",
+                  background: "var(--ind-surface-alpha-40)",
+                  border: "1px solid var(--ind-border)",
                   borderRadius: "8px",
                   font: "inherit",
                   fontSize: "13px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  color: "#F5F5F7",
+                  color: "var(--text-secondary)"
                 }}
                 onMouseDown={(e) =>
                   (e.currentTarget.style.transform = "translate(2px, 2px)")

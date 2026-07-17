@@ -271,8 +271,8 @@ export default function AdminApplicationsBoard({ viewSlug }) {
           >
             <div
               style={{
-                background: "#1F1F1F", border: "1px solid rgba(245, 245, 247, 0.14)", borderRadius: "16px",
-                boxShadow: "0 8px 16px rgba(0, 0, 0, 0.4)", width: "400px", maxWidth: "90%",
+                background: "var(--ind-surface)", border: "1px solid var(--ind-border)", borderRadius: "16px",
+                boxShadow: "var(--ind-shadow-tight)", width: "400px", maxWidth: "90%",
                 padding: "24px", display: "flex", flexDirection: "column", gap: "12px",
                 fontFamily: "inherit"
               }}
@@ -288,9 +288,9 @@ export default function AdminApplicationsBoard({ viewSlug }) {
               placeholder="Enter rejection reason..."
               rows={4}
               style={{
-                width: "100%", border: "1px solid rgba(245, 245, 247, 0.14)", borderRadius: "8px",
+                width: "100%", border: "1px solid var(--ind-border)", borderRadius: "8px",
                 padding: "10px", font: "inherit", fontSize: "0.85rem", resize: "vertical",
-                background: "rgba(31, 31, 31, 0.4)", color: "#FFFFFF"
+                background: "var(--ind-surface-alpha-40)", color: "var(--ind-white)"
               }}
             />
             <div style={{ display: "flex", gap: "10px" }}>

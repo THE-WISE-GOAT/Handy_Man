@@ -10,7 +10,7 @@
   height: calc(100vh - 120px);
   padding: 16px;
   box-sizing: border-box;
-  background-color: #0D0D0D;
+  background-color: var(--ind-concrete);
 }
 
 .grid-main {
@@ -43,8 +43,8 @@
    2. CARD SHELL STYLING
    ========================================================================== */
 .dashboard-card {
-  background-color: #1F1F1F;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  background-color: var(--ind-surface);
+  border: 1px solid var(--ind-border);
   border-radius: 12px;
   width: 100%;
   display: flex;

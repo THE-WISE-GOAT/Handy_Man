@@ -46,7 +46,8 @@
 .admin-section {
   border: 1px solid rgba(245, 245, 247, 0.14);
   border-radius: 12px;
-  background: #1F1F1F;
+  background: var(--ind-surface);
+  border: 1px solid var(--ind-border);
   padding: 1rem 1.1rem 1.2rem;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
 }
@@ -262,28 +263,56 @@
 .admin-chat-preview {
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid rgba(245, 245, 247, 0.08);
+  border: 1px solid var(--ind-border);
   border-radius: 8px;
   padding: 0.5rem;
   background: rgba(31, 31, 31, 0.4);
   font-size: 0.78rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .admin-chat-bubble {
-  padding: 0.3rem 0.5rem;
-  margin-bottom: 0.3rem;
-  border-radius: 6px;
-  color: #F5F5F7;
+  padding: 8px 12px;
+  margin: 0;
+  border-radius: 12px;
+  max-width: 85%;
+  word-wrap: break-word;
+  line-height: 1.4;
 }
 
 .admin-chat-bubble--user {
   background: rgba(59, 130, 246, 0.15);
   border-left: 3px solid #3b82f6;
+  color: #F5F5F7;
+  align-self: flex-end;
+  border-radius: 12px 4px 12px 12px;
 }
 
 .admin-chat-bubble--assistant {
   background: rgba(31, 31, 31, 0.4);
   border-left: 3px solid #7A7A7A;
+  color: #F5F5F7;
+  align-self: flex-start;
+  border-radius: 4px 12px 12px 12px;
+}
+
+.light .admin-chat-preview {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+}
+
+.light .admin-chat-bubble--user {
+  background: #FFF3E0;
+  border-left: 3px solid #FF6B1A;
+  color: #0D0D0D;
+}
+
+.light .admin-chat-bubble--assistant {
+  background: #E3F2FD;
+  border-left: 3px solid #3b82f6;
+  color: #0D0D0D;
 }
 
 .admin-profile-preview {
@@ -382,7 +411,7 @@
 }
 
 .chat-box {
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 8px;
   padding: 0.8rem;
   background: rgba(31, 31, 31, 0.4);
@@ -390,29 +419,73 @@
   max-height: 300px;
   overflow-y: auto;
   font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .chat-msg {
-  margin-bottom: 0.5rem;
-  padding: 0.3rem 0.5rem;
-  border-radius: 4px;
-  color: #F5F5F7;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  max-width: 85%;
+  word-wrap: break-word;
+  line-height: 1.45;
+}
+
+.chat-msg strong {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .chat-msg--user {
   background: rgba(59, 130, 246, 0.15);
   border-left: 3px solid #3b82f6;
+  color: #F5F5F7;
+  align-self: flex-end;
+  border-radius: 14px 4px 14px 14px;
 }
 
 .chat-msg--assistant {
   background: rgba(31, 31, 31, 0.4);
   border-left: 3px solid #7A7A7A;
+  color: #F5F5F7;
+  align-self: flex-start;
+  border-radius: 4px 14px 14px 14px;
 }
 
 .chat-msg--system {
   background: rgba(255, 107, 26, 0.1);
   border-left: 3px solid #FF6B1A;
   font-style: italic;
+  color: #F5F5F7;
+  align-self: flex-start;
+  border-radius: 4px 14px 14px 14px;
+}
+
+.light .onboarding-chat-section .chat-box {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+}
+
+.light .onboarding-chat-section .chat-msg--user {
+  background: #FFF3E0;
+  border-left: 3px solid #FF6B1A;
+  color: #0D0D0D;
+}
+
+.light .onboarding-chat-section .chat-msg--assistant {
+  background: #E3F2FD;
+  border-left: 3px solid #3b82f6;
+  color: #0D0D0D;
+}
+
+.light .onboarding-chat-section .chat-msg--system {
+  background: #E3F2FD;
+  border-left: 3px solid #3b82f6;
+  color: #0D0D0D;
 }
 
 .chat-form {
@@ -429,6 +502,16 @@
   font-size: 0.85rem;
   background: rgba(31, 31, 31, 0.4);
   color: #FFFFFF;
+}
+
+.light .onboarding-chat-section .chat-form input {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+  color: #0D0D0D;
+}
+
+.light .onboarding-chat-section .chat-form input::placeholder {
+  color: #555555;
 }
 
 .chat-btn {
@@ -589,4 +672,357 @@
   color: #7A7A7A;
   border-color: rgba(122, 122, 122, 0.3);
   cursor: not-allowed;
+}
+
+/* ==========================================================================
+   LIGHT MODE: Admin Control Dashboard
+   ========================================================================== */
+.light .admin-board__head h1 {
+  color: #1E293B;
+}
+
+.light .admin-board__sub {
+  color: var(--ind-muted);
+}
+
+.light .admin-section__head h2 {
+  color: #1E293B;
+}
+
+.light .admin-table th {
+  color: var(--ind-muted);
+}
+
+.light .admin-table td {
+  color: #334155;
+}
+
+.light .admin-table tr:hover td {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.light .admin-section__empty {
+  color: var(--ind-muted);
+}
+
+.light .admin-status {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-status--error {
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #c0392b;
+}
+
+.light .admin-section__count {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: rgba(255, 107, 26, 0.3);
+  color: var(--ind-amber);
+}
+
+.light .admin-chip {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-chip__value {
+  color: var(--ind-amber);
+}
+
+.light .admin-chip__label {
+  color: var(--ind-muted);
+}
+
+.light .admin-metric {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-metric__value {
+  color: var(--ind-amber);
+}
+
+.light .admin-metric__label {
+  color: var(--ind-muted);
+}
+
+.light .admin-table-wrap {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-section {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  box-shadow: var(--ind-shadow-tight);
+}
+
+.light .admin-row:hover td {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.light .admin-cell-email {
+  color: #334155;
+}
+
+.light .admin-cell-role {
+  color: #334155;
+}
+
+.light .admin-cell-name {
+  color: #334155;
+}
+
+.light .admin-cell-id {
+  color: #334155;
+}
+
+.light .admin-cell-status {
+  color: #334155;
+}
+
+.light .admin-cell-date {
+  color: #334155;
+}
+
+.light .admin-cell-actions {
+  color: #334155;
+}
+
+.light .admin-cell-actions button {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-cell-actions button:hover {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: var(--ind-amber);
+  color: var(--ind-amber);
+}
+
+.light .admin-cell-actions button--danger {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: #c0392b;
+}
+
+.light .admin-cell-actions button--danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #c0392b;
+}
+
+.light .admin-pagination {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-pagination__button {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-pagination__button.is-active {
+  background: var(--ind-amber);
+  border-color: var(--ind-amber);
+  color: var(--ind-white);
+}
+
+.light .admin-pagination__button:hover {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: var(--ind-amber);
+  color: var(--ind-amber);
+}
+
+.light .admin-pagination__info {
+  color: var(--ind-muted);
+}
+
+.light .admin-filter {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-filter__label {
+  color: var(--text-primary);
+}
+
+.light .admin-filter__input {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-filter__input:focus {
+  border-color: var(--ind-amber);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+}
+
+.light .admin-filter__select {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-filter__select:focus {
+  border-color: var(--ind-amber);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+}
+
+.light .admin-badge {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-badge--active {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.3);
+  color: #16a34a;
+}
+
+.light .admin-badge--inactive {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.3);
+  color: #c0392b;
+}
+
+.light .admin-badge--pending {
+  background: rgba(255, 193, 7, 0.1);
+  border-color: rgba(255, 193, 7, 0.3);
+  color: #b45309;
+}
+
+.light .admin-search {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-search__input {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-search__input:focus {
+  border-color: var(--ind-amber);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+}
+
+.light .admin-search__input::placeholder {
+  color: var(--ind-muted);
+}
+
+.light .admin-actions {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-actions__button {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-actions__button:hover {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: var(--ind-amber);
+  color: var(--ind-amber);
+}
+
+.light .admin-actions__button--primary {
+  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
+  border-color: var(--ind-amber);
+  color: var(--ind-white);
+}
+
+.light .admin-actions__button--danger {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: #c0392b;
+}
+
+.light .admin-actions__button--danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #c0392b;
+}
+
+.light .admin-modal {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-modal__header {
+  background: var(--ind-surface);
+  border-bottom-color: var(--ind-border);
+}
+
+.light .admin-modal__title {
+  color: var(--ind-white);
+}
+
+.light .admin-modal__body {
+  color: var(--text-primary);
+}
+
+.light .admin-modal__footer {
+  background: var(--ind-surface);
+  border-top-color: var(--ind-border);
+}
+
+.light .admin-modal__button {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-modal__button:hover {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: var(--ind-amber);
+  color: var(--ind-amber);
+}
+
+.light .admin-modal__button--primary {
+  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
+  border-color: var(--ind-amber);
+  color: var(--ind-white);
+}
+
+.light .admin-modal__button--danger {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: #c0392b;
+}
+
+.light .admin-modal__button--danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #c0392b;
+}
+
+.light .admin-modal__close {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-modal__close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--ind-border-strong);
+  color: var(--ind-muted);
+}
+
+.light .admin-modal__overlay {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.light .admin-modal__content {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
 }

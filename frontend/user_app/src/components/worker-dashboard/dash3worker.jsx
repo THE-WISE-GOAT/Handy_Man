@@ -842,8 +842,8 @@ export default function Dash3Worker({ viewSlug }) {
         >
           <div
             style={{
-              background: "#1F1F1F", border: "1px solid rgba(245, 245, 247, 0.14)", borderRadius: "16px",
-              boxShadow: "0 8px 16px rgba(0, 0, 0, 0.4)", width: "450px", maxWidth: "90%",
+              background: "var(--ind-surface)", border: "1px solid var(--ind-border)", borderRadius: "16px",
+              boxShadow: "var(--ind-shadow-tight)", width: "450px", maxWidth: "90%",
               padding: "20px", display: "flex", flexDirection: "column", gap: "12px",
               fontFamily: "inherit"
             }}
@@ -862,9 +862,9 @@ export default function Dash3Worker({ viewSlug }) {
                 value={modalSearchQuery}
                 onChange={(e) => setModalSearchQuery(e.target.value)}
                 style={{
-                  flex: 1, border: "1px solid rgba(245, 245, 247, 0.14)", borderRadius: "6px",
+                  flex: 1, border: "1px solid var(--ind-border)", borderRadius: "6px",
                   padding: "6px 10px", outline: "none", font: "inherit", fontSize: "11px",
-                  background: "rgba(31, 31, 31, 0.4)", color: "#FFFFFF"
+                  background: "var(--ind-surface-alpha-40)", color: "var(--ind-white)"
                 }}
               />
               <button
@@ -898,13 +898,13 @@ export default function Dash3Worker({ viewSlug }) {
           <div
             ref={mapContainerRef}
             style={{
-              width: "100%", height: "260px", border: "1px solid rgba(245, 245, 247, 0.14)",
-              borderRadius: "8px", background: "rgba(31, 31, 31, 0.4)", position: "relative",
+              width: "100%", height: "260px", border: "1px solid var(--ind-border)",
+              borderRadius: "8px", background: "var(--ind-surface-alpha-40)", position: "relative",
             }}
           />
 
-          <div style={{ fontSize: "11px", background: "rgba(31, 31, 31, 0.4)", padding: "8px", border: "1px dashed rgba(245, 245, 247, 0.14)", borderRadius: "6px" }}>
-            <strong style={{ color: "#F5F5F7" }}>SELECTED ADDRESS:</strong>
+          <div style={{ fontSize: "11px", background: "var(--ind-surface-alpha-40)", padding: "8px", border: "1px dashed var(--ind-border)", borderRadius: "6px" }}>
+            <strong style={{ color: "var(--text-secondary)" }}>SELECTED ADDRESS:</strong>
             <div style={{ textTransform: "uppercase", marginTop: "2px", fontWeight: "bold", wordBreak: "break-word" }}>
               {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
             </div>
@@ -915,9 +915,9 @@ export default function Dash3Worker({ viewSlug }) {
               type="button"
               onClick={() => setIsMapOpen(false)}
                 style={{
-                  flex: 1, padding: "8px", background: "rgba(31, 31, 31, 0.4)", border: "1px solid rgba(245, 245, 247, 0.14)",
+                  flex: 1, padding: "8px", background: "var(--ind-surface-alpha-40)", border: "1px solid var(--ind-border)",
                   borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer", color: "#F5F5F7"
+                  cursor: "pointer", color: "var(--text-secondary)"
                 }}
               onMouseDown={(e) => e.currentTarget.style.transform = "translate(2px, 2px)"}
               onMouseUp={(e) => e.currentTarget.style.transform = "none"}

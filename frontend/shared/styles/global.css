@@ -27,6 +27,8 @@
   --ind-grid-line-strong: rgba(245, 245, 247, 0.08);
   --ind-surface: #1F1F1F;
   --ind-surface-alt: #161616;
+  --ind-surface-alpha-10: rgba(31, 31, 31, 0.1);
+  --ind-surface-alpha-40: rgba(31, 31, 31, 0.4);
   --ind-shadow: 0 18px 42px rgba(0, 0, 0, 0.5);
   --ind-shadow-tight: 0 10px 24px rgba(0, 0, 0, 0.4);
   --ind-radius-sm: 8px;
@@ -49,6 +51,723 @@
   --dash-slate: #7A7A7A;
 
   color-scheme: dark;
+}
+
+.light {
+  --bg-primary: #F8F9FA;
+  --bg-card: #FFFFFF;
+  --bg-inner: #FFFFFF;
+  --accent: #FF6B1A;
+  --accent-hover: #e85d14;
+  --accent-glow: rgba(255, 107, 26, 0.2);
+  --text-primary: #0D0D0D;
+  --text-secondary: #1F1F1F;
+  --text-muted: #555555;
+  --border-subtle: #E2E8F0;
+  --border-default: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --surface-white: #FFFFFF;
+  --surface-off-white: #F8F9FA;
+
+  --ind-charcoal: #FFFFFF;
+  --ind-charcoal-soft: #F1F5F9;
+  --ind-amber: #FF6B1A;
+  --ind-concrete: #F8F9FA;
+  --ind-white: #0D0D0F;
+  --ind-ink: #FFFFFF;
+  --ind-muted: #555555;
+  --ind-border: #E2E8F0;
+  --ind-border-strong: #CBD5E1;
+  --ind-grid-line: rgba(0, 0, 0, 0.04);
+  --ind-grid-line-strong: rgba(0, 0, 0, 0.08);
+  --ind-surface: #FFFFFF;
+  --ind-surface-alt: #F8F9FA;
+  --ind-surface-alpha-10: rgba(0, 0, 0, 0.05);
+  --ind-surface-alpha-40: rgba(0, 0, 0, 0.06);
+  --ind-shadow: 0 18px 42px rgba(0, 0, 0, 0.08);
+  --ind-shadow-tight: 0 10px 24px rgba(0, 0, 0, 0.06);
+
+  color-scheme: light;
+}
+
+/* ==========================================================================
+   LIGHT MODE: Landing + Auth Pages
+   ========================================================================== */
+.light .ind-topbar {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.light .ind-brand__mark {
+  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.light .ind-nav-link {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+.light .ind-nav-link:hover,
+.light .ind-nav-link:focus-visible {
+  border-color: rgba(255, 107, 26, 0.6);
+  color: var(--ind-amber);
+  background: rgba(255, 107, 26, 0.06);
+}
+
+.light .ind-cta-button {
+  box-shadow: 0 14px 30px rgba(255, 107, 26, 0.18), 0 0 22px rgba(255, 107, 26, 0.08);
+}
+
+.light .hero-copy,
+.light .hero-panel,
+.light .ind-card,
+.light .ind-auth-panel,
+.light .ind-trust-banner,
+.light .ind-mini-panel {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  box-shadow: var(--ind-shadow-tight);
+}
+
+.light .hero-copy::before {
+  background: radial-gradient(circle, rgba(255, 107, 26, 0.12), transparent 72%);
+}
+
+.light .ind-kicker {
+  background: rgba(255, 107, 26, 0.08);
+  border-color: rgba(255, 107, 26, 0.25);
+  color: var(--ind-amber);
+}
+
+.light .ind-kicker__dot {
+  background: var(--ind-amber);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.15);
+}
+
+.light .ind-hero__title {
+  color: var(--ind-white);
+}
+
+.light .ind-hero__title span {
+  color: var(--ind-amber);
+}
+
+.light .ind-hero__lede {
+  color: var(--ind-muted);
+}
+
+.light .hero-stat {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .hero-stat__value {
+  color: var(--ind-white);
+}
+
+.light .hero-stat__label {
+  color: var(--ind-muted);
+}
+
+.light .ind-panel-title {
+  color: var(--ind-white);
+}
+
+.light .ind-card__tag {
+  background: rgba(255, 107, 26, 0.08);
+  border-color: rgba(255, 107, 26, 0.3);
+  color: var(--ind-amber);
+}
+
+.light .ind-card h3 {
+  color: var(--ind-white);
+}
+
+.light .ind-card p,
+.light .ind-copy-muted {
+  color: var(--ind-muted);
+}
+
+.light .ind-card__meta {
+  border-top-color: var(--ind-border);
+  color: var(--ind-muted);
+}
+
+.light .ind-trust-item {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .ind-trust-item strong {
+  color: var(--ind-white);
+}
+
+.light .ind-trust-item span {
+  color: var(--ind-muted);
+}
+
+.light .ind-footer__bar {
+  border-top-color: var(--ind-border);
+}
+
+.light .ind-footer__meta {
+  color: var(--text-secondary);
+}
+
+/* Auth Pages */
+.light .auth-shell {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  box-shadow: var(--ind-shadow);
+}
+
+.light .auth-shell__intro {
+  background:
+    linear-gradient(180deg, rgba(31, 31, 31, 0.95), rgba(22, 22, 22, 0.92)),
+    radial-gradient(circle at top left, rgba(255, 107, 26, 0.25), transparent 42%);
+  color: var(--ind-white);
+}
+
+.light .auth-shell__eyebrow {
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.light .auth-shell__intro h1 {
+  color: var(--ind-white);
+}
+
+.light .auth-shell__lead {
+  color: rgba(245, 245, 247, 0.85);
+}
+
+.light .auth-shell__benefit {
+  background: rgba(31, 31, 31, 0.4);
+  border-color: rgba(245, 245, 247, 0.12);
+  color: rgba(245, 245, 247, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.light .auth-shell__panel {
+  background: var(--ind-surface);
+}
+
+.light .auth-form {
+  background: var(--ind-surface);
+}
+
+.light .auth-form input {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .auth-form input:focus {
+  background: var(--ind-surface);
+  border-color: rgba(255, 107, 26, 0.8);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+}
+
+.light .auth-form input::placeholder {
+  color: rgba(122, 122, 122, 0.9);
+}
+
+.light .auth-socials__icon {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+}
+
+.light .auth-role-switch__button {
+  background: rgba(31, 31, 31, 0.6);
+  color: var(--ind-amber);
+}
+
+.light .auth-role-switch__button.is-active {
+  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
+  color: var(--ind-white);
+}
+
+.light .auth-submit-stack__button {
+  background: rgba(31, 31, 31, 0.6);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.light .auth-submit-stack__button.is-active {
+  border-color: var(--ind-amber);
+  background: rgba(255, 107, 26, 0.1);
+  color: var(--ind-amber);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+}
+
+.light .auth-submit-stack__button--primary {
+  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
+  color: var(--ind-charcoal);
+  border-color: var(--ind-amber);
+  box-shadow: 0 16px 30px rgba(255, 107, 26, 0.18), 0 0 22px rgba(255, 107, 26, 0.08);
+}
+
+.light .auth-signin-actions__secondary {
+  background: transparent;
+  border: 1px solid var(--ind-border);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.light .hero-search__input,
+.light .ind-input,
+.light .ind-select,
+.light .ind-textarea {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .hero-search__input:focus,
+.light .ind-input:focus,
+.light .ind-select:focus,
+.light .ind-textarea:focus {
+  background: var(--ind-surface);
+  border-color: var(--ind-amber);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+}
+
+.light .ind-mini-chip {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .ind-mini-chip__tag {
+  color: var(--ind-amber);
+}
+
+/* Admin Dashboard Light Mode Fixes */
+.light .admin-board__head h1 {
+  color: #1E293B;
+}
+
+.light .admin-board__sub {
+  color: var(--ind-muted);
+}
+
+.light .admin-section__head h2 {
+  color: #1E293B;
+}
+
+.light .admin-table th {
+  color: var(--ind-muted);
+}
+
+.light .admin-table td {
+  color: #334155;
+}
+
+.light .admin-table tr:hover td {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.light .admin-section__empty {
+  color: var(--ind-muted);
+}
+
+.light .admin-status {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-status--error {
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #c0392b;
+}
+
+.light .admin-section__count {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: rgba(255, 107, 26, 0.3);
+  color: var(--ind-amber);
+}
+
+.light .admin-chip {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-chip__value {
+  color: var(--ind-amber);
+}
+
+.light .admin-chip__label {
+  color: var(--ind-muted);
+}
+
+.light .admin-metric {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-metric__value {
+  color: var(--ind-amber);
+}
+
+.light .admin-metric__label {
+  color: var(--ind-muted);
+}
+
+.light .admin-table-wrap {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-section {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  box-shadow: var(--ind-shadow-tight);
+}
+
+.light .admin-row:hover td {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.light .admin-cell-email {
+  color: #334155;
+}
+
+.light .admin-cell-role {
+  color: #334155;
+}
+
+.light .admin-cell-name {
+  color: #334155;
+}
+
+.light .admin-cell-id {
+  color: #334155;
+}
+
+.light .admin-cell-status {
+  color: #334155;
+}
+
+.light .admin-cell-date {
+  color: #334155;
+}
+
+.light .admin-cell-actions {
+  color: #334155;
+}
+
+.light .admin-cell-actions button {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-cell-actions button:hover {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: var(--ind-amber);
+  color: var(--ind-amber);
+}
+
+.light .admin-cell-actions button--danger {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: #c0392b;
+}
+
+.light .admin-cell-actions button--danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #c0392b;
+}
+
+.light .admin-pagination {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-pagination__button {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-pagination__button.is-active {
+  background: var(--ind-amber);
+  border-color: var(--ind-amber);
+  color: var(--ind-white);
+}
+
+.light .admin-pagination__button:hover {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: var(--ind-amber);
+  color: var(--ind-amber);
+}
+
+.light .admin-pagination__info {
+  color: var(--ind-muted);
+}
+
+.light .admin-filter {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-filter__label {
+  color: var(--text-primary);
+}
+
+.light .admin-filter__input {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-filter__input:focus {
+  border-color: var(--ind-amber);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+}
+
+.light .admin-filter__select {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-filter__select:focus {
+  border-color: var(--ind-amber);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+}
+
+.light .admin-badge {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-badge--active {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.3);
+  color: #16a34a;
+}
+
+.light .admin-badge--inactive {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.3);
+  color: #c0392b;
+}
+
+.light .admin-badge--pending {
+  background: rgba(255, 193, 7, 0.1);
+  border-color: rgba(255, 193, 7, 0.3);
+  color: #b45309;
+}
+
+.light .admin-search {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-search__input {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-search__input:focus {
+  border-color: var(--ind-amber);
+  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+}
+
+.light .admin-search__input::placeholder {
+  color: var(--ind-muted);
+}
+
+.light .admin-actions {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-actions__button {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-actions__button:hover {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: var(--ind-amber);
+  color: var(--ind-amber);
+}
+
+.light .admin-actions__button--primary {
+  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
+  border-color: var(--ind-amber);
+  color: var(--ind-white);
+}
+
+.light .admin-actions__button--danger {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: #c0392b;
+}
+
+.light .admin-actions__button--danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #c0392b;
+}
+
+.light .admin-modal {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-modal__header {
+  background: var(--ind-surface);
+  border-bottom-color: var(--ind-border);
+}
+
+.light .admin-modal__title {
+  color: var(--ind-white);
+}
+
+.light .admin-modal__body {
+  color: var(--text-primary);
+}
+
+.light .admin-modal__footer {
+  background: var(--ind-surface);
+  border-top-color: var(--ind-border);
+}
+
+.light .admin-modal__button {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-modal__button:hover {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: var(--ind-amber);
+  color: var(--ind-amber);
+}
+
+.light .admin-modal__button--primary {
+  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
+  border-color: var(--ind-amber);
+  color: var(--ind-white);
+}
+
+.light .admin-modal__button--danger {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: #c0392b;
+}
+
+.light .admin-modal__button--danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #c0392b;
+}
+
+.light .admin-modal__close {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-modal__close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--ind-border-strong);
+  color: var(--ind-muted);
+}
+
+.light .admin-modal__overlay {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.light .admin-modal__content {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.light .admin-modal__header {
+  background: var(--ind-surface);
+  border-bottom-color: var(--ind-border);
+}
+
+.light .admin-modal__title {
+  color: var(--ind-white);
+}
+
+.light .admin-modal__body {
+  color: var(--text-primary);
+}
+
+.light .admin-modal__footer {
+  background: var(--ind-surface);
+  border-top-color: var(--ind-border);
+}
+
+.light .admin-modal__button {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-modal__button:hover {
+  background: rgba(255, 107, 26, 0.1);
+  border-color: var(--ind-amber);
+  color: var(--ind-amber);
+}
+
+.light .admin-modal__button--primary {
+  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
+  border-color: var(--ind-amber);
+  color: var(--ind-white);
+}
+
+.light .admin-modal__button--danger {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: #c0392b;
+}
+
+.light .admin-modal__button--danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #c0392b;
+}
+
+.light .admin-modal__close {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  color: var(--text-primary);
+}
+
+.light .admin-modal__close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--ind-border-strong);
+  color: var(--ind-muted);
+}
+
+.light .admin-modal__overlay {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.light .admin-modal__content {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+}
+
+.auth-loader {
+  background: var(--ind-concrete);
+  color: var(--text-primary);
 }
 
 * {
@@ -80,6 +799,22 @@ body::before {
     linear-gradient(135deg, rgba(255, 107, 26, 0.04), transparent 36%),
     linear-gradient(315deg, rgba(31, 31, 31, 0.3), transparent 44%);
   opacity: 0.6;
+}
+
+.light body,
+.light body::before {
+  background: transparent;
+}
+
+.light body {
+  background-color: var(--ind-concrete);
+}
+
+.light body::before {
+  background:
+    linear-gradient(135deg, rgba(255, 107, 26, 0.06), transparent 36%),
+    linear-gradient(315deg, rgba(0, 0, 0, 0.04), transparent 44%);
+  opacity: 1;
 }
 
 a {
@@ -893,6 +1628,11 @@ button {
   border: 1px solid var(--ind-border);
 }
 
+.light .auth-shell__tabs {
+  background: #F1F5F9;
+  border-color: var(--ind-border);
+}
+
 .auth-shell__tab {
   flex: 1;
   padding: 0.9rem 1rem;
@@ -901,11 +1641,22 @@ button {
   border: 1px solid transparent;
 }
 
+.light .auth-shell__tab {
+  color: #475569;
+}
+
 .auth-shell__tab.is-active {
   background: var(--bg-card);
   color: var(--ind-amber);
   border-color: var(--ind-border-strong);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.3);
+}
+
+.light .auth-shell__tab.is-active {
+  background: var(--ind-surface);
+  border-color: var(--ind-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  color: var(--ind-amber);
 }
 
 .auth-stage {

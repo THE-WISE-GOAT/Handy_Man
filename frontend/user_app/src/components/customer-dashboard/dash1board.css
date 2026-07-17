@@ -10,7 +10,7 @@
   height: calc(100vh - 120px);
   padding: 16px;
   box-sizing: border-box;
-  background-color: #0D0D0D;
+  background-color: var(--ind-concrete);
 }
 
 .grid-main {
@@ -38,8 +38,8 @@
    2. CARD SHELLS AND SLOTS
    ========================================================================== */
 .dashboard-card {
-  background-color: #1F1F1F;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  background-color: var(--ind-surface);
+  border: 1px solid var(--ind-border);
   border-radius: 12px;
   width: 100%;
   display: flex;
@@ -140,6 +140,10 @@ button[name="post"]:hover {
   margin-bottom: 0px;
 }
 
+.light .main-view h2 {
+  color: #0D0D0D;
+}
+
 .sidebar-slot {
   height: 100%;
 }
@@ -173,19 +177,32 @@ button[name="post"]:hover {
 .badge {
   display: inline-block;
   padding: 10px 16px;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 12px;
   font-size: 0.85rem;
   font-weight: 700;
   width: fit-content;
   background-color: rgba(31, 31, 31, 0.6);
   color: #F5F5F7;
+  transition: var(--fixfast-ease);
 }
 
 .badge-highlight {
   background-color: rgba(255, 107, 26, 0.12);
   color: #FF6B1A;
   border-color: rgba(255, 107, 26, 0.3);
+}
+
+.light .badge {
+  background-color: #FFFFFF;
+  border-color: #E2E8F0;
+  color: #0D0D0D;
+}
+
+.light .badge-highlight {
+  background-color: rgba(255, 107, 26, 0.08);
+  color: #FF6B1A;
+  border-color: rgba(255, 107, 26, 0.25);
 }
 
 .card-summary {
@@ -211,15 +228,64 @@ button[name="post"]:hover {
   margin-top: -4px;
 }
 
+.light .workspace-textarea {
+  color: #0D0D0D;
+}
+
 .chat-box {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 16px;
   padding: 16px;
   background-color: rgba(31, 31, 31, 0.4);
   margin-bottom: 16px;
   max-height: 350px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-msg {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  max-width: 85%;
+  word-wrap: break-word;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.chat-msg strong {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.chat-msg--user {
+  background: rgba(59, 130, 246, 0.15);
+  border-left: 3px solid #3b82f6;
+  color: #F5F5F7;
+  align-self: flex-end;
+  border-radius: 14px 4px 14px 14px;
+}
+
+.chat-msg--assistant {
+  background: rgba(31, 31, 31, 0.4);
+  border-left: 3px solid #7A7A7A;
+  color: #F5F5F7;
+  align-self: flex-start;
+  border-radius: 4px 14px 14px 14px;
+}
+
+.chat-msg--system {
+  background: rgba(255, 107, 26, 0.1);
+  border-left: 3px solid #FF6B1A;
+  font-style: italic;
+  color: #F5F5F7;
+  align-self: flex-start;
+  border-radius: 4px 14px 14px 14px;
 }
 
 .chat-form {
@@ -231,13 +297,23 @@ button[name="post"]:hover {
   flex: 1;
   width: 100%;
   padding: 14px 20px;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 16px;
   font-size: 1rem;
   outline: none;
   box-sizing: border-box;
   background: rgba(31, 31, 31, 0.4);
   color: #FFFFFF;
+}
+
+.light .chat-form input {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+  color: #0D0D0D;
+}
+
+.light .chat-form input::placeholder {
+  color: #555555;
 }
 
 .chat-btn {
@@ -254,6 +330,39 @@ button[name="post"]:hover {
 .chat-btn:hover {
   background-color: #e85d14;
   border-color: #e85d14;
+}
+
+.light .chat-box {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+}
+
+.light .chat-msg--user {
+  background: #FFF3E0;
+  border-left: 3px solid #FF6B1A;
+  color: #0D0D0D;
+}
+
+.light .chat-msg--assistant {
+  background: #E3F2FD;
+  border-left: 3px solid #3b82f6;
+  color: #0D0D0D;
+}
+
+.light .chat-msg--system {
+  background: #E3F2FD;
+  border-left: 3px solid #3b82f6;
+  color: #0D0D0D;
+}
+
+.light .chat-form input {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+  color: #0D0D0D;
+}
+
+.light .chat-form input::placeholder {
+  color: #555555;
 }
 
 .title {

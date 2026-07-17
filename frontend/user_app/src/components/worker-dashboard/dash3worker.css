@@ -10,7 +10,7 @@
   height: calc(100vh - 120px);
   padding: 16px;
   box-sizing: border-box;
-  background-color: #0D0D0D;
+  background-color: var(--ind-concrete);
 }
 
 .grid-area-main {
@@ -38,8 +38,8 @@
    2. SIMPLIFIED CARD CORE STYLES
    ========================================================================== */
 .dashboard-card {
-  background-color: #1F1F1F;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  background-color: var(--ind-surface);
+  border: 1px solid var(--ind-border);
   border-radius: 12px;
   width: 100%;
   display: flex;
@@ -123,6 +123,11 @@
   color: #FFFFFF;
 }
 
+.light .main-panel h2,
+.light .main-panel h3 {
+  color: #0D0D0D;
+}
+
 .panel-desc {
   font-size: 0.95rem;
   color: #7A7A7A;
@@ -139,13 +144,14 @@
 .badge {
   display: inline-block;
   padding: 10px 18px;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 14px;
   font-size: 0.85rem;
   font-weight: 700;
   background-color: rgba(31, 31, 31, 0.6);
   width: fit-content;
   color: #F5F5F7;
+  transition: var(--fixfast-ease);
 }
 
 .badge-highlight {
@@ -158,6 +164,24 @@
   background-color: rgba(220, 53, 69, 0.15);
   color: #ff6b6b;
   border-color: rgba(220, 53, 69, 0.3);
+}
+
+.light .badge {
+  background-color: #FFFFFF;
+  border-color: #E2E8F0;
+  color: #0D0D0D;
+}
+
+.light .badge-highlight {
+  background-color: rgba(255, 107, 26, 0.08);
+  color: #FF6B1A;
+  border-color: rgba(255, 107, 26, 0.25);
+}
+
+.light .badge--rejected {
+  background-color: rgba(220, 53, 69, 0.06);
+  color: #c0392b;
+  border-color: rgba(220, 53, 69, 0.2);
 }
 
 .card-summary {
@@ -189,6 +213,14 @@
   color: #7A7A7A;
 }
 
+.light .start-interview-prompt h3 {
+  color: #0D0D0D;
+}
+
+.light .start-interview-prompt .panel-desc {
+  color: #555555;
+}
+
 /* ==========================================================================
    5. CHAT TERMINAL
    ========================================================================== */
@@ -212,7 +244,7 @@
 }
 
 .chat-box {
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 8px;
   padding: 0.8rem;
   background: rgba(31, 31, 31, 0.4);
@@ -221,24 +253,41 @@
   overflow-y: auto;
   font-size: 0.85rem;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .chat-msg {
-  margin-bottom: 0.5rem;
-  padding: 0.3rem 0.5rem;
-  border-radius: 4px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  max-width: 85%;
+  word-wrap: break-word;
+  line-height: 1.45;
+}
+
+.chat-msg strong {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .chat-msg--user {
   background: rgba(59, 130, 246, 0.15);
   border-left: 3px solid #3b82f6;
   color: #F5F5F7;
+  align-self: flex-end;
+  border-radius: 14px 4px 14px 14px;
 }
 
 .chat-msg--assistant {
   background: rgba(31, 31, 31, 0.4);
   border-left: 3px solid #7A7A7A;
   color: #F5F5F7;
+  align-self: flex-start;
+  border-radius: 4px 14px 14px 14px;
 }
 
 .chat-msg--system {
@@ -246,48 +295,41 @@
   border-left: 3px solid #FF6B1A;
   font-style: italic;
   color: #F5F5F7;
+  align-self: flex-start;
+  border-radius: 4px 14px 14px 14px;
 }
 
-.chat-form {
-  display: flex;
-  gap: 0.5rem;
+.light .chat-box {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
 }
 
-.chat-form input {
-  flex: 1;
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 6px;
-  padding: 0.5rem;
-  font: inherit;
-  font-size: 0.85rem;
-  background: rgba(31, 31, 31, 0.4);
-  color: #FFFFFF;
+.light .chat-msg--user {
+  background: #FFF3E0;
+  border-left: 3px solid #FF6B1A;
+  color: #0D0D0D;
 }
 
-.chat-btn {
-  padding: 0.5rem 1rem;
-  border: 1px solid #FF6B1A;
-  border-radius: 6px;
-  background: #FF6B1A;
-  color: #FFFFFF;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  transition: var(--fixfast-ease);
+.light .chat-msg--assistant {
+  background: #E3F2FD;
+  border-left: 3px solid #3b82f6;
+  color: #0D0D0D;
 }
 
-.chat-btn:hover {
-  background: #e85d14;
-  border-color: #e85d14;
+.light .chat-msg--system {
+  background: #E3F2FD;
+  border-left: 3px solid #3b82f6;
+  color: #0D0D0D;
 }
 
-.chat-btn:active {
-  transform: translate(1px, 1px);
+.light .chat-form input {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+  color: #0D0D0D;
 }
 
-.chat-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.light .chat-form input::placeholder {
+  color: #555555;
 }
 
 /* ==========================================================================
@@ -301,7 +343,7 @@
 
 .extraction-panel,
 .location-panel {
-  border: 1px solid rgba(245, 245, 245, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 8px;
   padding: 0.8rem;
   background: rgba(31, 31, 31, 0.4);
@@ -314,6 +356,29 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #FFFFFF;
+}
+
+.light .extraction-panel,
+.light .location-panel {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+}
+
+.light .extraction-panel h3,
+.light .location-panel h3 {
+  color: #0D0D0D;
+}
+
+.light .extracted-label {
+  color: #0D0D0D;
+}
+
+.light .extracted-value {
+  color: #555555;
+}
+
+.light .extracted-row {
+  border-bottom: 1px solid #E2E8F0;
 }
 
 .extracted-data {

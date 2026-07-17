@@ -5,14 +5,14 @@ import { useAuth } from "@shared/context/AuthContext";
 function FullScreenLoader() {
   return (
     <div
+      className="auth-loader"
       style={{
         minHeight: "100vh",
         display: "grid",
         placeItems: "center",
-        background: "#0D0D0D",
       }}
     >
-      <div style={{ fontFamily: "monospace", color: "#F5F5F7" }}>
+      <div style={{ fontFamily: "monospace", color: "var(--text-primary)" }}>
         Checking session...
       </div>
     </div>

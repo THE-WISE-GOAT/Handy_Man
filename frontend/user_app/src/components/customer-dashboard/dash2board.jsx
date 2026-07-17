@@ -290,7 +290,7 @@ export default function Dash2Board({ viewSlug }) {
           <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <h2 style={{ flexShrink: 0 }}>QUALIFIED WORKER NETWORK</h2>
             
-            <h3 style={{ color: "#000000", flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h3 style={{ color: "var(--text-primary)", flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span>Matched Profiles For: {selectedJob ? selectedJob.title : "No Job Selected"}</span>
               
               {selectedJob?.matchCategory && (

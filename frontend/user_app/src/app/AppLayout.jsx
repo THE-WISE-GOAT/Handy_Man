@@ -14,12 +14,14 @@ import {
   getDefaultWorkerPath,
   getDefaultAdminPath,
 } from "@shared/config/viewRoutes";
+import { useTheme } from "../hooks/useTheme";
 import "./app-layout.css";
 
 export default function AppLayout({ role = "customer" }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, canAccessWorker, canAccessAdmin, refreshUser } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const [isWorkerApplicant, setIsWorkerApplicant] = useState(false);
   const [checkingApplicant, setCheckingApplicant] = useState(false);
@@ -159,6 +161,11 @@ export default function AppLayout({ role = "customer" }) {
       });
     }
   }
+
+  profileActions.push({
+    label: theme === "dark" ? "☀️ Light Mode" : "🌙 Dark Mode",
+    onClick: toggleTheme,
+  });
 
   profileActions.push({
     label: "Log out",
