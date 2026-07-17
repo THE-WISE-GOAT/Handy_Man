@@ -182,6 +182,12 @@ class WorkerProfile(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    job_matches: Mapped[List["JobWorkerMatch"]] = relationship(
+        "JobWorkerMatch",
+        back_populates="worker",
+        cascade="all, delete-orphan",
+    )
+
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"
 
@@ -234,6 +240,46 @@ class Job(Base):
     # ── Semantic Search / Smart Matching Data ─────────────────────────────────
     description_vector: Mapped[Optional[List[float]]] = mapped_column(Vector(4096), nullable=True)
 
+    # Denormalized counters so the customer pipeline can render live tallies
+    # without an expensive join on every request. Kept in sync by the
+    # POST /jobs/{job_id}/interest endpoint.
+    matched_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    interested_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     # ── Timestamps ────────────────────────────────────────────────────────────
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    matches: Mapped[List["JobWorkerMatch"]] = relationship(
+        "JobWorkerMatch",
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
+
+
+class JobWorkerMatch(Base):
+    __tablename__ = "job_worker_matches"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    worker_id: Mapped[int] = mapped_column(
+        ForeignKey("workers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    match_score: Mapped[float] = mapped_column(Float, nullable=False)
+    match_rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    semantic_distance: Mapped[float] = mapped_column(Float, nullable=True)
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    interested: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    job: Mapped["Job"] = relationship("Job", back_populates="matches")
+    worker: Mapped["WorkerProfile"] = relationship("WorkerProfile", back_populates="job_matches")

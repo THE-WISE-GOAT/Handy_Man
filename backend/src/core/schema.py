@@ -327,8 +327,28 @@ class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used
     category: Optional[str] = None     # the category that was searched (if any)
     workers: List[WorkerMatchOut]
-    
-    
+
+class WorkerMatchedJobOut(BaseModel):
+    job_id: int
+    booking_chat_id: int
+    title: str
+    description: str
+    status: str
+    categories: List[Dict[str, Any]]
+    address_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    match_score: float
+    match_rank: int
+    interested: bool
+    matched_count: int
+    interested_count: int
+
+class MatchedJobsForWorkerOut(BaseModel):
+    status: str = "success"
+    jobs: List[WorkerMatchedJobOut]
+
+
 class WorkerCompleteChatIn(BaseModel):
     location: LocationCoordinates
     phone_number: Optional[str] = None
