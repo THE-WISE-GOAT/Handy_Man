@@ -40,6 +40,33 @@ export const createWorkspaceZlice = (set, get) => ({
   socket: null,
   activeJob: null, // New state for the incoming job
   isInterested: false,
+  matchedJobs: [], // Jobs matched to this worker via semantic matching
+
+  setActiveJob: (job) => set({ activeJob: job }),
+
+  fetchMatchedJobs: async () => {
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      const response = await fetch("http://127.0.0.1:8000/jobs/for-worker", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        console.error("Failed to fetch matched jobs:", response.status);
+        return;
+      }
+
+      const data = await response.json();
+      if (data.status === "success") {
+        set({ matchedJobs: data.jobs || [] });
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch matched jobs:", error);
+    }
+  },
 
   connectToDispatch: (workerChatId, token) => {
     // Connect using the token as a query param
