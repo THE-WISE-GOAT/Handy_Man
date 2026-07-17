@@ -4,7 +4,7 @@ from typing import List
 from sqlalchemy import select, func, delete
 from sqlalchemy.orm import Session
 
-from src.database import model
+from src.core import model
 
 
 MATCH_SCORE_THRESHOLD = 55.0
