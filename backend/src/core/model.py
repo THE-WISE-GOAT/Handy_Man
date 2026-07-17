@@ -182,12 +182,6 @@ class WorkerProfile(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    job_matches: Mapped[List["JobWorkerMatch"]] = relationship(
-    "JobWorkerMatch",
-    back_populates="worker",
-    cascade="all, delete-orphan",
-    )
-
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"
 
@@ -243,69 +237,3 @@ class Job(Base):
     # ── Timestamps ────────────────────────────────────────────────────────────
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
-
-    matches: Mapped[List["JobWorkerMatch"]] = relationship(
-    "JobWorkerMatch",
-    back_populates="job",
-    cascade="all, delete-orphan",
-    )
-
-
-
-class JobWorkerMatch(Base):
-    __tablename__ = "job_worker_matches"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-
-    # Relationship
-    job_id: Mapped[int] = mapped_column(
-        ForeignKey("jobs.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    worker_id: Mapped[int] = mapped_column(
-        ForeignKey("workers.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    # Matching Information
-    match_score: Mapped[float] = mapped_column(Float, nullable=False)
-    match_rank: Mapped[int] = mapped_column(Integer, nullable=False)
-    semantic_distance: Mapped[float] = mapped_column(Float, nullable=False)
-
-    # Current lifecycle
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-
-    # Future websocket / bidding state
-    is_interested: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    bid_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    bid_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
-    is_selected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
-    job: Mapped["Job"] = relationship(
-        "Job",
-        back_populates="matches",
-    )
-
-    worker: Mapped["WorkerProfile"] = relationship(
-        "WorkerProfile",
-        back_populates="job_matches",
-    )

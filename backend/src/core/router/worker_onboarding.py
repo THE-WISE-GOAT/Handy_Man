@@ -28,6 +28,8 @@ Endpoints
 """
 
 import logging
+import os
+import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -36,6 +38,44 @@ from src.core.oauth2 import get_current_user
 from src.core import model, schema
 
 logger = logging.getLogger(__name__)
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _generate_description_vector(text: str):
+    """
+    Embed a worker's job_description via NVIDIA nv-embed-v1 so it can be
+    cosine-matched against customer job vectors in the matching engine.
+    Returns the embedding list, or None if embedding is unavailable.
+    """
+    if not text:
+        return None
+    try:
+        headers = {
+            "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
+            "Content-Type": "application/json",
+        }
+        nvidia_payload = {
+            "model": "nvidia/nv-embed-v1",
+            "input": [text],
+            "input_type": "passage",
+            "encoding_format": "float",
+        }
+        response = requests.post(
+            "https://integrate.api.nvidia.com/v1/embeddings",
+            headers=headers,
+            json=nvidia_payload,
+            timeout=20.0,
+        )
+        if response.status_code == 200:
+            return response.json()["data"][0]["embedding"]
+        logger.error(
+            "NVIDIA embedding error in worker onboarding: %s - %s",
+            response.status_code, response.text,
+        )
+    except Exception as exc:
+        logger.error("Failed to embed worker job_description: %s", exc)
+    return None
+
 
 router = APIRouter(prefix="/worker-onboarding", tags=["Worker Onboarding"])
 
@@ -184,6 +224,66 @@ def submit_worker_application(
     profile.latitude = payload.latitude
     profile.longitude = payload.longitude
 
+    # ── Carry the AI-extracted interview profile into the WorkerProfile ──
+    # The interview router stores the validated WorkerProfileSchema dict on
+    # WorkerInterviewSession.profile. The admin review and the matching
+    # engine both read the WorkerProfile columns, so we MUST copy the
+    # extracted fields across here — otherwise an approved worker keeps an
+    # empty profile (all "None") and the job matcher finds no vector.
+    session = db.execute(
+        select(model.WorkerInterviewSession).where(
+            model.WorkerInterviewSession.id == payload.worker_chat_id,
+            model.WorkerInterviewSession.user_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+    # Guard against the dual-session drift: if the session linked to
+    # worker_chat_id has no extracted profile, fall back to the user's
+    # COMPLETED session (the one that actually holds the data).
+    if not (session and session.profile):
+        session = db.execute(
+            select(model.WorkerInterviewSession)
+            .where(
+                model.WorkerInterviewSession.user_id == current_user.id,
+                model.WorkerInterviewSession.is_complete.is_(True),
+                model.WorkerInterviewSession.profile.isnot(None),
+            )
+            .order_by(model.WorkerInterviewSession.id.desc())
+        ).scalars().first()
+
+    if session and session.profile:
+        extracted = session.profile
+        profile.job_category = extracted.get("job_category", profile.job_category)
+        profile.category_tag = extracted.get("category_tag", profile.category_tag)
+        profile.is_custom_category = extracted.get("is_custom_category", profile.is_custom_category)
+        profile.specialities = extracted.get("specialities", []) or []
+        profile.years_experience = extracted.get("years_experience", 0) or 0
+        profile.license_or_certification = extracted.get("license_or_certification")
+        profile.specialized_tools_or_equipment = (
+            extracted.get("specialized_tools_or_equipment", []) or []
+        )
+        profile.job_description = extracted.get("job_description", "") or ""
+        profile.emergency_available = extracted.get("emergency_available", False) or False
+        profile.has_verified_specialty = extracted.get("has_verified_specialty", False) or False
+        profile.scenario_passed = extracted.get("scenario_passed", False) or False
+        profile.scenario_score = extracted.get("scenario_score", 0) or 0
+
+    # ── Generate the semantic embedding + geolocation ──
+    # The matching engine (chat_customer.find_help / matching_manager) only
+    # considers workers whose description_vector AND location are non-null
+    # and is_complete=True. Without these, an approved worker never
+    # receives routed jobs. The embedding is derived from job_description,
+    # which the extraction step produced above.
+    if payload.latitude is not None and payload.longitude is not None:
+        profile.latitude = payload.latitude
+        profile.longitude = payload.longitude
+        profile.location = f"POINT({payload.longitude} {payload.latitude})"
+
+    if profile.job_description:
+        profile.description_vector = _generate_description_vector(
+            profile.job_description
+        )
+
     try:
         db.commit()
     except Exception:
@@ -221,11 +321,21 @@ def get_my_application_status(
         "rejection_reason": profile.rejection_reason,
         "job_category": profile.job_category,
         "category_tag": profile.category_tag,
+        "is_custom_category": profile.is_custom_category,
         "specialities": profile.specialities,
+        "specialized_tools_or_equipment": profile.specialized_tools_or_equipment,
         "years_experience": profile.years_experience,
+        "license_or_certification": profile.license_or_certification,
+        "job_description": profile.job_description,
+        "emergency_available": profile.emergency_available,
+        "has_verified_specialty": profile.has_verified_specialty,
+        "scenario_passed": profile.scenario_passed,
+        "scenario_score": profile.scenario_score,
         "worker_chat_id": profile.worker_chat_id,
         "phone_number": profile.phone_number,
         "address_text": profile.address_text,
+        "latitude": profile.latitude,
+        "longitude": profile.longitude,
     }
 
 
@@ -264,6 +374,18 @@ def list_pending_applications(
                 model.WorkerInterviewSession.id == profile.worker_chat_id
             )
         ).scalar_one_or_none()
+        if not (session and (session.history or session.profile)):
+            session = db.execute(
+                select(model.WorkerInterviewSession)
+                .where(
+                    model.WorkerInterviewSession.user_id == profile.user_id,
+                    model.WorkerInterviewSession.is_complete.is_(True),
+                )
+                .order_by(model.WorkerInterviewSession.id.desc())
+            ).scalars().first()
+
+        raw_history = (session.history if session and session.history else []) or []
+        raw_profile = (session.profile if session and session.profile else None)
 
         applications.append({
             "id": profile.id,
@@ -278,13 +400,17 @@ def list_pending_applications(
             "rejection_reason": profile.rejection_reason,
             "job_category": profile.job_category,
             "category_tag": profile.category_tag,
+            "is_custom_category": profile.is_custom_category,
             "specialities": profile.specialities,
             "years_experience": profile.years_experience,
+            "license_or_certification": profile.license_or_certification,
+            "job_description": profile.job_description,
+            "emergency_available": profile.emergency_available,
             "worker_chat_id": profile.worker_chat_id,
             "phone_number": profile.phone_number,
             "address_text": profile.address_text,
-            "history": session.history if session else [],
-            "profile": session.profile if session else None,
+            "history": raw_history,
+            "profile": raw_profile,
         })
 
     return applications
@@ -327,6 +453,42 @@ def approve_worker_application(
     profile.stage = "approved"
     profile.is_rejected = False
     profile.rejection_reason = None
+
+    # ── Backstop: ensure the AI-extracted profile is present ──
+    # If the approved WorkerProfile still has empty core fields (e.g. the
+    # submit step ran before extraction was copied, or an edge-case flow),
+    # pull them from the linked interview session so the worker's dashboard
+    # and the matching engine both see the real details.
+    if not profile.job_category and profile.worker_chat_id:
+        session = db.execute(
+            select(model.WorkerInterviewSession).where(
+                model.WorkerInterviewSession.id == profile.worker_chat_id
+            )
+        ).scalar_one_or_none()
+        if session and session.profile:
+            extracted = session.profile
+            profile.job_category = extracted.get("job_category", profile.job_category)
+            profile.category_tag = extracted.get("category_tag", profile.category_tag)
+            profile.is_custom_category = extracted.get("is_custom_category", profile.is_custom_category)
+            profile.specialities = extracted.get("specialities", []) or []
+            profile.years_experience = extracted.get("years_experience", 0) or 0
+            profile.license_or_certification = extracted.get("license_or_certification")
+            profile.specialized_tools_or_equipment = (
+                extracted.get("specialized_tools_or_equipment", []) or []
+            )
+            profile.job_description = extracted.get("job_description", "") or ""
+            profile.emergency_available = extracted.get("emergency_available", False) or False
+            profile.has_verified_specialty = extracted.get("has_verified_specialty", False) or False
+            profile.scenario_passed = extracted.get("scenario_passed", False) or False
+            profile.scenario_score = extracted.get("scenario_score", 0) or 0
+
+    # ── Generate the semantic embedding on approval ──
+    # The matching engine (chat_customer.find_help) only routes jobs to
+    # workers whose description_vector is non-null. If submit didn't persist
+    # one (e.g. embedding API was down), (re)generate it now from the
+    # job_description so the approved worker actually receives jobs.
+    if profile.job_description and profile.description_vector is None:
+        profile.description_vector = _generate_description_vector(profile.job_description)
 
     user = db.query(model.User).filter(model.User.id == profile.user_id).first()
     if user:

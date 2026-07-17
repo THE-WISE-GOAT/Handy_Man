@@ -51,11 +51,21 @@ class WorkerAppStatusOut(BaseModel):
     rejection_reason: str | None = None
     job_category: str
     category_tag: str
+    is_custom_category: bool = False
     specialities: List[str]
+    specialized_tools_or_equipment: List[str]
     years_experience: int
+    license_or_certification: str | None = None
+    job_description: str
+    emergency_available: bool = False
+    has_verified_specialty: bool = False
+    scenario_passed: bool = False
+    scenario_score: int = 0
     worker_chat_id: int | None = None
     phone_number: str | None = None
     address_text: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 class AdminPendingAppOut(BaseModel):
     id: int
@@ -70,8 +80,12 @@ class AdminPendingAppOut(BaseModel):
     rejection_reason: str | None = None
     job_category: str
     category_tag: str
+    is_custom_category: bool = False
     specialities: List[str]
     years_experience: int
+    license_or_certification: str | None = None
+    job_description: str | None = None
+    emergency_available: bool = False
     worker_chat_id: int | None = None
     phone_number: str | None = None
     address_text: str | None = None

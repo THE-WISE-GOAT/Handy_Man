@@ -99,24 +99,75 @@ def start_worker_session(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    chat_session = model.WorkerInterviewSession(
-        user_id=current_user.id,
-        history=build_fresh_history(),
-        stage="interviewing",
-        is_complete=False,
-        is_rejected=False,
-    )
-    db.add(chat_session)
-
-    try:
-        db.commit()
-        db.refresh(chat_session)
-    except Exception:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create worker interview session.",
+    # Reuse the user's existing in-progress interview session rather than
+    # creating a second one. The onboarding flow (POST /worker-onboarding/
+    # initialize) already creates a WorkerInterviewSession and stores its id
+    # on WorkerProfile.worker_chat_id. If we created a NEW session here, the
+    # frontend would chat against that new id while the admin board (and
+    # WorkerProfile.worker_chat_id) still point at the empty initialize
+    # session — so the admin would always see "No interview history" and
+    # "Profile not yet extracted". Reusing keeps a single source of truth.
+    # Prefer a COMPLETED session (the one holding the extracted profile +
+    # history) over an empty in-progress one, so a returning worker always
+    # lands on the session that has data.
+    chat_session = db.execute(
+        select(model.WorkerInterviewSession)
+        .where(model.WorkerInterviewSession.user_id == current_user.id)
+        .order_by(
+            model.WorkerInterviewSession.is_complete.desc(),
+            model.WorkerInterviewSession.id.desc(),
         )
+    ).scalars().first()
+
+    if chat_session is None:
+        chat_session = model.WorkerInterviewSession(
+            user_id=current_user.id,
+            history=build_fresh_history(),
+            stage="interviewing",
+            is_complete=False,
+            is_rejected=False,
+        )
+        db.add(chat_session)
+        try:
+            db.commit()
+            db.refresh(chat_session)
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create worker interview session.",
+            )
+
+    # Ensure the linked WorkerProfile points at this (the real) session, in
+    # case the initialize-created session id drifted from what we reuse.
+    profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalar_one_or_none()
+    if profile and profile.worker_chat_id != chat_session.id:
+        profile.worker_chat_id = chat_session.id
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to link worker profile to interview session.",
+            )
+
+    # Seed the system prompt + greeting if the reused session is still empty
+    # (e.g. the one created by initialize started with history=[]).
+    if not chat_session.history:
+        chat_session.history = build_fresh_history()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to seed interview session history.",
+            )
 
     return {
         "worker_chat_id": chat_session.id,

@@ -419,35 +419,34 @@ async def complete_customer_chat(
         logger.error(f"Persistence failed: {e}")
         raise HTTPException(status_code=500, detail="Database update failed.")
     
-    #fix no repeated searches
+    category, _ = _extract_primary_category(job_data.categories or [])
     
-# ... (After db.commit() inside complete_customer_chat)
+    if category:
+        category_lower = category.lower()
+        stmt = (
+            select(model.WorkerProfile.worker_chat_id)
+            .join(model.User, model.User.id == model.WorkerProfile.user_id)
+            .where(
+                model.WorkerProfile.is_complete.is_(True),
+                model.WorkerProfile.is_rejected.is_(False),
+                or_(
+                    func.lower(model.WorkerProfile.job_category) == category_lower,
+                    func.lower(model.WorkerProfile.category_tag) == category_lower,
+                )
+            )
+            .limit(20)
+        )
+        worker_ids = [row[0] for row in db.execute(stmt).all()]
+        
+        job_payload = {
+            "booking_chat_id": booking_chat_id,
+            "title": payload.title,
+            "description": job_desc
+        }
+        
+        for worker_id in worker_ids:
+            manager.send_job_notification(worker_id, job_payload)
     
-    # 1. Fetch matched workers dynamically
-    # We use the embedding_vector and location already generated in this function
-    matches = _search_workers(
-        db,
-        query_vector=embedding_vector,
-        customer_location=wkt_point,
-        category_tag=None, # Send to all relevant categories or filter by primary category
-        radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
-        limit=5,
-    )
-    
-    # 2. Extract IDs for the notification
-    # 'matches' returns (model.WorkerProfile, username, distance)
-    worker_ids = [worker.worker_chat_id for worker, _, _ in matches]
-    
-    # 3. Notify
-    job_payload = {
-        "booking_chat_id": booking_chat_id,
-        "title": payload.title,
-        "description": job_desc
-    }
-    
-    for worker_id in worker_ids:
-        await manager.send_job_notification(worker_id, job_payload)
-
     return {"status": "success", "message": "Job created and dispatched to matched workers."}
 
 
@@ -545,6 +544,7 @@ def get_booking_summary(
 # ── Matching configuration ────────────────────────────────────────────────────
 
 DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km — hard cutoff, not a soft preference
+FALLBACK_SEARCH_RADIUS_METERS = 500_000  # 500 km — development fallback when no local matches found
 
 
 # ── Helper: pick the primary category ────────────────────────────────────────
@@ -673,12 +673,24 @@ def find_help(
         )
         used_category_filter = bool(matches)
 
+    # Fallback: if category-filtered search yields nothing, broaden the radius
+    if not matches:
+        matches = _search_workers(
+            db,
+            query_vector=job_data.description_vector,
+            customer_location=job_data.location,
+            category_tag=category,
+            radius_meters=FALLBACK_SEARCH_RADIUS_METERS,
+            limit=5,
+        )
+        used_category_filter = bool(matches)
 
     if not matches:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No matching workers found within 60km.",
-        )
+        return {
+            "matched_by_category": used_category_filter,
+            "category": category,
+            "workers": [],
+        }
 
     workers = [
         {
