@@ -44,6 +44,14 @@ const blinkingWorkerIcon = L.divIcon({
   popupAnchor: [0, -15]
 });
 
+const goldenWorkerIcon = L.divIcon({
+  className: 'custom-worker-icon golden-worker-icon',
+  html: `<div style="color: #FFD700; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -15]
+});
+
 
 const MapUpdater = ({ center }) => {
   const map = useMap();
@@ -72,6 +80,8 @@ const Card = ({ slug, title, position, onSelect, children }) => {
 
 export default function Dash2Board({ viewSlug }) {
   const navigate = useNavigate();
+  const workerCardRefs = React.useRef({});
+  
   const {
     postingsSlots,
     swapPostingsSlots,
@@ -92,6 +102,21 @@ export default function Dash2Board({ viewSlug }) {
   useEffect(() => {
     fetchPendingJobs();
   }, [fetchPendingJobs]);
+
+  useEffect(() => {
+    const handleFocus = () => { fetchPendingJobs(); };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchPendingJobs]);
+
+  useEffect(() => {
+    if (selectedWorkerId && workerCardRefs.current[selectedWorkerId]) {
+      workerCardRefs.current[selectedWorkerId].scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }, [selectedWorkerId]);
 
   useEffect(() => {
     if (!viewSlug) return;
@@ -162,6 +187,14 @@ export default function Dash2Board({ viewSlug }) {
             .blinking-red-icon div {
               animation: blinkRedIcon 1.2s infinite ease-in-out;
             }
+            @keyframes goldGlow {
+              0% { filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.6)); }
+              50% { filter: drop-shadow(0 0 10px rgba(255, 215, 0, 1)); }
+              100% { filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.6)); }
+            }
+            .golden-worker-icon div {
+              animation: goldGlow 1.5s infinite ease-in-out;
+            }
           `}
         </style>
 
@@ -184,19 +217,27 @@ export default function Dash2Board({ viewSlug }) {
                 )}
 
                 {/* 2. Worker Location Markers */}
-                {currentWorkers.map(worker => {
+                {currentWorkers.map((worker, index) => {
                   const locInfo = workerLocations[worker.worker_chat_id];
                   
                   if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
                   
                   const workerPos = [locInfo.latitude, locInfo.longitude];
-                  const iconToUse = locInfo.is_interested ? blinkingWorkerIcon : staticWorkerIcon;
+                  const rank = index + 1;
+                  const isTopThree = rank <= 3;
+                  const iconToUse = isTopThree ? goldenWorkerIcon : (locInfo.is_interested ? blinkingWorkerIcon : staticWorkerIcon);
 
                   return (
-                    <Marker key={`map-worker-${worker.worker_chat_id}`} position={workerPos} icon={iconToUse}>
+                    <Marker 
+                      key={`map-worker-${worker.worker_chat_id}`} 
+                      position={workerPos} 
+                      icon={iconToUse}
+                      eventHandlers={{ click: () => setSelectedWorkerId(worker.worker_chat_id) }}
+                    >
                       <Popup>
                         <div style={{ textAlign: 'center' }}>
                           <strong>{worker.username}</strong><br/>
+                          {isTopThree ? `🏆 Rank #${rank} Match` : `Rank #${rank}`}<br/>
                           Match Score: {worker.match_score}%<br/>
                           <button 
                             onClick={() => toggleWorkerInterest(worker.worker_chat_id)}
@@ -282,20 +323,43 @@ export default function Dash2Board({ viewSlug }) {
               {currentWorkers.length === 0 ? (
                 <p style={{ opacity: 0.7 }}>No professionals matched yet or scanning network...</p>
               ) : (
-                currentWorkers.map(worker => (
-                  <div key={worker.worker_chat_id} style={{
-                    border: '1px solid #444',
-                    borderRadius: '8px',
-                    padding: '15px',
-                    backgroundColor: '#dbddda', 
-                    boxShadow: '0 2px 4px rgb(0, 0, 0)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <strong style={{ fontSize: '1.1em', color: '#090f09' }}>{worker.username}</strong>
-                      <span style={{ fontSize: '0.85em', color: '#0a0707af', border: '1px solid #555', padding: '2px 6px', borderRadius: '4px' }}>
-                        ID: {worker.worker_chat_id}
-                      </span>
-                    </div>
+                currentWorkers.map((worker, index) => {
+                  const isSelected = selectedWorkerId && worker.worker_chat_id === selectedWorkerId;
+                  const rank = index + 1;
+                  return (
+                    <div 
+                      key={worker.worker_chat_id} 
+                      ref={el => workerCardRefs.current[worker.worker_chat_id] = el}
+                      style={{
+                        border: isSelected ? '3px solid #FFD700' : '1px solid #444',
+                        borderRadius: '8px',
+                        padding: '15px',
+                        backgroundColor: isSelected ? '#FFFDE7' : '#dbddda', 
+                        boxShadow: isSelected ? '0 0 12px rgba(255, 215, 0, 0.6)' : '0 2px 4px rgb(0, 0, 0)',
+                        transform: isSelected ? 'scale(1.02)' : 'none',
+                        transition: 'all 0.2s ease-in-out'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <strong style={{ fontSize: '1.1em', color: '#090f09' }}>{worker.username}</strong>
+                          {isSelected && (
+                            <span style={{ 
+                              backgroundColor: '#FFD700', 
+                              color: '#000', 
+                              padding: '2px 8px', 
+                              borderRadius: '4px', 
+                              fontWeight: 'bold', 
+                              fontSize: '0.75em' 
+                            }}>
+                              🏆 Rank #{rank}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.85em', color: '#0a0707af', border: '1px solid #555', padding: '2px 6px', borderRadius: '4px' }}>
+                          ID: {worker.worker_chat_id}
+                        </span>
+                      </div>
 
                     <p style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: '#010201', fontStyle: 'italic', lineHeight: '1.4' }}>
                       "{worker.job_description}"
@@ -312,8 +376,9 @@ export default function Dash2Board({ viewSlug }) {
                         Vector Match Score: {worker.match_score}%
                       </span>
                     </div>
-                  </div>
-                ))
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

@@ -118,7 +118,26 @@ export default function AdminApplicationsBoard({ viewSlug }) {
     );
   };
 
-  const renderProfilePreview = (profile) => {
+  const renderProfilePreview = (app) => {
+    // Prefer the AI-extracted interview profile; if it is missing, fall back
+    // to the persisted WorkerProfile columns so the admin always sees the
+    // details the worker submitted (category, tag, specialities, etc.).
+    const profile =
+      app && app.profile
+        ? app.profile
+        : app
+          ? {
+              job_category: app.job_category,
+              category_tag: app.category_tag,
+              is_custom_category: app.is_custom_category,
+              specialities: app.specialities,
+              years_experience: app.years_experience,
+              license_or_certification: app.license_or_certification,
+              job_description: app.job_description,
+              emergency_available: app.emergency_available,
+            }
+          : null;
+
     if (!profile) return <p className="admin-section__empty">Profile not yet extracted.</p>;
     const entries = Object.entries(profile).filter(([_, v]) => v && !Array.isArray(v));
     const arrays = Object.entries(profile).filter(([_, v]) => Array.isArray(v) && v.length > 0);
@@ -217,7 +236,7 @@ export default function AdminApplicationsBoard({ viewSlug }) {
                     <div className="admin-application-details-grid">
                       <div className="admin-detail-section">
                         <h4>Worker Details</h4>
-                        {renderProfilePreview(app.profile)}
+                        {renderProfilePreview(app)}
                         {app.phone_number && (
                           <p><strong>Phone:</strong> {app.phone_number}</p>
                         )}
@@ -230,7 +249,7 @@ export default function AdminApplicationsBoard({ viewSlug }) {
                       </div>
                       <div className="admin-detail-section">
                         <h4>AI Interview Transcript</h4>
-                        {renderHistoryPreview(expandedHistory[app.id])}
+                        {renderHistoryPreview(expandedHistory[app.id] || app.history)}
                       </div>
                     </div>
                   )}

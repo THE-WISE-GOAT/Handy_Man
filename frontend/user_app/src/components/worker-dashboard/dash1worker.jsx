@@ -13,6 +13,10 @@ export default function Dash1Worker({ viewSlug }) {
     mapStatus,
     bidsPipelineText,
     jobSpecsText,
+    activeJob,
+    isInterested,
+    expressInterest,
+    workerChatId,
   } = useWorkerDashboardData();
 
   // Route state synchronization layer
@@ -147,11 +151,38 @@ export default function Dash1Worker({ viewSlug }) {
           </div>
 
           <div className="main-panel">
-            <h2>Job Details Monitor</h2>
+            {activeJob ? (
+              <>
+                <h2>{activeJob.title || "Untitled Job"}</h2>
+                <p><strong>Job ID:</strong> {activeJob.booking_chat_id || activeJob.id || "N/A"}</p>
+                <p className="panel-desc">{activeJob.description || activeJob.job_description || "No description available."}</p>
+                <button
+                  type="button"
+                  onClick={() => expressInterest(activeJob.booking_chat_id || activeJob.id, workerChatId)}
+                  style={{
+                    marginTop: '16px',
+                    padding: '10px 20px',
+                    backgroundColor: isInterested ? '#4CAF50' : '#2196F3',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '14px'
+                  }}
+                >
+                  {isInterested ? '✓ Interested' : "I'm Interested"}
+                </button>
+              </>
+            ) : (
+              <>
+                <h2>Job Details Monitor</h2>
 
-            <p className="panel-desc">
-              Full breakdown of client structural parameters and requirements.
-            </p>
+                <p className="panel-desc">
+                  Full breakdown of client structural parameters and requirements.
+                </p>
+              </>
+            )}
           </div>
         </div>
       );
