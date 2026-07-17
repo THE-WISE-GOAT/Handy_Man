@@ -38,7 +38,8 @@ export const createWorkspaceZlice = (set, get) => ({
 
   workerProfession: "plumber",
   socket: null,
-activeJob: null, // New state for the incoming job
+  activeJob: null, // New state for the incoming job
+  isInterested: false,
 
   connectToDispatch: (workerChatId, token) => {
     // Connect using the token as a query param
@@ -53,6 +54,35 @@ activeJob: null, // New state for the incoming job
     };
     
     set({ socket });
+  },
+  
+  expressInterest: async (jobId, workerChatId) => {
+    const newInterestState = !get().isInterested;
+    set({ isInterested: newInterestState });
+
+    const payload = {
+      type: "TOGGLE_INTEREST",
+      data: { job_id: jobId, worker_chat_id: workerChatId, interested: newInterestState }
+    };
+
+    const socket = get().socket;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
+    } else {
+      try {
+        const token = localStorage.getItem("handy_man_access_token");
+        await fetch(`http://127.0.0.1:8000/jobs/${jobId}/interest`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ worker_chat_id: workerChatId, interested: newInterestState })
+        });
+      } catch (error) {
+        console.error("❌ Failed to express interest:", error);
+      }
+    }
   },
   
 
