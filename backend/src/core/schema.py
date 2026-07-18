@@ -246,6 +246,7 @@ class WorkerOnboardIn(BaseModel):
 ### schemas for the worker chat functionality
 
 # use in the worker_chat_analyser_nvidia.py to validate the data that is sent to the API
+# use in the worker_chat_analyser_nvidia.py to validate the data that is sent to the API
 class WorkerProfileSchema(BaseModel):
     job_category: str
     category_tag: str
@@ -259,6 +260,15 @@ class WorkerProfileSchema(BaseModel):
     has_verified_specialty: bool
     scenario_passed: bool
     scenario_score: int
+
+    @field_validator("job_description", "license_or_certification", "job_category", mode="before")
+    @classmethod
+    def sanitize_string_fields(cls, value: Any) -> str:
+        # If AI sends a list, join it into a single string
+        if isinstance(value, list):
+            return " ".join(str(v) for v in value)
+        # Ensure it's a string even if the AI sends an int or other type
+        return str(value)
 
 # use to display session start response
 class WorkerSessionStartOut(BaseModel):

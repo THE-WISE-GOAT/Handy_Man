@@ -5,34 +5,31 @@ Endpoints
 ---------
   POST /dispatch/session
       Start a brand-new chat session.  Returns the opening greeting and
-      the new booking_chat_id so the client can display it immediately
-      before the customer has typed anything.
+      the new booking_chat_id so the client can display it immediately.
 
   POST /dispatch/chat
       Send one customer message and get the AI reply back.
-      Automatically closes the session when [COMPLETE] is emitted or
-      MAX_TURNS is reached and triggers the extraction pipeline.
 
   GET  /dispatch/{booking_chat_id}/history
-      Fetch the full conversation so far (client-safe subset only —
-      system prompt is stripped).
+      Fetch the full conversation so far (client-safe subset only).
 
   GET  /dispatch/{booking_chat_id}/summary
       Fetch the structured extraction result once the session is complete.
-      Returns 409 if called while the session is still in progress.
 """
-
 import logging
-import math
-from sqlalchemy import select, func, or_ 
+import os
+import requests
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
-import requests, os
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
-from src.core import model, schema, job_manager, manager
+# FIX: Explicitly import matching_manager alongside job_manager from core
+from src.core import model, schema, job_manager, matching_manager
+from src.core.manager import manager
+
 from src.ai.customer_chat_analyser_nvidia import (
-    _nvidia_client,          # shared NIM client — no second API key needed
+    _nvidia_client,
     build_fresh_history,
     count_user_turns,
     extract_final_json,
@@ -44,6 +41,8 @@ from src.ai.customer_chat_analyser_nvidia import (
 router = APIRouter(prefix="/dispatch", tags=["Dispatch"])
 match_router = APIRouter(tags=["Dispatch"])
 logger = logging.getLogger(__name__)
+
+DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km — hard cutoff
 
 
 # ── Helper ───────────────────────────────────────────────────────────────────
@@ -57,10 +56,6 @@ def _get_own_session(
     session = db.execute(
         select(model.BookingChat).where(
             model.BookingChat.id == booking_chat_id,
-            # FIX: BookingChat has no `customer_id` column — the actual
-            # foreign key on the model is `user_id`. This was raising an
-            # AttributeError on every single call to this helper, i.e.
-            # every endpoint below.
             model.BookingChat.user_id == current_user.id,
         )
     ).scalar_one_or_none()
@@ -73,25 +68,91 @@ def _get_own_session(
     return session
 
 
-# ── 1. Start a new session ───────────────────────────────────────────────────
+def _get_address_from_coords(lat: float, lng: float) -> str:
+    """Detects the physical location address text from latitude and longitude coordinates."""
+    url = "https://nominatim.openstreetmap.org/reverse"
+    params = {
+        "lat": lat,
+        "lon": lng,
+        "format": "json",
+        "addressdetails": 1
+    }
+    headers = {
+        "User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"
+    }
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=8.0)
+        if response.status_code == 200:
+            data = response.json()
+            if "display_name" in data:
+                return data["display_name"]
+            logger.error("[Geocode Error] 'display_name' field missing in JSON response")
+        else:
+            logger.error(f"[Geocode Error] Server responded with code: {response.status_code}")
+    except Exception as e:
+        logger.error(f"[Geocode Exception] Network failure details: {e}")
+        
+    return f"Location ({lat}, {lng})"
 
-@router.post("/session",response_model=schema.SessionStartOut,status_code=status.HTTP_201_CREATED,summary="Create a new dispatch chat session",
+
+def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
+    """Requests a vector embedding from the Nvidia NIM API for a given job description."""
+    api_key = os.getenv("NVIDIA_API_KEY")
+    if not api_key:
+        logger.error("NVIDIA_API_KEY environment variable is missing.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Embedding configuration error."
+        )
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    nvidia_payload = {
+        "model": "nvidia/nv-embed-v1",
+        "input": [job_desc],
+        "input_type": "query",
+        "encoding_format": "float"
+    }
+
+    try:
+        logger.info("Requesting embedding from Nvidia NIM...")
+        response = requests.post(
+            "https://integrate.api.nvidia.com/v1/embeddings",
+            headers=headers, 
+            json=nvidia_payload, 
+            timeout=20.0
+        )
+        if response.status_code == 200:
+            return response.json()["data"][0]["embedding"]
+        else:
+            logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Nvidia API error: {response.status_code}"
+            )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to connect to Nvidia API: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to connect to Nvidia API: {e}"
+        )
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/session",
+    response_model=schema.SessionStartOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new dispatch chat session",
 )
 def start_session(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    """
-    Creates a fresh BookingChat row, seeds the conversation history with
-    the system prompt and the opening greeting, and returns the
-    booking_chat_id + greeting to the client.
-
-    Call this once when the customer opens the chat UI.
-    """
     chat_session = model.BookingChat(
-        # FIX: same customer_id -> user_id correction as _get_own_session
-        # above, so newly created rows actually populate the real FK
-        # column instead of failing immediately.
         user_id=current_user.id,
         history=build_fresh_history(),
         is_complete=False,
@@ -114,6 +175,7 @@ def start_session(
         "turns_remaining": MAX_TURNS,
     }
 
+
 @router.post(
     "/chat",
     response_model=schema.ChatMessageOut,
@@ -124,21 +186,6 @@ def dispatch_chat(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    """
-    Handles one full conversation turn:
-
-    1. Validates the session and checks it is still open.
-    2. Appends the customer message to the persisted history.
-    3. Calls the NIM model with the full history so context is never lost.
-    4. Detects completion via [COMPLETE] or MAX_TURNS exhaustion.
-    5. On completion, runs the extraction pipeline and caches the
-       structured result — including whether a real job was found and,
-       per trade, whether it came from the static registry or the AI
-       fallback.
-    6. Commits everything in one transaction.
-    """
-
-    # ── Resolve session ───────────────────────────────────────────────────────
     if payload.booking_chat_id <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -153,18 +200,16 @@ def dispatch_chat(
             detail="This chat session is already completed. Start a new session.",
         )
 
-    # ── Append customer message ───────────────────────────────────────────────
     updated_history = list(chat_session.history)
     updated_history.append({"role": "user", "content": payload.message})
     user_turn_count = count_user_turns(updated_history)
 
-    # ── Call the NIM model ───────────────────────────────────────────────────
     try:
         response = _nvidia_client.chat.completions.create(
             model=MODEL_NAME,
             messages=updated_history,
             temperature=0.0,
-            max_tokens=512,   # system prompt enforces 1–2 sentence replies
+            max_tokens=512,
         )
     except Exception as exc:
         raise HTTPException(
@@ -173,68 +218,39 @@ def dispatch_chat(
         )
 
     ai_message: str = response.choices[0].message.content.strip()
-
-    # ── Completion detection ──────────────────────────────────────────────────
     force_complete = user_turn_count >= MAX_TURNS
-    is_complete    = "[COMPLETE]" in ai_message or force_complete
+    is_complete = "[COMPLETE]" in ai_message or force_complete
 
     if force_complete and "[COMPLETE]" not in ai_message:
         ai_message += " [COMPLETE]"
 
-    # Persist the raw AI message (with tag) before we strip it for display
     updated_history.append({"role": "assistant", "content": ai_message})
     chat_session.history = updated_history
-
-    # ── Strip tag for client display ──────────────────────────────────────────
     display_message = ai_message.replace("[COMPLETE]", "").strip()
 
-    # ── Extraction pipeline (only on completion) ──────────────────────────────
-    categories_to_return:  list[dict] = []
-    tags_to_return:        list[str]  = []
-    job_found:              bool      = False
-    custom_category_flag:   bool      = False
+    categories_to_return: list[dict] = []
+    tags_to_return: list[str] = []
+    job_found: bool = False
+    custom_category_flag: bool = False
 
     if is_complete:
         chat_session.is_complete = True
-
         try:
             structured = extract_final_json(chat_session.history, MODEL_NAME)
-            chat_session.categories          = [c.model_dump() for c in structured.categories]
+            chat_session.categories = [c.model_dump() for c in structured.categories]
             chat_session.problem_description = structured.problem_description
-            chat_session.is_job_request       = structured.is_job_request
+            chat_session.is_job_request = structured.is_job_request
 
             categories_to_return = chat_session.categories
-
-            tags_to_return = sorted({
-                tag for c in structured.categories for tag in c.tags
-            })
+            tags_to_return = sorted({tag for c in structured.categories for tag in c.tags})
             job_found = structured.is_job_request
-            custom_category_flag = any(
-                c.is_custom_category for c in structured.categories
-            )
-
-            if not structured.is_job_request:
-                logger.info(
-                    "[Dispatch] booking_chat_id=%s completed with no dispatchable "
-                    "job extracted (off-topic or empty conversation).",
-                    chat_session.id,
-                )
+            custom_category_flag = any(c.is_custom_category for c in structured.categories)
         except Exception as extraction_err:
-            chat_session.categories          = []
+            chat_session.categories = []
             chat_session.problem_description = ""
-            chat_session.is_job_request       = False
+            chat_session.is_job_request = False
+            logger.error(f"[Dispatch] Extraction failure for booking_chat_id={chat_session.id}: {extraction_err}")
 
-            categories_to_return  = []
-            tags_to_return        = []
-            job_found              = False
-            custom_category_flag  = False
-
-            logger.error(
-                "[Dispatch] Extraction pipeline failure for booking_chat_id=%s: %s",
-                chat_session.id, extraction_err,
-            )
-
-    # ── Persist ───────────────────────────────────────────────────────────────
     try:
         db.commit()
     except Exception:
@@ -244,69 +260,23 @@ def dispatch_chat(
             detail="Database write failure.",
         )
 
-    turns_used      = user_turn_count
-    turns_remaining = max(0, MAX_TURNS - turns_used)
-
     return {
-        "booking_chat_id":     chat_session.id,
-        "ai_response":         display_message,
-        "is_complete":         chat_session.is_complete,
-        "current_tags":        tags_to_return,
-        "is_job_request":      job_found,
-        "is_custom_category":  custom_category_flag,
-        "turns_used":          turns_used,
-        "turns_remaining":     turns_remaining,
+        "booking_chat_id": chat_session.id,
+        "ai_response": display_message,
+        "is_complete": chat_session.is_complete,
+        "current_tags": tags_to_return,
+        "is_job_request": job_found,
+        "is_custom_category": custom_category_flag,
+        "turns_used": user_turn_count,
+        "turns_remaining": max(0, MAX_TURNS - user_turn_count),
         "problem_description": chat_session.problem_description,
-        "categories":          categories_to_return
+        "categories": categories_to_return
     }
-
-
-def _get_address_from_coords(lat: float, lng: float) -> str:
-    """
-    Detects the physical location address text from latitude and longitude coordinates.
-    """
-    # FIX: Point to the actual OpenStreetMap Nominatim reverse geocoding API endpoint
-    url = "https://nominatim.openstreetmap.org/reverse"
-    
-    params = {
-        "lat": lat,
-        "lon": lng,
-        "format": "json",
-        "addressdetails": 1
-    }
-    
-    headers = {
-        # CRITICAL FIX: Nominatim demands a distinct application name and contact point
-        # to prevent automatic system blocking. Replace with your actual email.
-        "User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"
-    }
-    
-    try:
-        # Increased timeout to 8.0 seconds to give the free API tier time to respond
-        response = requests.get(url, params=params, headers=headers, timeout=8.0)
-        
-        if response.status_code == 200:
-            data = response.json()
-            # If the API succeeds, grab the precise real address text string
-            if "display_name" in data:
-                return data["display_name"]
-            else:
-                print(f"[Geocode Error] 'display_name' field missing in JSON response")
-        else:
-            # This logs the explicit error code to your terminal console for visibility
-            print(f"[Geocode Error] Server responded with code: {response.status_code}")
-            
-    except Exception as e:
-        # This will print the actual technical network error in your terminal console
-        print(f"[Geocode Exception] Network failure details: {e}")
-        
-    # Only fall back to this coordinate text string if the API call genuinely fails
-    return f"Location ({lat}, {lng})"
 
 
 @router.post(
     "/{booking_chat_id}/complete",
-    summary="Complete the AI chat, extract job explained keys, generate embedding, and save to DB",
+    summary="Complete the AI chat, write core records, invoke engine matching, and alert workers",
 )
 async def complete_customer_chat(
     booking_chat_id: int, 
@@ -320,77 +290,29 @@ async def complete_customer_chat(
     lat = payload.location.latitude
     wkt_point = f"POINT({lng} {lat})"
 
-    # 1. Verify and fetch the chat session
     chat_session = _get_own_session(booking_chat_id, db, current_user)
-
     if not chat_session.is_complete:
-        logger.warning(f"Completion failed: Session {booking_chat_id} is not complete.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot process summary. The AI chat session is not complete yet.",
+            detail="Cannot process summary. The AI chat session is not complete yet."
         )
     
-    # 2. Extract incoming values
     job_desc = payload.edited_description.strip()
     if not job_desc:
-        logger.warning("Completion failed: Job description is empty.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Job description is missing. Cannot generate vector profile."
         )
 
-    # 3. Request Vector Embedding from Nvidia
-    embedding_vector = None
-    try:
-        logger.info("Requesting embedding from Nvidia NIM...")
-        headers = {
-            "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
-            "Content-Type": "application/json"
-        }
-        nvidia_payload = {
-            "model": "nvidia/nv-embed-v1",
-            "input": [job_desc],
-            "input_type": "query",
-            "encoding_format": "float"
-        }
-
-        response = requests.post(
-           "https://integrate.api.nvidia.com/v1/embeddings",
-           headers=headers, 
-           json=nvidia_payload, 
-           timeout=20.0 # 10-> 20 seconds timeout to handle potential delays in Nvidia API response
-        )
+    embedding_vector = _fetch_nvidia_embedding(job_desc)
         
-        if response.status_code == 200:
-            embedding_vector = response.json()["data"][0]["embedding"]
-            logger.info("Successfully received embedding from Nvidia.")
-        else:
-            logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Nvidia API error: {response.status_code}"
-            )
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to connect to Nvidia API: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to connect to Nvidia API: {e}"
-        )
-        
-    # 4 & 5. Upsert separately via Job Manager
-    logger.info("Syncing Job and Analytical records...")
-    
-    # Data mapping
     customer_fields = {
         "is_complete": getattr(chat_session, "is_complete", False),
         "is_job_request": getattr(chat_session, "is_job_request", False),
         "categories": getattr(chat_session, "categories", []), 
-        "problem_description": job_desc,
-        "location": wkt_point,
-        "description_vector": embedding_vector 
+        "problem_description": job_desc
     }
     address_text = _get_address_from_coords(lat, lng)
-
 
     job_fields = {
         "title": payload.title,
@@ -409,49 +331,57 @@ async def complete_customer_chat(
         "address_text": address_text
     }
 
-    # Atomic execution
     try:
         job_manager.upsert_chat_data(db, booking_chat_id, current_user.id, customer_fields)
-        job_manager.upsert_job(db, booking_chat_id, current_user.id, job_fields)
-        db.commit()
+        # FIX / OPTIMIZATION: Capture the job row returned directly from your upsert tool
+        job_data = job_manager.upsert_job(db, booking_chat_id, current_user.id, job_fields)
     except Exception as e:
         db.rollback()
-        logger.error(f"Persistence failed: {e}")
+        logger.error(f"Core entity persistence failed: {e}")
         raise HTTPException(status_code=500, detail="Database update failed.")
     
-    #fix no repeated searches
+    # Fallback query only if upsert_job does not return the model object instance
+    if not job_data:
+        job_data = db.execute(
+            select(model.Job).where(model.Job.booking_chat_id == booking_chat_id)
+        ).scalar_one_or_none()
+
+    if not job_data:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Job processing lookup failed after setup.")
     
-# ... (After db.commit() inside complete_customer_chat)
-    
-    # 1. Fetch matched workers dynamically
-    # We use the embedding_vector and location already generated in this function
-    matches = _search_workers(
-        db,
-        query_vector=embedding_vector,
-        customer_location=wkt_point,
-        category_tag=None, # Send to all relevant categories or filter by primary category
-        radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
-        limit=5,
-    )
-    
-    # 2. Extract IDs for the notification
-    # 'matches' returns (model.WorkerProfile, username, distance)
-    worker_ids = [worker.worker_chat_id for worker, _, _ in matches]
-    
-    # 3. Notify
+    # FIX: Correctly routed directly to matching_manager as an independent module dependency
+    try:
+        matching_result = matching_manager.create_matches_for_job(
+            db=db,
+            job_id=job_data.id,
+            query_vector=embedding_vector,
+            customer_location=wkt_point,
+            radius_meters=DEFAULT_SEARCH_RADIUS_METERS
+        )
+        db.commit()
+    except Exception as engine_err:
+        db.rollback()
+        logger.error(f"Matching Engine execution forced transaction rollback: {engine_err}")
+        raise HTTPException(status_code=500, detail="Failed to safely compile and record marketplace matches.")
+
     job_payload = {
-        "booking_chat_id": booking_chat_id,
-        "title": payload.title,
+        "booking_chat_id": booking_chat_id, 
+        "title": payload.title, 
         "description": job_desc
     }
     
-    for worker_id in worker_ids:
-        await manager.send_job_notification(worker_id, job_payload)
+    for worker_chat_id in matching_result.get("worker_chat_ids", []):
+        try:
+            await manager.send_job_notification(worker_chat_id, job_payload)
+        except Exception as ws_err:
+            logger.warning(f"Failed live alert broadcast to worker {worker_chat_id}: {ws_err}")
 
-    return {"status": "success", "message": "Job created and dispatched to matched workers."}
+    return {
+        "status": "success", 
+        "message": f"Job registered. Established {matching_result.get('count', 0)} matches successfully."
+    }
 
-
-# ── 3. Retrieve conversation history ─────────────────────────────────────────
 
 @router.get(
     "/{booking_chat_id}/history",
@@ -463,16 +393,7 @@ def get_history(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    """
-    Returns the client-visible conversation (system prompt is stripped).
-    Useful for restoring the chat UI after a page reload.
-    """
     chat_session = _get_own_session(booking_chat_id, db, current_user)
-
-    # Strip the raw [COMPLETE] tag from the assistant's own completion
-    # message only — never touch customer-typed content. A customer who
-    # happens to type the literal string "[COMPLETE]" should see exactly
-    # what they typed when the history is reloaded.
     visible_history = [
         {
             "role": msg["role"],
@@ -486,8 +407,6 @@ def get_history(
         if msg["role"] != "system"
     ]
 
-    #endpoint here
-    
     return {
         "booking_chat_id":  chat_session.id,
         "history":          visible_history,
@@ -496,8 +415,6 @@ def get_history(
         "turns_remaining":  max(0, MAX_TURNS - count_user_turns(chat_session.history)),
     }
 
-
-# ── 4. Structured summary ─────────────────────────────────────────────────────
 
 @router.get(
     "/{booking_chat_id}/summary",
@@ -509,23 +426,6 @@ def get_booking_summary(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    """
-    Returns the validated extraction payload.
-
-    is_job_request=False means no real job was ever extracted from this
-    session (off-topic conversation, or the extraction pipeline failed) —
-    callers should NOT dispatch a worker for it.
-
-    categories is a list of per-trade matches, most central trade first.
-    Each entry's is_custom_category=True means that trade's category/tags
-    came from the AI fallback rather than an exact SERVICE_REGISTRY match —
-    route that entry to a manual-matching / review flow instead of
-    automated worker-tag matching; entries with is_custom_category=False
-    can be auto-routed as-is.
-
-    Returns 409 Conflict if the session is not yet complete — don't
-    poll this; check the is_complete flag in the chat response instead.
-    """
     chat_session = _get_own_session(booking_chat_id, db, current_user)
 
     if not chat_session.is_complete:
@@ -542,87 +442,24 @@ def get_booking_summary(
     }
 
 
-# ── Matching configuration ────────────────────────────────────────────────────
-
-DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km — hard cutoff, not a soft preference
-
-
-# ── Helper: pick the primary category ────────────────────────────────────────
-
 def _extract_primary_category(categories: list[dict]) -> tuple[str | None, bool]:
-    """
-    Pull the primary (most central) trade name straight from the
-    customer's extracted categories. categories is ordered most-central-trade-first.
-
-    Returns (category_name, is_custom). category_name is None if the
-    customer has no extracted categories at all.
-    """
     if not categories:
         return None, False
-    
     top = categories[0]
     return top.get("category"), bool(top.get("is_custom_category", False))
 
 
-# ── Helper: category (optional) + radius (mandatory) + vector rank ──────────
-
-def _search_workers(
-    db: Session,
-    query_vector: list[float],
-    customer_location,
-    category_tag: str | None,
-    radius_meters: int,
-    limit: int,
-):
-    """
-    Single-query funnel:
-      1. category_tag exact match — skipped entirely when category_tag is None
-      2. ST_DWithin hard radius cutoff against the customer's job location
-      3. ORDER BY cosine_distance — closest meaning first
-    Steps 2 and 3 always run, regardless of whether step 1 was applied.
-    """
-    distance = model.WorkerProfile.description_vector.cosine_distance(query_vector)
-
-    stmt = (
-        select(model.WorkerProfile, model.User.username, distance.label("distance"))
-        .join(model.User, model.User.id == model.WorkerProfile.user_id)
-        .where(
-            model.WorkerProfile.description_vector.isnot(None),
-            model.WorkerProfile.location.isnot(None),
-            model.WorkerProfile.is_complete.is_(True),
-            model.WorkerProfile.is_rejected.is_(False),
-            func.ST_DWithin(
-                model.WorkerProfile.location,
-                customer_location,
-                radius_meters,
-            ),
-        )
-    )
-
-    if category_tag:
-        stmt = stmt.where(
-            or_(
-                func.lower(model.WorkerProfile.job_category) == category_tag.lower(),
-                func.lower(model.WorkerProfile.category_tag) == category_tag.lower(),
-            )
-        )
-
-    stmt = stmt.order_by(distance).limit(limit)
-    return db.execute(stmt).all()
-
-
-# ── Find help ─────────────────────────────────────────────────────────────────
-
 @match_router.get(
     "/match/{booking_chat_id}/find-help",
     response_model=schema.FindHelpOut,
-    summary="Find the top 5 matching workers for a completed job request",
+    summary="Fetch pre-calculated matching workers for a completed job layout from DB",
 )
 def find_help(
     booking_chat_id: int,
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
+    # REMINDER: Verify if model.Job uses customer_id or user_id in your schema
     job_data = db.execute(
         select(model.Job).where(
             model.Job.booking_chat_id == booking_chat_id,
@@ -633,51 +470,27 @@ def find_help(
     if not job_data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No operational job data found for this booking_chat_id. "
-                   "Call POST /dispatch/{booking_chat_id}/complete first.",
-        )
-
-    if job_data.description_vector is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This job has no embedding yet — cannot search for workers.",
-        )
-
-    if job_data.location is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This job has no location set — cannot search for nearby workers.",
-        )
-
-    if not job_data.is_job_request:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This chat session was not a dispatchable job request.",
+            detail="No operational job data found for this booking_chat_id.",
         )
 
     category, is_custom = _extract_primary_category(job_data.categories or [])
     
-    # We remove the `and not is_custom` condition here so both false and true custom categories 
-    # query the database exactly the same way before falling back.
-    used_category_filter = bool(category) 
-
-    matches = []
-    if used_category_filter:
-        matches = _search_workers(
-            db,
-            query_vector=job_data.description_vector,
-            customer_location=job_data.location,
-            category_tag=category,
-            radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
-            limit=5,
+    stmt = (
+        select(model.JobWorkerMatch, model.WorkerProfile, model.User.username)
+        .join(model.WorkerProfile, model.WorkerProfile.id == model.JobWorkerMatch.worker_id)
+        .join(model.User, model.User.id == model.WorkerProfile.user_id)
+        .where(
+            model.JobWorkerMatch.job_id == job_data.id,
+            model.JobWorkerMatch.is_active == True
         )
-        used_category_filter = bool(matches)
-
+        .order_by(model.JobWorkerMatch.match_rank.asc())
+    )
+    matches = db.execute(stmt).all()
 
     if not matches:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No matching workers found within 60km.",
+            detail="No matching workers found recorded for this job specification.",
         )
 
     workers = [
@@ -687,13 +500,13 @@ def find_help(
             "job_category": worker.job_category,
             "category_tag": worker.category_tag,
             "job_description": worker.job_description,
-            "match_score": max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2))),
+            "match_score": match.match_score,
         }
-        for worker, username, distance in matches
+        for match, worker, username in matches
     ]
 
     return {
-        "matched_by_category": used_category_filter,
+        "matched_by_category": bool(category),
         "category": category,
         "workers": workers,
     }

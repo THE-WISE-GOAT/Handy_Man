@@ -34,6 +34,7 @@ from sqlalchemy import select
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema
+from src.ai.worker_chat_analyser_nvidia import build_fresh_history, INITIAL_GREETING
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +107,13 @@ def initialize_worker_application(
     if not already_worker:
         current_user.roles.append(worker_role)
 
+    # Build the proper AI history and inject the first question so it saves to the DB immediately
+    initial_history = build_fresh_history()
+    initial_history.append({"role": "assistant", "content": INITIAL_GREETING})
+
     interview_session = model.WorkerInterviewSession(
         user_id=current_user.id,
-        history=[],
+        history=initial_history,
         stage="interviewing",
         is_complete=False,
         is_rejected=False,
@@ -119,7 +124,7 @@ def initialize_worker_application(
     worker_profile = model.WorkerProfile(
         user_id=current_user.id,
         worker_chat_id=interview_session.id,
-        stage="pending_interview",
+        stage="interviewing",  # Align the profile stage with the chat stage
         is_complete=False,
         is_rejected=False,
         job_category="",

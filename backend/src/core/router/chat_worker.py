@@ -9,12 +9,7 @@ Endpoints
 
   POST /worker-interview/chat
       Send one worker message and get the AI's next step back. Internally
-      drives a small state machine:
-        interviewing             -> ordinary Q&A turn
-        awaiting_scenario_answer -> the message is graded as the answer to
-                                     the last scenario question, not
-                                     treated as a normal chat turn
-        complete                 -> session is closed; use /summary
+      drives a small state machine (interviewing, awaiting_scenario_answer, complete).
 
   GET  /worker-interview/{worker_chat_id}/history
       Fetch the full conversation so far (system prompt stripped).
@@ -23,29 +18,24 @@ Endpoints
       Fetch the structured profile once the session is complete. Returns
       409 if called while still in progress.
 
-Server-side invariants (do not weaken these without re-reading
-worker_interview_nvidia.py's module docstring first):
-  - A session can only become is_complete=True through
-    _handle_scenario_answer, i.e. only after evaluate_answer() has
-    actually graded a real answer. A bare [COMPLETE] token emitted during
-    the "interviewing" stage is stripped and ignored, never honored.
-  - MAX_PRETEST_TURNS is enforced here, not just via the system prompt's
-    RULE 6 — see the forced-resolution block in _handle_interview_turn.
+  POST /worker-interview/{worker_chat_id}/complete
+      Finalizes onboarding, geocodes physical coordinates, builds a vectorized 
+      skill profile via Nvidia NIM, maps matching jobs, and broadcasts live alerts.
 """
 
 import logging
 import os
-
+import requests
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
-from src.core import model, schema
-import requests
+# FIX: Import matching_manager and manager directly as decoupled sibling core dependencies
+from src.core import model, schema, manager, matching_manager
 from src.ai.worker_chat_analyser_nvidia import (
-    _nvidia_client,          # shared NIM client — same instance dispatch.py uses
+    _nvidia_client,          # shared NIM client instance
     build_fresh_history,
     count_user_turns,
     generate_scenario,
@@ -63,8 +53,10 @@ from src.ai.worker_chat_analyser_nvidia import (
 router = APIRouter(prefix="/worker-interview", tags=["Worker Interview"])
 logger = logging.getLogger(__name__)
 
+DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km hard marketplace cutoff
 
-# ── Helper ───────────────────────────────────────────────────────────────────
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _get_own_worker_session(
     worker_chat_id: int,
@@ -85,6 +77,80 @@ def _get_own_worker_session(
             detail="Worker interview session not found.",
         )
     return chat_session
+
+
+def _get_address_from_coords(lat: float, lng: float) -> str:
+    """Detects the physical location address text from latitude and longitude coordinates."""
+    url = "https://nominatim.openstreetmap.org/reverse"
+    params = {
+        "lat": lat,
+        "lon": lng,
+        "format": "json",
+        "addressdetails": 1
+    }
+    headers = {
+        "User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"
+    }
+    
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=8.0)
+        if response.status_code == 200:
+            data = response.json()
+            if "display_name" in data:
+                return data["display_name"]
+            logger.error("[Geocode Error] 'display_name' field missing in JSON response")
+        else:
+            logger.error(f"[Geocode Error] Server responded with code: {response.status_code}")
+    except Exception as e:
+        logger.error(f"[Geocode Exception] Network failure details: {e}")
+        
+    return f"Location ({lat}, {lng})"
+
+
+def _fetch_nvidia_passage_embedding(job_desc: str) -> list[float]:
+    """Requests a vector passage embedding from the Nvidia NIM API for a worker profile description."""
+    api_key = os.getenv("NVIDIA_API_KEY")
+    if not api_key:
+        logger.error("NVIDIA_API_KEY environment variable is missing.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Embedding configuration error."
+        )
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    nvidia_payload = {
+        "model": "nvidia/nv-embed-v1",
+        "input": [job_desc],
+        "input_type": "passage",  # Set input type to passage target search document
+        "encoding_format": "float"
+    }
+
+    try:
+        logger.info("Requesting worker profile embedding from Nvidia NIM...")
+        response = requests.post(
+            "https://integrate.api.nvidia.com/v1/embeddings",
+            headers=headers, 
+            json=nvidia_payload, 
+            timeout=20.0
+        )
+        
+        if response.status_code == 200:
+            return response.json()["data"][0]["embedding"]
+        else:
+            logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Nvidia API error: {response.status_code}"
+            )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to connect to Nvidia API: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to connect to Nvidia API: {e}"
+        )
 
 
 # ── 1. Start a new session ───────────────────────────────────────────────────
@@ -169,11 +235,6 @@ def _handle_scenario_answer(
     answer: str,
     db: Session,
 ) -> dict:
-    """
-    The worker's message here is their answer to the last scenario
-    question, not an ordinary chat turn. This is the ONLY place a session
-    is allowed to become is_complete=True — see the module docstring.
-    """
     history = list(chat_session.history)
     history.append({"role": "user", "content": answer})
 
@@ -194,9 +255,6 @@ def _handle_scenario_answer(
     chat_session.scenario_passed = passed
 
     if passed:
-        # Record the system-verified result in history — never the raw
-        # model's self-report — so the extraction step and the audit
-        # trail both see exactly what happened here.
         history.append({
             "role": "assistant",
             "content": (
@@ -218,10 +276,6 @@ def _handle_scenario_answer(
             chat_session.profile = profile.model_dump()
             ai_response = "Technical verification complete. Your profile has been registered."
         except Exception as extraction_err:
-            # A passed test with a failed extraction is a pipeline error,
-            # not a rejection — don't discard a legitimate pass. Leave the
-            # session complete-but-unprofiled and log loudly so it gets
-            # retried/reviewed rather than silently treated as a fail.
             chat_session.profile = None
             ai_response = (
                 "Technical verification complete, but we hit an internal "
@@ -295,7 +349,7 @@ def _handle_interview_turn(
             model=MODEL_NAME,
             messages=history,
             temperature=0.0,
-            max_tokens=200,   # system prompt enforces short replies
+            max_tokens=200,
         )
         ai_reply: str = response.choices[0].message.content.strip()
     except Exception as exc:
@@ -304,11 +358,6 @@ def _handle_interview_turn(
             detail=f"NVIDIA NIM inference error: {exc}",
         )
 
-    # ── Server-side hard cap ───────────────────────────────────────────────
-    # RULE 6 in the system prompt asks the model to self-resolve by
-    # question 8, but that's a prompt instruction, not a guarantee. If
-    # we're out of runway and it still hasn't emitted REJECTED or
-    # TEST_REQUIRED, force one more directed call before failing closed.
     if (
         turns_used >= MAX_PRETEST_TURNS
         and REJECTION_TOKEN not in ai_reply
@@ -340,10 +389,8 @@ def _handle_interview_turn(
             )
 
         if REJECTION_TOKEN not in ai_reply and not TEST_TOKEN_RE.search(ai_reply):
-            # Still didn't resolve — fail closed rather than loop forever.
             ai_reply = REJECTION_TOKEN
 
-    # ── Rejection ────────────────────────────────────────────────────────
     if REJECTION_TOKEN in ai_reply:
         history.append({"role": "assistant", "content": ai_reply})
         chat_session.history = history
@@ -375,7 +422,6 @@ def _handle_interview_turn(
             "turns_remaining": 0,
         }
 
-    # ── Scenario test triggered ─────────────────────────────────────────
     test_match = TEST_TOKEN_RE.search(ai_reply)
     if test_match:
         sub_skill = test_match.group(1).strip()
@@ -420,10 +466,6 @@ def _handle_interview_turn(
             "turns_remaining": max(0, MAX_PRETEST_TURNS - turns_used),
         }
 
-    # ── Normal question turn ────────────────────────────────────────────
-    # A bare COMPLETE_TOKEN here is never honored — completion can only
-    # happen through _handle_scenario_answer after a real graded test. If
-    # the model emits one anyway, it's stripped and treated as plain text.
     display = ai_reply.replace(COMPLETE_TOKEN, "").strip()
     history.append({"role": "assistant", "content": display})
     chat_session.history = history
@@ -463,9 +505,6 @@ def get_worker_history(
 ):
     chat_session = _get_own_worker_session(worker_chat_id, db, current_user)
 
-    # Strip the raw control tokens from the assistant's own messages only
-    # — never touch worker-typed content, even if they happen to type a
-    # literal "[COMPLETE]" or "[REJECTED]".
     visible_history = [
         {
             "role": msg["role"],
@@ -491,6 +530,7 @@ def get_worker_history(
 
 
 # ── 4. Structured summary ─────────────────────────────────────────────────────
+
 @router.get(
     "/{worker_chat_id}/summary",
     response_model=schema.WorkerSummaryOut,
@@ -501,15 +541,6 @@ def get_worker_summary(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    """
-    is_rejected=True means no profile was produced — check
-    rejection_reason for why. profile is populated only on a genuine pass;
-    it can still be None even when is_rejected=False if extraction itself
-    failed after a passed test (see _handle_scenario_answer) — treat that
-    combination as "needs manual follow-up," not as a rejection.
-
-    Returns 409 Conflict if the session is not yet complete.
-    """
     chat_session = _get_own_worker_session(worker_chat_id, db, current_user)
 
     if not chat_session.is_complete:
@@ -527,63 +558,21 @@ def get_worker_summary(
     }
 
 
-
-
-def _get_address_from_coords(lat: float, lng: float) -> str:
-    """
-    Detects the physical location address text from latitude and longitude coordinates.
-    """
-    # FIX: Point to the actual OpenStreetMap Nominatim reverse geocoding API endpoint
-    url = "https://nominatim.openstreetmap.org/reverse"
-    
-    params = {
-        "lat": lat,
-        "lon": lng,
-        "format": "json",
-        "addressdetails": 1
-    }
-    
-    headers = {
-        # CRITICAL FIX: Nominatim demands a distinct application name and contact point
-        # to prevent automatic system blocking. Replace with your actual email.
-        "User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"
-    }
-    
-    try:
-        # Increased timeout to 8.0 seconds to give the free API tier time to respond
-        response = requests.get(url, params=params, headers=headers, timeout=8.0)
-        
-        if response.status_code == 200:
-            data = response.json()
-            # If the API succeeds, grab the precise real address text string
-            if "display_name" in data:
-                return data["display_name"]
-            else:
-                print(f"[Geocode Error] 'display_name' field missing in JSON response")
-        else:
-            # This logs the explicit error code to your terminal console for visibility
-            print(f"[Geocode Error] Server responded with code: {response.status_code}")
-            
-    except Exception as e:
-        # This will print the actual technical network error in your terminal console
-        print(f"[Geocode Exception] Network failure details: {e}")
-        
-    # Only fall back to this coordinate text string if the API call genuinely fails
-    return f"Location ({lat}, {lng})"
-
-
+# ── 5. Complete and Run Marketplace Matching Engine ──────────────────────────
 
 @router.post(
     "/{worker_chat_id}/complete",
-    summary="Complete the AI chat, extract profile keys, generate embedding, and save to DB",
+    summary="Complete the AI chat, extract profile keys, generate embedding, save to DB, and run reverse job matching funnel",
 )
-def complete_worker_chat(
+async def complete_worker_chat(
     worker_chat_id: int, 
-    payload: schema.WorkerCompleteChatIn,  # Expects location (latitude, longitude)
+    payload: schema.WorkerCompleteChatIn,
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
-    # Step 1: Get the completed AI chat session
+    logger.info(f"Starting registration completion pipeline for worker_chat_id: {worker_chat_id}")
+    
+    # 1. Verify and fetch the chat session
     chat_session = _get_own_worker_session(worker_chat_id, db, current_user)
 
     if not chat_session.is_complete:
@@ -593,54 +582,22 @@ def complete_worker_chat(
         )
         
     profile_data = chat_session.profile if chat_session.profile else {}
-    job_desc = profile_data.get("job_description", "")
+    job_desc = profile_data.get("job_description", "").strip()
     
+    if not job_desc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job description is missing from the extracted profile. Cannot generate vector profile."
+        )
+
     lng = payload.location.longitude
     lat = payload.location.latitude
     wkt_point = f"POINT({lng} {lat})"
     
-    # Step 3: Get Vector Embedding from Nvidia
-    embedding_vector = None
-    if job_desc:
-        try:
-            headers = {
-                "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
-                "Content-Type": "application/json"
-            }
-            # FIX: Renamed 'payload' to 'nvidia_payload' to prevent variable overriding
-            nvidia_payload = {
-                "model": "nvidia/nv-embed-v1",
-                "input": [job_desc],
-                "input_type": "passage",
-                "encoding_format": "float"
-            }
-    
-            response = requests.post(
-               "https://integrate.api.nvidia.com/v1/embeddings",
-               headers=headers, 
-               json=nvidia_payload,  # Use renamed variable here
-               timeout=20.0
-            )
-            
-            if response.status_code == 200:
-                embedding_vector = response.json()["data"][0]["embedding"]
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"Nvidia API error: {response.status_code} - {response.text}"
-                )
-        except requests.exceptions.RequestException as e:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Failed to connect to Nvidia API: {e}"
-            )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Job description is missing. Cannot generate vector profile."
-        )
+    # 2. Fetch Vector Passage Embedding from isolated helper
+    embedding_vector = _fetch_nvidia_passage_embedding(job_desc)
         
-    # Step 2: Check if WorkerProfile already exists
+    # 3. Synchronize core operational records
     db_profile = db.query(model.WorkerProfile).filter(
         model.WorkerProfile.worker_chat_id == worker_chat_id,
         model.WorkerProfile.user_id == current_user.id
@@ -648,7 +605,6 @@ def complete_worker_chat(
 
     address_text = _get_address_from_coords(lat, lng)
     
-    # Define the dictionary of key-value data extracted from JSON summary
     profile_fields = {
         "stage": chat_session.stage,
         "is_complete": chat_session.is_complete,
@@ -670,7 +626,7 @@ def complete_worker_chat(
         "latitude": lat,
         "longitude": lng,
         "location": wkt_point,
-        "phone_number": payload.phone_number,  # This will now correctly reference your Pydantic input model
+        "phone_number": payload.phone_number,
         "address_text": address_text
     }
 
@@ -684,11 +640,44 @@ def complete_worker_chat(
             **profile_fields
         )
     db.add(db_profile)
-    db.commit()
     
-    return {"status": "success", "message": "Worker profile structured and saved successfully."}
-    
-    
-    
-    
-    
+    # Stage record generation prior to executing the reverse matching funnel
+    try:
+        db.flush()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"WorkerProfile entity staging failed: {e}")
+        raise HTTPException(status_code=500, detail="Database write failure during onboarding initialization.")
+
+    # 4. FIX: Delegate matching directly to matching_manager as an independent dependency module
+    try:
+        matching_result = matching_manager.create_matches_for_worker(
+            db=db,
+            worker_id=db_profile.id,
+            query_vector=embedding_vector,
+            worker_location=wkt_point,
+            radius_meters=DEFAULT_SEARCH_RADIUS_METERS
+        )
+        db.commit()
+    except Exception as engine_err:
+        db.rollback()
+        logger.error(f"Matching Engine reverse placement transaction failure: {engine_err}")
+        raise HTTPException(status_code=500, detail="Failed to safely compile and match worker to existing marketplace jobs.")
+
+    # 5. Broadcast live edge updates using the connection manager
+    for matched_job in matching_result.get("matched_jobs", []):
+        try:
+            job_payload = {
+                "booking_chat_id": matched_job.get("booking_chat_id"), 
+                "title": matched_job.get("title"), 
+                "description": matched_job.get("description")
+            }
+            # Alert the newly matching worker immediately about historical client jobs needing their profile
+            await manager.send_job_notification(worker_chat_id, job_payload)
+        except Exception as ws_err:
+            logger.warning(f"Failed live placement alert broadcast to worker chat {worker_chat_id}: {ws_err}")
+
+    return {
+        "status": "success", 
+        "message": f"Worker profile activated. Pre-calculated matches created for {matching_result.get('count', 0)} open jobs."
+    }

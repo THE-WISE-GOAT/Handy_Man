@@ -21,7 +21,6 @@ L.Icon.Default.mergeOptions({
 });
 
 // --- CUSTOM SVG WORKER ICONS ---
-
 const personSvg = `
   <svg viewBox="0 0 24 24" fill="currentColor" width="30px" height="30px">
     <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
@@ -43,7 +42,6 @@ const blinkingWorkerIcon = L.divIcon({
   iconAnchor: [15, 15],
   popupAnchor: [0, -15]
 });
-
 
 const MapUpdater = ({ center }) => {
   const map = useMap();
@@ -82,8 +80,8 @@ export default function Dash2Board({ viewSlug }) {
     fetchPendingJobs,
     
     matchedWorkersMap,
-    workerLocations,          // Extracted coordinates map
-    toggleWorkerInterest,     // Extracted for testing the animation
+    workerLocations,          
+    toggleWorkerInterest,     
 
     selectedWorkerId,
     setSelectedWorkerId
@@ -139,19 +137,17 @@ export default function Dash2Board({ viewSlug }) {
   );
 
   const renderLiveMap = (position) => {
+    // 🛠️ ARCHITECTURAL FIX: Consumes seamlessly flattened store coordinates safely
     const centerPoint = selectedJob && selectedJob.latitude && selectedJob.longitude 
       ? [parseFloat(selectedJob.latitude), parseFloat(selectedJob.longitude)]
       : [27.7172, 85.3240];
 
-    // Safely pull matched array mapped to current job to pinpoint network coordinates
     const currentWorkers = selectedJob && matchedWorkersMap[selectedJob.id] 
       ? matchedWorkersMap[selectedJob.id] 
       : [];
 
     return (
       <Card slug="GeospatialLiveMap" title="GEOSPATIAL LIVE MAP" position={position} onSelect={handleModuleSelect}>
-        
-        {/* CSS Keyframes for the blinking red effect */}
         <style>
           {`
             @keyframes blinkRedIcon {
@@ -176,17 +172,14 @@ export default function Dash2Board({ viewSlug }) {
                 />
                 <MapUpdater center={centerPoint} />
                 
-                {/* 1. Job Location Marker */}
                 {selectedJob && selectedJob.latitude && (
                   <Marker position={centerPoint}>
                     <Popup><strong>{selectedJob.title}</strong><br/>Job Location</Popup>
                   </Marker>
                 )}
 
-                {/* 2. Worker Location Markers */}
                 {currentWorkers.map(worker => {
                   const locInfo = workerLocations[worker.worker_chat_id];
-                  
                   if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
                   
                   const workerPos = [locInfo.latitude, locInfo.longitude];
@@ -217,7 +210,6 @@ export default function Dash2Board({ viewSlug }) {
                     </Marker>
                   );
                 })}
-
               </MapContainer>
             </div>
           </div>
@@ -336,7 +328,6 @@ export default function Dash2Board({ viewSlug }) {
 
   const renderPostsDashboard = (position) => (
     <Card slug="ActivePostsDashboard" title="ACTIVE POSTS DASHBOARD" position={position} onSelect={handleModuleSelect}>
-      
       <style>
         {`
           @keyframes blinkDot {

@@ -37,6 +37,8 @@ def upsert_job(db: Session, booking_chat_id: int, user_id: int, fields: dict):
     else:
         db_job = model.Job(booking_chat_id=booking_chat_id, customer_id=user_id, **fields)
         db.add(db_job)
+
+    db.flush()
     return db_job
 
 # --- NEW JOB CRUD & FILTER FUNCTIONS ---

@@ -30,14 +30,14 @@ export default function Dash1Board({ viewSlug }) {
     addChatMessage,
     activePostsCount,
     userCont,
-fetchBookingsPendingJobs,
+    fetchBookingsPendingJobs,
     // Spatial state parameters from Zustand configuration
     userAddrText,
     userLng,
     userLat,
     setUserAddrText,
     setUserCoordinates,
-fetchedJobs,
+    fetchedJobs,
     userName,
     setUserName,
     setUserCont,
@@ -110,7 +110,6 @@ fetchedJobs,
   // ====================================================
   useEffect(() => {
     if (isMapOpen) {
-      // Synchronize existing point data if already set
       if (userLat && userLng) {
         setModalLat(userLat);
         setModalLng(userLng);
@@ -121,7 +120,6 @@ fetchedJobs,
         setModalAddrText("");
       }
 
-      // Inject Leaflet CSS Asset Node
       if (!document.getElementById("leaflet-cdn-css")) {
         const link = document.createElement("link");
         link.id = "leaflet-cdn-css";
@@ -130,7 +128,6 @@ fetchedJobs,
         document.head.appendChild(link);
       }
 
-      // Inject Leaflet JS Binary Script Node
       if (!window.L) {
         const script = document.createElement("script");
         script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
@@ -153,7 +150,6 @@ fetchedJobs,
     if (!mapReady || !mapContainerRef.current || !window.L) return;
     const L = window.L;
 
-    // Build stylised custom emoji container pin to bypass missing standard asset compilation warnings
     const stylizedPinIcon = L.divIcon({
       html: `<div style="font-size: 30px; transform: translate(-3px, -24px); filter: drop-shadow(2px 3px 0px rgba(0,0,0,0.6));">📍</div>`,
       className: "cute-custom-pin",
@@ -161,7 +157,6 @@ fetchedJobs,
       iconAnchor: [15, 30],
     });
 
-    // Initialize Map Viewport instance
     const map = L.map(mapContainerRef.current, { zoomControl: false }).setView(
       [modalLat, modalLng],
       14,
@@ -169,19 +164,16 @@ fetchedJobs,
     L.control.zoom({ position: "bottomright" }).addTo(map);
     leafletMapRef.current = map;
 
-    // Append Clean OSM Carto Tiles
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
-    // Append Interactively Draggable Marker Pin Point
     const marker = L.marker([modalLat, modalLng], {
       icon: stylizedPinIcon,
       draggable: true,
     }).addTo(map);
     leafletMarkerRef.current = marker;
 
-    // Reverse Geocode Handler Routine
     const runReverseGeocode = async (lat, lng) => {
       try {
         const resp = await fetch(
@@ -201,12 +193,10 @@ fetchedJobs,
       }
     };
 
-    // If address text is blank, perform initial reverse geocode lookup
     if (!modalAddrText) {
       runReverseGeocode(modalLat, modalLng);
     }
 
-    // Monitor Drag Actions
     marker.on("dragend", () => {
       const point = marker.getLatLng();
       setModalLat(point.lat);
@@ -214,7 +204,6 @@ fetchedJobs,
       runReverseGeocode(point.lat, point.lng);
     });
 
-    // Monitor Manual Surface Clicks
     map.on("click", (e) => {
       marker.setLatLng(e.latlng);
       setModalLat(e.latlng.lat);
@@ -227,7 +216,6 @@ fetchedJobs,
     };
   }, [mapReady]);
 
-  // Handle Search Input Submission (Restricted to Nepal)
   const executeModalAddressSearch = async (e) => {
     e.preventDefault();
     if (
@@ -258,13 +246,10 @@ fetchedJobs,
             .toUpperCase();
           setModalAddrText(title.trim());
 
-          // Transition map viewport smoothly to target
           leafletMapRef.current.setView([newLat, newLng], 15);
           leafletMarkerRef.current.setLatLng([newLat, newLng]);
         } else {
-          alert(
-            "NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.",
-          );
+          alert("NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.");
         }
       }
     } catch (err) {
@@ -272,12 +257,9 @@ fetchedJobs,
     }
   };
 
-  // Live Tracking Hardware Handler within Modal
   const handleModalLiveTracking = () => {
     if (!navigator.geolocation) {
-      alert(
-        "GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.",
-      );
+      alert("GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.");
       return;
     }
 
@@ -309,9 +291,7 @@ fetchedJobs,
         }
       },
       (error) => {
-        alert(
-          "LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.",
-        );
+        alert("LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.");
       },
       { enableHighAccuracy: true, timeout: 7000 },
     );
@@ -319,6 +299,12 @@ fetchedJobs,
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/customer/bookings/${targetSlug}`);
+  };
+
+  // Safe wrapper execution to refresh list instantly upon new creations
+  const handleCreateJobFinalize = async () => {
+    await createJob();
+    fetchBookingsPendingJobs();
   };
 
   // ====================================================
@@ -338,8 +324,7 @@ fetchedJobs,
         <div className="dashboard-card main-view">
           <span className="card-flag">
             INTERACTIVE DISPATCH MANAGER
-            {turns_remaining !== undefined &&
-              ` — TURNS LEFT: ${turns_remaining}`}
+            {turns_remaining !== undefined && ` — TURNS LEFT: ${turns_remaining}`}
           </span>
           <h2>AI CHAT TERMINAL</h2>
           <div className="chat-box">
@@ -353,9 +338,7 @@ fetchedJobs,
             <input
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder={
-                is_complete ? "Conversation finalized." : "Instruct AI..."
-              }
+              placeholder={is_complete ? "Conversation finalized." : "Instruct AI..."}
               disabled={is_complete}
             />
             <button
@@ -378,9 +361,7 @@ fetchedJobs,
         <div className="card-header">••• AI CHAT TERMINAL</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge badge-highlight">
-              Live Dispatch — Active Session
-            </span>
+            <span className="badge badge-highlight">Live Dispatch — Active Session</span>
             <p className="card-summary">Logs Captured: {chatMessages.length}</p>
           </>
         ) : (
@@ -405,22 +386,9 @@ fetchedJobs,
           }}
         >
           {/* ⬅️ LEFT SIDE COLUMN */}
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              height: "100%",
-              minWidth: 0,
-            }}
-          >
-            <span className="card-flag" style={{ marginTop: "-14px" }}>
-              EDIT OR CREATE JOB POSTING
-            </span>
-            <h3
-              className="title"
-              style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}
-            >
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
+            <span className="card-flag" style={{ marginTop: "-14px" }}>EDIT OR CREATE JOB POSTING</span>
+            <h3 className="title" style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}>
               <span>·•TITLE:</span>
               <input
                 type="text"
@@ -459,36 +427,14 @@ fetchedJobs,
           </div>
 
           {/* ➡️ RIGHT SIDE COLUMN */}
-          <div
-            style={{
-              width: "35%",
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              minWidth: 0,
-              flexShrink: 0,
-            }}
-          >
-            <h3 className="title" dir="rtl" style={{ marginBottom: "4px" }}>
-              AttACHMENTs
-            </h3>
+          <div style={{ width: "35%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, flexShrink: 0 }}>
+            <h3 className="title" dir="rtl" style={{ marginBottom: "4px" }}>AttACHMENTs</h3>
 
-            <div
-              style={{
-                position: "relative",
-                display: "flex",
-                alignItems: "center",
-                width: "100%",
-              }}
-            >
+            <div style={{ position: "relative", display: "flex", alignItems: "center", width: "100%" }}>
               <button
                 type="button"
                 onClick={() => {
-                  if (scrollRef.current)
-                    scrollRef.current.scrollBy({
-                      left: -120,
-                      behavior: "smooth",
-                    });
+                  if (scrollRef.current) scrollRef.current.scrollBy({ left: -120, behavior: "smooth" });
                 }}
                 style={{
                   position: "absolute",
@@ -537,13 +483,11 @@ fetchedJobs,
                 }}
                 onMouseLeave={() => {
                   isDown.current = false;
-                  if (scrollRef.current)
-                    scrollRef.current.style.cursor = "grab";
+                  if (scrollRef.current) scrollRef.current.style.cursor = "grab";
                 }}
                 onMouseUp={() => {
                   isDown.current = false;
-                  if (scrollRef.current)
-                    scrollRef.current.style.cursor = "grab";
+                  if (scrollRef.current) scrollRef.current.style.cursor = "grab";
                 }}
                 onMouseMove={(e) => {
                   if (!isDown.current || !scrollRef.current) return;
@@ -573,15 +517,7 @@ fetchedJobs,
                     }}
                   >
                     <span style={{ fontWeight: "bold" }}>[{file.type}]</span>
-                    <span
-                      style={{
-                        fontSize: "9px",
-                        textOverflow: "ellipsis",
-                        overflow: "hidden",
-                        width: "100%",
-                        textAlign: "center",
-                      }}
-                    >
+                    <span style={{ fontSize: "9px", textOverflow: "ellipsis", overflow: "hidden", width: "100%", textAlign: "center" }}>
                       {file.name}
                     </span>
                   </div>
@@ -591,11 +527,7 @@ fetchedJobs,
               <button
                 type="button"
                 onClick={() => {
-                  if (scrollRef.current)
-                    scrollRef.current.scrollBy({
-                      left: 120,
-                      behavior: "smooth",
-                    });
+                  if (scrollRef.current) scrollRef.current.scrollBy({ left: 120, behavior: "smooth" });
                 }}
                 style={{
                   position: "absolute",
@@ -619,10 +551,7 @@ fetchedJobs,
               </button>
             </div>
 
-            <h3 className="title" dir="rtl" style={{ marginTop: "10px" }}>
-              {" "}
-              UsER INFo{" "}
-            </h3>
+            <h3 className="title" dir="rtl" style={{ marginTop: "10px" }}> UsER INFo </h3>
             <div className="user-info" style={{ lineHeight: "35px" }}>
               <span style={{ display: "inline-flex", alignItems: "baseline" }}>
                 <span>NAME:</span>
@@ -668,7 +597,6 @@ fetchedJobs,
                 />
               </span>
 
-              {/* 🗺️ CLEAN SINGLE-CLICK INTERACTIVE ADDRESS MODULE */}
               <div
                 onClick={() => setIsMapOpen(true)}
                 style={{
@@ -713,7 +641,7 @@ fetchedJobs,
 
             <button
               type="button"
-              onClick={() => createJob()}
+              onClick={handleCreateJobFinalize}
               className="title"
               dir="rtl"
               name="post"
@@ -733,15 +661,11 @@ fetchedJobs,
         <div className="card-header">••• JOB DESCRIPTION WORKSPACE</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge">
-              Sidebar: Description Live Glance — Draft Mode
-            </span>
-            <p className="card-summary"></p>
+            <span className="badge">Sidebar: Description Live Glance — Draft Mode</span>
           </>
         ) : (
           <span className="badge">
-            Footer: Draft character footprint: {jobDescriptionDraft.length}{" "}
-            chars
+            Footer: Draft character footprint: {jobDescriptionDraft.length} chars
           </span>
         )}
       </div>
@@ -751,16 +675,58 @@ fetchedJobs,
   const renderActivePosts = (slotKey) => {
     if (slotKey === "main") {
       return (
-        <div className="dashboard-card main-view">
+        <div className="dashboard-card main-view" style={{ overflowY: "auto" }}>
+          <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
           <h2>ACTIVE PENDING POSTS</h2>
-          <button onClick={fetchBookingsPendingJobs}>REFRESH LIST</button>
-          <ul>
-            {fetchedJobs.map((job) => (
-              <li key={job.id}>
-                {job.title} - {job.status} - {job.description}
-              </li>
-            ))}
-          </ul>
+          <button 
+            onClick={fetchBookingsPendingJobs}
+            style={{
+              background: "#1a1a1a",
+              color: "#ffffff",
+              border: "2px solid #1a1a1a",
+              borderRadius: "12px",
+              padding: "8px 16px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              marginBottom: "16px",
+              width: "fit-content"
+            }}
+          >
+            🔄 REFRESH LIVE PIPELINE
+          </button>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {fetchedJobs.length === 0 ? (
+              <p style={{ fontFamily: "Courier New", color: "#666", fontSize: "0.9rem" }}>
+                No active pending jobs found in your database instance.
+              </p>
+            ) : (
+              fetchedJobs.map((job) => (
+                <div 
+                  key={job.id} 
+                  style={{
+                    border: "2px solid #1a1a1a",
+                    borderRadius: "16px",
+                    padding: "16px",
+                    background: "#ffffff",
+                    boxShadow: "4px 4px 0px #1a1a1a"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <span style={{ fontFamily: "Courier New", fontWeight: "bold", fontSize: "1.1rem" }}>
+                      {job.title ? job.title.toUpperCase() : "NEW JOB REQUEST"}
+                    </span>
+                    <span className="badge badge-highlight" style={{ textTransform: "uppercase", fontSize: "0.75rem", padding: "4px 8px" }}>
+                      ⚙️ {job.status || "PENDING"}
+                    </span>
+                  </div>
+                  <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "#333", lineHeight: "1.4" }}>
+                    {job.description}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       );
     }
@@ -773,12 +739,8 @@ fetchedJobs,
         <div className="card-header">••• YOUR ACTIVE POSTS</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge badge-highlight">
-              Network Pipeline Active
-            </span>
-            <p className="card-summary">
-              Live Trackable: {activePostsCount} Positions
-            </p>
+            <span className="badge badge-highlight">Network Pipeline Active</span>
+            <p className="card-summary">Live Trackable: {activePostsCount} Positions</p>
           </>
         ) : (
           <span className="badge">
@@ -841,33 +803,14 @@ fetchedJobs,
               fontFamily: "inherit",
             }}
           >
-            {/* Header */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                width: "100%",
-              }}
-            >
-              <span
-                style={{
-                  fontWeight: "bold",
-                  fontSize: "14px",
-                  textTransform: "uppercase",
-                  letterSpacing: "1px",
-                }}
-              >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+              <span style={{ fontWeight: "bold", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>
                 🗺️ CHOOSE DELIVERY PIN (NEPAL)
               </span>
             </div>
 
-            {/* Address Search Form + Current Location Pin Trigger Button */}
             <div style={{ display: "flex", gap: "6px", width: "100%" }}>
-              <form
-                onSubmit={executeModalAddressSearch}
-                style={{ display: "flex", gap: "6px", flex: 1 }}
-              >
+              <form onSubmit={executeModalAddressSearch} style={{ display: "flex", gap: "6px", flex: 1 }}>
                 <input
                   type="text"
                   placeholder="SEARCH LALITPUR, THAMEL, ETC..."
@@ -901,7 +844,6 @@ fetchedJobs,
                 </button>
               </form>
 
-              {/* 🎯 LIVE GEOLOCATION HARDWARE SNAP BUTTON */}
               <button
                 type="button"
                 onClick={handleModalLiveTracking}
@@ -918,16 +860,11 @@ fetchedJobs,
                   justifyContent: "center",
                   boxShadow: "2px 2px 0px #000000",
                 }}
-                onMouseDown={(e) =>
-                  (e.currentTarget.style.transform = "translate(1px, 1px)")
-                }
-                onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
               >
                 📍
               </button>
             </div>
 
-            {/* Leaflet Surface Container Mount Node */}
             <div
               ref={mapContainerRef}
               style={{
@@ -941,31 +878,13 @@ fetchedJobs,
               }}
             />
 
-            {/* Resolved Preview Description Output Text Block */}
-            <div
-              style={{
-                fontSize: "11px",
-                background: "#f9f9f9",
-                padding: "8px",
-                border: "1px dashed #000",
-                borderRadius: "6px",
-              }}
-            >
+            <div style={{ fontSize: "11px", background: "#f9f9f9", padding: "8px", border: "1px dashed #000", borderRadius: "6px" }}>
               <strong style={{ color: "#333" }}>SELECTED ADDRESS:</strong>
-              <div
-                style={{
-                  textTransform: "uppercase",
-                  marginTop: "2px",
-                  fontWeight: "bold",
-                  wordBreak: "break-word",
-                }}
-              >
-                {modalAddrText ||
-                  "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
+              <div style={{ textTransform: "uppercase", marginTop: "2px", fontWeight: "bold", wordBreak: "break-word" }}>
+                {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
               </div>
             </div>
 
-            {/* Bottom Modal Action Strip */}
             <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
               <button
                 type="button"
@@ -982,10 +901,6 @@ fetchedJobs,
                   cursor: "pointer",
                   boxShadow: "2px 2px 0px #000",
                 }}
-                onMouseDown={(e) =>
-                  (e.currentTarget.style.transform = "translate(2px, 2px)")
-                }
-                onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
               >
                 CANCEL
               </button>
@@ -993,10 +908,7 @@ fetchedJobs,
               <button
                 type="button"
                 onClick={() => {
-                  setUserAddrText(
-                    modalAddrText ||
-                      `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`,
-                  );
+                  setUserAddrText(modalAddrText || `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`);
                   setUserCoordinates(modalLng, modalLat);
                   setIsMapOpen(false);
                 }}
@@ -1013,10 +925,6 @@ fetchedJobs,
                   boxShadow: "2px 2px 0px #000",
                   color: "darkslategray",
                 }}
-                onMouseDown={(e) =>
-                  (e.currentTarget.style.transform = "translate(2px, 2px)")
-                }
-                onMouseUp={(e) => (e.currentTarget.style.transform = "none")}
               >
                 CONFIRM LOCATION
               </button>

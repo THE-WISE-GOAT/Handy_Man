@@ -305,7 +305,9 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // Submit the application for admin review
+  // ====================================================
+  // 🛠️ ARCHITECTURAL UPDATE: Hit the correct completion/extraction endpoint!
+  // ====================================================
   submitApplication: async () => {
     const { workerChatId, phoneNumber, addressText, latitude, longitude } = get();
 
@@ -318,32 +320,39 @@ export const createMeZlice = (set, get) => ({
 
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/worker-onboarding/submit", {
+      
+      // Hitting complete instead of raw submit ensures that the profile extractor,
+      // Nvidia vector embeds, and DB properties populate correctly.
+      const response = await fetch(`http://127.0.0.1:8000/worker-interview/${workerChatId}/complete`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
-          worker_chat_id: parseInt(workerChatId),
-          phone_number: phoneNumber || null,
-          address_text: addressText || null,
-          latitude: latitude || null,
-          longitude: longitude || null,
+          phone_number: phoneNumber || "",
+          location: {
+            longitude: parseFloat(longitude) || 0.0,
+            latitude: parseFloat(latitude) || 0.0
+          }
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Submit failed: ${response.status}`);
+        throw new Error(`Completion / submit pipeline failed: ${response.status}`);
       }
 
       const data = await response.json();
+      
       set({
-        applicantStage: data.stage,
+        applicantStage: "pending_admin_review", // Pushes UI state forward
         applicationSubmitted: true,
       });
+
+      // Refresh applicant and map statuses
+      await get().loadApplicantStatus();
     } catch (error) {
-      console.error("Failed to submit application:", error);
+      console.error("Failed to complete application process:", error);
     } finally {
       set({ isSubmittingApplication: false });
     }

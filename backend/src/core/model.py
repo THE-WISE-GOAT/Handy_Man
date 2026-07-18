@@ -148,8 +148,16 @@ class WorkerProfile(Base):
 
         # Core Identifiers
     id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    
+    # ADDED unique=True HERE
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        unique=True, 
+        nullable=False
+    )
+    
     worker_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+    
     # Outer Metadata Fields
     stage: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., "complete"
     is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -186,7 +194,7 @@ class WorkerProfile(Base):
     "JobWorkerMatch",
     back_populates="worker",
     cascade="all, delete-orphan",
-    )
+)
 
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"
