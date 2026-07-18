@@ -419,7 +419,7 @@ async def complete_customer_chat(
         db.rollback()
         logger.error(f"Persistence failed: {e}")
         raise HTTPException(status_code=500, detail="Database update failed.")
-    
+    categories_for_matching = getattr(chat_session, "categories", []) or []
     job = db.execute(
         select(model.Job).where(model.Job.booking_chat_id == booking_chat_id)
     ).scalar_one_or_none()
@@ -430,7 +430,7 @@ async def complete_customer_chat(
         except Exception as e:
             logger.error(f"Semantic matching failed: {e}")
     
-    category, _ = _extract_primary_category(job_data.categories or [])
+    category, _ = _extract_primary_category(categories_for_matching)
     
     if category:
         category_lower = category.lower()
@@ -555,7 +555,8 @@ def get_booking_summary(
 # ── Matching configuration ────────────────────────────────────────────────────
 
 DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km — hard cutoff, not a soft preference
-FALLBACK_SEARCH_RADIUS_METERS = 500_000  # 500 km — development fallback when no local matches found
+FALLBACK_SEARCH_RADIUS_METERS = 500_000  # 500 km — last-resort widen when nothing is close
+MATCH_SCORE_THRESHOLD = 70.0  # workers scoring below this are treated as no-match
 
 
 # ── Helper: pick the primary category ────────────────────────────────────────
@@ -570,9 +571,22 @@ def _extract_primary_category(categories: list[dict]) -> tuple[str | None, bool]
     """
     if not categories:
         return None, False
-    
+
     top = categories[0]
     return top.get("category"), bool(top.get("is_custom_category", False))
+
+
+# ── Helper: distance -> 0-100 match score (single source of truth) ──────────
+
+def _compute_match_score(distance: float) -> float:
+    """
+    Sigmoid rescale of cosine_distance into a 0-100 score. Kept as one
+    function so the threshold filter and the response payload can never
+    drift apart by using two copies of this formula.
+    """
+    return max(0.0, min(100.0, round(
+        (1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2
+    )))
 
 
 # ── Helper: category (optional) + radius (mandatory) + vector rank ──────────
@@ -622,6 +636,22 @@ def _search_workers(
     return db.execute(stmt).all()
 
 
+# ── Helper: drop any row scoring below the threshold ─────────────────────────
+
+def _above_threshold(matches, threshold: float = MATCH_SCORE_THRESHOLD):
+    """
+    Rows already come ordered closest-first, so this only ever trims off
+    the tail — it never reorders anything. A tier whose best rows still
+    fall under threshold comes back empty, which the caller treats the
+    same as "this tier found nothing" and cascades to the next tier.
+    """
+    return [
+        (worker, username, distance)
+        for (worker, username, distance) in matches
+        if _compute_match_score(distance) >= threshold
+    ]
+
+
 # ── Find help ─────────────────────────────────────────────────────────────────
 
 @match_router.get(
@@ -666,39 +696,53 @@ def find_help(
             detail="This chat session was not a dispatchable job request.",
         )
 
-    category, is_custom = _extract_primary_category(job_data.categories or [])
-    
-    # We remove the `and not is_custom` condition here so both false and true custom categories 
-    # query the database exactly the same way before falling back.
-    used_category_filter = bool(category) 
+    category, _is_custom = _extract_primary_category(job_data.categories or [])
 
     matches = []
-    if used_category_filter:
-        matches = _search_workers(
+    used_category_filter = False
+
+    # Tier 1: category + normal radius — only attempted if a category exists.
+    if category:
+        matches = _above_threshold(_search_workers(
             db,
             query_vector=job_data.description_vector,
             customer_location=job_data.location,
             category_tag=category,
             radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
             limit=5,
-        )
+        ))
         used_category_filter = bool(matches)
 
-    # Fallback: if category-filtered search yields nothing, broaden the radius
+    # Tier 2: category didn't match (or none existed, or all its matches
+    # fell below threshold) — drop it and rank every worker inside the
+    # SAME normal radius on semantic similarity alone.
     if not matches:
-        matches = _search_workers(
+        matches = _above_threshold(_search_workers(
             db,
             query_vector=job_data.description_vector,
             customer_location=job_data.location,
-            category_tag=category,
+            category_tag=None,
+            radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
+            limit=5,
+        ))
+        used_category_filter = False
+
+    # Tier 3: still nothing above threshold nearby — widen the radius as a
+    # last resort, still category-free.
+    if not matches:
+        matches = _above_threshold(_search_workers(
+            db,
+            query_vector=job_data.description_vector,
+            customer_location=job_data.location,
+            category_tag=None,
             radius_meters=FALLBACK_SEARCH_RADIUS_METERS,
             limit=5,
-        )
-        used_category_filter = bool(matches)
+        ))
+        used_category_filter = False
 
     if not matches:
         return {
-            "matched_by_category": used_category_filter,
+            "matched_by_category": False,
             "category": category,
             "workers": [],
         }
@@ -710,7 +754,7 @@ def find_help(
             "job_category": worker.job_category,
             "category_tag": worker.category_tag,
             "job_description": worker.job_description,
-            "match_score": max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2))),
+            "match_score": _compute_match_score(distance),
         }
         for worker, username, distance in matches
     ]
