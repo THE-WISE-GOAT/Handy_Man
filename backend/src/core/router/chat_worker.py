@@ -26,16 +26,17 @@ Endpoints
 import logging
 import os
 import requests
-from fastapi import APIRouter, Depends, HTTPException, status
+# FIX: Added BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
-# FIX: Import matching_manager and manager directly as decoupled sibling core dependencies
-from src.core import model, schema, manager, matching_manager
+from src.core import model, schema, matching_manager
+from src.core.manager import manager
 from src.ai.worker_chat_analyser_nvidia import (
-    _nvidia_client,          # shared NIM client instance
+    _nvidia_client,          
     build_fresh_history,
     count_user_turns,
     generate_scenario,
@@ -124,7 +125,7 @@ def _fetch_nvidia_passage_embedding(job_desc: str) -> list[float]:
     nvidia_payload = {
         "model": "nvidia/nv-embed-v1",
         "input": [job_desc],
-        "input_type": "passage",  # Set input type to passage target search document
+        "input_type": "passage",  
         "encoding_format": "float"
     }
 
@@ -151,6 +152,37 @@ def _fetch_nvidia_passage_embedding(job_desc: str) -> list[float]:
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to connect to Nvidia API: {e}"
         )
+
+# FIX: Added async helper for WebSocket broadcasting
+async def _broadcast_live_alerts(worker_chat_id: int, matched_jobs: list[dict]):
+    """Helper to run async websocket broadcasts from a sync endpoint in the background."""
+    
+    for matched_job in matched_jobs:
+        booking_chat_id = matched_job.get("booking_chat_id")
+        
+        # 1. PING THE WORKER: "You matched with a job!"
+        try:
+            worker_payload = {
+                "event": "new_job_match",
+                "booking_chat_id": booking_chat_id, 
+                "title": matched_job.get("title"), 
+                "description": matched_job.get("description")
+            }
+            await manager.send_worker_notification(worker_chat_id, worker_payload)
+        except Exception as ws_err:
+            logger.warning(f"Failed alert broadcast to worker {worker_chat_id}: {ws_err}")
+
+        # 2. PING THE CUSTOMER: "A new worker just arrived for your job!"
+        try:
+            customer_payload = {
+                "event": "new_worker_match",
+                "message": "A new worker matching your job requirements just joined the platform.",
+                "worker_chat_id": worker_chat_id
+            }
+            # Note: We send this to the booking_chat_id channel
+            await manager.send_customer_notification(booking_chat_id, customer_payload)
+        except Exception as ws_err:
+            logger.warning(f"Failed alert broadcast to customer booking {booking_chat_id}: {ws_err}")
 
 
 # ── 1. Start a new session ───────────────────────────────────────────────────
@@ -564,9 +596,10 @@ def get_worker_summary(
     "/{worker_chat_id}/complete",
     summary="Complete the AI chat, extract profile keys, generate embedding, save to DB, and run reverse job matching funnel",
 )
-async def complete_worker_chat(
+def complete_worker_chat( # FIX: Changed from async def to def
     worker_chat_id: int, 
     payload: schema.WorkerCompleteChatIn,
+    background_tasks: BackgroundTasks, # FIX: Added background tasks
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
@@ -649,7 +682,7 @@ async def complete_worker_chat(
         logger.error(f"WorkerProfile entity staging failed: {e}")
         raise HTTPException(status_code=500, detail="Database write failure during onboarding initialization.")
 
-    # 4. FIX: Delegate matching directly to matching_manager as an independent dependency module
+    # 4. Delegate matching directly to matching_manager as an independent dependency module
     try:
         matching_result = matching_manager.create_matches_for_worker(
             db=db,
@@ -664,18 +697,10 @@ async def complete_worker_chat(
         logger.error(f"Matching Engine reverse placement transaction failure: {engine_err}")
         raise HTTPException(status_code=500, detail="Failed to safely compile and match worker to existing marketplace jobs.")
 
-    # 5. Broadcast live edge updates using the connection manager
-    for matched_job in matching_result.get("matched_jobs", []):
-        try:
-            job_payload = {
-                "booking_chat_id": matched_job.get("booking_chat_id"), 
-                "title": matched_job.get("title"), 
-                "description": matched_job.get("description")
-            }
-            # Alert the newly matching worker immediately about historical client jobs needing their profile
-            await manager.send_job_notification(worker_chat_id, job_payload)
-        except Exception as ws_err:
-            logger.warning(f"Failed live placement alert broadcast to worker chat {worker_chat_id}: {ws_err}")
+    # 5. FIX: Broadcast live edge updates safely via BackgroundTasks
+    matched_jobs = matching_result.get("matched_jobs", [])
+    if matched_jobs:
+        background_tasks.add_task(_broadcast_live_alerts, worker_chat_id, matched_jobs)
 
     return {
         "status": "success", 

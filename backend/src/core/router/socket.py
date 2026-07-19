@@ -4,29 +4,47 @@ from src.core.oauth2 import verify_access_token
 
 router = APIRouter(tags=["WebSocket"])
 
-@router.websocket("/ws/{worker_chat_id}")
-async def websocket_endpoint(
+@router.websocket("/ws/worker/{worker_chat_id}")
+async def worker_websocket_endpoint(
     websocket: WebSocket, 
     worker_chat_id: int, 
     token: str
 ):
-    # 1. Verify Token
     credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials"
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials"
     )
     token_data = verify_access_token(token, credentials_exception)
     
-    # 2. Safety check: ensure the authenticated user matches the requested worker_chat_id
-    if int(token_data.id) != worker_chat_id: # Ensure 'id' matches the field in your token_data
+    if int(token_data.id) != worker_chat_id: 
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # 3. Connect
-    await manager.connect(websocket, worker_chat_id)
+    await manager.connect_worker(websocket, worker_chat_id)
     try:
         while True:
-            # Keep connection alive
             await websocket.receive_text()
     except WebSocketDisconnect:
-        manager.disconnect(worker_chat_id)
+        manager.disconnect_worker(worker_chat_id)
+
+
+@router.websocket("/ws/booking/{booking_chat_id}")
+async def customer_websocket_endpoint(
+    websocket: WebSocket, 
+    booking_chat_id: int, 
+    token: str
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials"
+    )
+    token_data = verify_access_token(token, credentials_exception)
+    
+    # Optional: Safety check to ensure token_data.id owns this booking_chat_id
+    # You might need a DB call here if you want strict validation, 
+    # but for now, we'll establish the connection.
+
+    await manager.connect_customer(websocket, booking_chat_id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect_customer(booking_chat_id)

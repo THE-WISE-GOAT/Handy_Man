@@ -19,12 +19,12 @@ Endpoints
 import logging
 import os
 import requests
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
-# FIX: Explicitly import matching_manager alongside job_manager from core
 from src.core import model, schema, job_manager, matching_manager
 from src.core.manager import manager
 
@@ -39,7 +39,6 @@ from src.ai.customer_chat_analyser_nvidia import (
 )
 
 router = APIRouter(prefix="/dispatch", tags=["Dispatch"])
-match_router = APIRouter(tags=["Dispatch"])
 logger = logging.getLogger(__name__)
 
 DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km — hard cutoff
@@ -138,6 +137,15 @@ def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to connect to Nvidia API: {e}"
         )
+
+
+async def _broadcast_notifications(worker_chat_ids: list[int], job_payload: dict):
+    """Helper to run async websocket broadcasts from a sync endpoint in the background."""
+    for worker_chat_id in worker_chat_ids:
+        try:
+            await manager.send_job_notification(worker_chat_id, job_payload)
+        except Exception as ws_err:
+            logger.warning(f"Failed live alert broadcast to worker {worker_chat_id}: {ws_err}")
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -278,9 +286,10 @@ def dispatch_chat(
     "/{booking_chat_id}/complete",
     summary="Complete the AI chat, write core records, invoke engine matching, and alert workers",
 )
-async def complete_customer_chat(
+def complete_customer_chat(
     booking_chat_id: int, 
     payload: schema.CompleteChatIn, 
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
@@ -333,24 +342,12 @@ async def complete_customer_chat(
 
     try:
         job_manager.upsert_chat_data(db, booking_chat_id, current_user.id, customer_fields)
-        # FIX / OPTIMIZATION: Capture the job row returned directly from your upsert tool
         job_data = job_manager.upsert_job(db, booking_chat_id, current_user.id, job_fields)
     except Exception as e:
         db.rollback()
         logger.error(f"Core entity persistence failed: {e}")
         raise HTTPException(status_code=500, detail="Database update failed.")
     
-    # Fallback query only if upsert_job does not return the model object instance
-    if not job_data:
-        job_data = db.execute(
-            select(model.Job).where(model.Job.booking_chat_id == booking_chat_id)
-        ).scalar_one_or_none()
-
-    if not job_data:
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Job processing lookup failed after setup.")
-    
-    # FIX: Correctly routed directly to matching_manager as an independent module dependency
     try:
         matching_result = matching_manager.create_matches_for_job(
             db=db,
@@ -371,11 +368,10 @@ async def complete_customer_chat(
         "description": job_desc
     }
     
-    for worker_chat_id in matching_result.get("worker_chat_ids", []):
-        try:
-            await manager.send_job_notification(worker_chat_id, job_payload)
-        except Exception as ws_err:
-            logger.warning(f"Failed live alert broadcast to worker {worker_chat_id}: {ws_err}")
+    # Broadcast asynchronously without blocking the main event loop
+    worker_chat_ids = matching_result.get("worker_chat_ids", [])
+    if worker_chat_ids:
+        background_tasks.add_task(_broadcast_notifications, worker_chat_ids, job_payload)
 
     return {
         "status": "success", 
@@ -449,7 +445,7 @@ def _extract_primary_category(categories: list[dict]) -> tuple[str | None, bool]
     return top.get("category"), bool(top.get("is_custom_category", False))
 
 
-@match_router.get(
+@router.get(
     "/match/{booking_chat_id}/find-help",
     response_model=schema.FindHelpOut,
     summary="Fetch pre-calculated matching workers for a completed job layout from DB",
@@ -459,7 +455,7 @@ def find_help(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    # REMINDER: Verify if model.Job uses customer_id or user_id in your schema
+
     job_data = db.execute(
         select(model.Job).where(
             model.Job.booking_chat_id == booking_chat_id,

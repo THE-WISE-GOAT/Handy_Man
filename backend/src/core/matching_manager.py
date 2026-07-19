@@ -208,4 +208,4 @@ def create_matches_for_worker(
     return {
         "matched_jobs": matched_jobs_payload,
         "count": len(matched_jobs_payload)
-    }
+    } 
