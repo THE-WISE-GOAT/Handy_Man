@@ -2,7 +2,7 @@
 
 `Handy_Man` is a location-centric, map-based digital platform that bridges the gap between independent gig workers, professional service organizations, and local customers. Unlike rigid on-demand apps with algorithmic pricing, this platform empowers workers with total geographic control via interactive service radius mapping and facilitates direct, transparent price negotiations.
 
-The application dynamically accommodates diverse hiring scenarios—ranging from single ad-hoc repairs to multi-worker modular groups and blueprint-reliant agency projects.
+The application dynamically accommodates diverse hiring scenarios—ranging from single ad-hoc repairs to multi-worker modular groups and blueprint-reliant agency projects
 
 ---
 
