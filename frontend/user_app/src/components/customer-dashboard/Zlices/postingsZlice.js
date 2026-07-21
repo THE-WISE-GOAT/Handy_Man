@@ -40,6 +40,8 @@ export const createPostingsZlice = (set, get) => ({
   feedbackRating: "Verified Feedback - 5.0 Star Average",
   pipelineStatus: "Post Network Pipeline Monitor Active",
 
+  customerSocket: null,
+
   // ==========================================
   // 3. ACTIONS AND INTEGRATION PIPELINES
   // ==========================================
@@ -206,5 +208,36 @@ export const createPostingsZlice = (set, get) => ({
   },
 
   setSelectedWorkerId: (workerId) => set({ selectedWorkerId: workerId }),
-  setSelectedJob: (job) => set({ selectedJob: job }),
+  setSelectedJob: (job) => set({ selectedJob: job, selectedWorkerId: null }),
+
+  connectCustomerDispatch: (customerId, token) => {
+    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/customer/${customerId}?token=${token}`);
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === "WORKER_INTEREST_UPDATE") {
+        const { job_id, worker_chat_id, interested } = message.data;
+        set((state) => ({
+          pendingJobs: state.pendingJobs.map(job =>
+            job.id === job_id
+              ? { ...job, interestedCount: (job.interestedCount || 0) + (interested ? 1 : -1) }
+              : job
+          ),
+          workerLocations: {
+            ...state.workerLocations,
+            [worker_chat_id]: {
+              ...state.workerLocations[worker_chat_id],
+              is_interested: interested
+            }
+          }
+        }));
+      }
+      if (message.type === "NEW_BID") {
+        const { job_id, bid } = message.data;
+        set((state) => ({
+          biddingsStream: [...state.biddingsStream, { ...bid, id: crypto.randomUUID(), status: "Incoming" }]
+        }));
+      }
+    };
+    set({ customerSocket: socket });
+  },
 });

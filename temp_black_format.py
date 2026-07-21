@@ -1,210 +1,722 @@
-# This file defines the database schema for the User model using SQLAlchemy. This is use for components of database components
+"""
+Dispatch router — AI-powered home-repair booking interview.
 
-from typing import List, Optional
-from pydantic import BaseModel, Field
-from src.database.database import Base
-from sqlalchemy import Column, DateTime, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float, text
-from sqlalchemy.sql.sqltypes import TIMESTAMP, UUID, Numeric
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import JSONB, ARRAY
-import enum
-from datetime import datetime
-from geoalchemy2 import Geography
-from geoalchemy2.elements import WKBElement
-from sqlalchemy import JSON
-from sqlalchemy import DateTime, JSON, func  
-from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime
-from pgvector.sqlalchemy import Vector
-from typing import Dict, Any
+Endpoints
+---------
+  POST /dispatch/session
+      Start a brand-new chat session.  Returns the opening greeting and
+      the new booking_chat_id so the client can display it immediately
+      before the customer has typed anything.
 
-class User(Base):
-    __tablename__ = "users"
+  POST /dispatch/chat
+      Send one customer message and get the AI reply back.
+      Automatically closes the session when [COMPLETE] is emitted or
+      MAX_TURNS is reached and triggers the extraction pipeline.
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    password: Mapped[str] = mapped_column(String, nullable=False)
-    username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    firstName: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    lastName: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    phonenumber: Mapped[Optional[str]] = mapped_column("phonenumber", String, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, server_default='TRUE')
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default="now()")
-      
-    
-    # THE RELATIONSHIP LINK FOR USER
-    roles: Mapped[List["Role"]] = relationship(
-        "Role",
-        secondary="user_roles",       # Maps to the __tablename__ string of UserRole
-        back_populates="users",       # Matches the attribute name inside the Role class
-        lazy="selectin"               # CRITICAL FOR ASYNCPG: Pre-loads data safely, lazy="selectin" is crucial here. It tells SQLAlchemy to fetch the user's roles automatically so they are ready when your endpoint asks for them (Mainly to have asysnc process)
-    )
-    
-class Role(Base):
-    __tablename__ = "roles"
+  GET  /dispatch/{booking_chat_id}/history
+      Fetch the full conversation so far (client-safe subset only —
+      system prompt is stripped).
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+  GET  /dispatch/{booking_chat_id}/summary
+      Fetch the structured extraction result once the session is complete.
+      Returns 409 if called while the session is still in progress.
+"""
 
-    # THE RELATIONSHIP LINK FOR ROLE
-    users: Mapped[List["User"]] = relationship(
-        "User",
-        secondary="user_roles",
-        back_populates="roles",
-        lazy="selectin"
-    )
-
-class UserRole(Base):
-    __tablename__ = "user_roles"
-
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
-
-
-
-class BookingChat(Base): 
-    __tablename__ = "booking_chats"
-    
-    id: Mapped[int]= mapped_column(primary_key=True, index=True)
-    user_id: Mapped[int]= mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    history: Mapped[list[dict]] = mapped_column(JSON, default=list) # store chat history as a list of dictionaries
-    is_complete: Mapped[bool]  = mapped_column(Boolean, server_default='FALSE', nullable=False) # tell if the chat is complete or not
-    is_job_request: Mapped[bool]   = mapped_column(Boolean, server_default='FALSE', nullable=False) # tell if the chat is a job request or not
-    categories: Mapped[list[dict]]   = mapped_column(JSONB, nullable=True) # tell about job categories, this is a list of dictionaries, each dictionary contains the category name and the subcategories
-    problem_description: Mapped[str | None] = mapped_column(Text, nullable=True) # just text about the job request
-    
-    
-
-# needs top work on it
-class JobStatus(str, enum.Enum):
-    OPEN = "open"
-    MATCHED = "matched"
-    COMPLETED = "completed"
-    
-
-# needs to work on it
-class Service_tasks(Base):
-    __tablename__ = "service_tasks"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    customer_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    problem_description: Mapped[str] = mapped_column(Text, nullable=False) 
-    image_url: Mapped[str] = mapped_column(String, nullable=True)
-    location: Mapped[WKBElement] = mapped_column(Geography(geometry_type='POINT', srid=4326), nullable=False)
-    ai_extracted_json: Mapped[dict] = mapped_column(JSONB, nullable=True)
-    status: Mapped[JobStatus] = mapped_column(
-    Enum(JobStatus, name="job_status_enum"), 
-    nullable=False, 
-    default=JobStatus.OPEN # Python handles the default assignment smoothly
+import logging
+import math
+from sqlalchemy import select, func, or_ 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+import requests, os
+from src.database.database import get_db
+from src.core.oauth2 import get_current_user
+from src.core import model, schema, job_manager, manager
+from src.core.router.matching_manager import create_matches_for_job
+from src.ai.customer_chat_analyser_nvidia import (
+    _nvidia_client,          # shared NIM client — no second API key needed
+    build_fresh_history,
+    count_user_turns,
+    extract_final_json,
+    INITIAL_GREETING,
+    MAX_TURNS,
+    MODEL_NAME,
 )
-    
 
-# needs to work on it
-class BidStatus(str, enum.Enum):
-    SUBMITTED = "submitted"
-    SELECTED = "selected"
-    REJECTED = "rejected"
+router = APIRouter(prefix="/dispatch", tags=["Dispatch"])
+match_router = APIRouter(tags=["Dispatch"])
+logger = logging.getLogger(__name__)
 
-# let's work on this later
-class Bids(Base):
-    __tablename__ = "bids"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    task_id: Mapped[int] = mapped_column(ForeignKey("service_tasks.id", ondelete="CASCADE"), nullable=False)
-    worker_id: Mapped[int] = mapped_column(ForeignKey("workers.id", ondelete="CASCADE"), nullable=False)
-    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True) 
-    status: Mapped[BidStatus] = mapped_column(
-    Enum(BidStatus, name="bid_status_enum"), 
-    nullable=False, 
-    default=BidStatus.SUBMITTED # Python handles the default assignment smoothly
+# ── Helper ───────────────────────────────────────────────────────────────────
+
+def _get_own_session(
+    booking_chat_id: int,
+    db: Session,
+    current_user: model.User,
+) -> model.BookingChat:
+    """Fetch a BookingChat that belongs to the current user; 404 if missing."""
+    session = db.execute(
+        select(model.BookingChat).where(
+            model.BookingChat.id == booking_chat_id,
+            # FIX: BookingChat has no `customer_id` column — the actual
+            # foreign key on the model is `user_id`. This was raising an
+            # AttributeError on every single call to this helper, i.e.
+            # every endpoint below.
+            model.BookingChat.user_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat session not found.",
+        )
+    return session
+
+
+# ── 1. Start a new session ───────────────────────────────────────────────────
+
+@router.post("/session",response_model=schema.SessionStartOut,status_code=status.HTTP_201_CREATED,summary="Create a new dispatch chat session",
 )
+def start_session(
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    """
+    Creates a fresh BookingChat row, seeds the conversation history with
+    the system prompt and the opening greeting, and returns the
+    booking_chat_id + greeting to the client.
+
+    Call this once when the customer opens the chat UI.
+    """
+    chat_session = model.BookingChat(
+        # FIX: same customer_id -> user_id correction as _get_own_session
+        # above, so newly created rows actually populate the real FK
+        # column instead of failing immediately.
+        user_id=current_user.id,
+        history=build_fresh_history(),
+        is_complete=False,
+    )
+    db.add(chat_session)
+
+    try:
+        db.commit()
+        db.refresh(chat_session)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create chat session.",
+        )
+
+    return {
+        "booking_chat_id": chat_session.id,
+        "ai_response": INITIAL_GREETING,
+        "turns_remaining": MAX_TURNS,
+    }
+
+@router.post(
+    "/chat",
+    response_model=schema.ChatMessageOut,
+    summary="Send a customer message and receive an AI reply",
+)
+def dispatch_chat(
+    payload: schema.ChatMessageIn,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    """
+    Handles one full conversation turn:
+
+    1. Validates the session and checks it is still open.
+    2. Appends the customer message to the persisted history.
+    3. Calls the NIM model with the full history so context is never lost.
+    4. Detects completion via [COMPLETE] or MAX_TURNS exhaustion.
+    5. On completion, runs the extraction pipeline and caches the
+       structured result — including whether a real job was found and,
+       per trade, whether it came from the static registry or the AI
+       fallback.
+    6. Commits everything in one transaction.
+    """
+
+    # ── Resolve session ───────────────────────────────────────────────────────
+    if payload.booking_chat_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="booking_chat_id must be a positive integer. Call POST /dispatch/session first.",
+        )
+
+    chat_session = _get_own_session(payload.booking_chat_id, db, current_user)
+
+    if chat_session.is_complete:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This chat session is already completed. Start a new session.",
+        )
+
+    # ── Append customer message ───────────────────────────────────────────────
+    updated_history = list(chat_session.history)
+    updated_history.append({"role": "user", "content": payload.message})
+    user_turn_count = count_user_turns(updated_history)
+
+    # ── Call the NIM model ───────────────────────────────────────────────────
+    try:
+        response = _nvidia_client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=updated_history,
+            temperature=0.0,
+            max_tokens=512,   # system prompt enforces 1–2 sentence replies
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"NVIDIA NIM inference error: {exc}",
+        )
+
+    ai_message: str = response.choices[0].message.content.strip()
+
+    # ── Completion detection ──────────────────────────────────────────────────
+    force_complete = user_turn_count >= MAX_TURNS
+    is_complete    = "[COMPLETE]" in ai_message or force_complete
+
+    if force_complete and "[COMPLETE]" not in ai_message:
+        ai_message += " [COMPLETE]"
+
+    # Persist the raw AI message (with tag) before we strip it for display
+    updated_history.append({"role": "assistant", "content": ai_message})
+    chat_session.history = updated_history
+
+    # ── Strip tag for client display ──────────────────────────────────────────
+    display_message = ai_message.replace("[COMPLETE]", "").strip()
+
+    # ── Extraction pipeline (only on completion) ──────────────────────────────
+    categories_to_return:  list[dict] = []
+    tags_to_return:        list[str]  = []
+    job_found:              bool      = False
+    custom_category_flag:   bool      = False
+
+    if is_complete:
+        chat_session.is_complete = True
+
+        try:
+            structured = extract_final_json(chat_session.history, MODEL_NAME)
+            chat_session.categories          = [c.model_dump() for c in structured.categories]
+            chat_session.problem_description = structured.problem_description
+            chat_session.is_job_request       = structured.is_job_request
+
+            categories_to_return = chat_session.categories
+
+            tags_to_return = sorted({
+                tag for c in structured.categories for tag in c.tags
+            })
+            job_found = structured.is_job_request
+            custom_category_flag = any(
+                c.is_custom_category for c in structured.categories
+            )
+
+            if not structured.is_job_request:
+                logger.info(
+                    "[Dispatch] booking_chat_id=%s completed with no dispatchable "
+                    "job extracted (off-topic or empty conversation).",
+                    chat_session.id,
+                )
+        except Exception as extraction_err:
+            chat_session.categories          = []
+            chat_session.problem_description = ""
+            chat_session.is_job_request       = False
+
+            categories_to_return  = []
+            tags_to_return        = []
+            job_found              = False
+            custom_category_flag  = False
+
+            logger.error(
+                "[Dispatch] Extraction pipeline failure for booking_chat_id=%s: %s",
+                chat_session.id, extraction_err,
+            )
+
+    # ── Persist ───────────────────────────────────────────────────────────────
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database write failure.",
+        )
+
+    turns_used      = user_turn_count
+    turns_remaining = max(0, MAX_TURNS - turns_used)
+
+    return {
+        "booking_chat_id":     chat_session.id,
+        "ai_response":         display_message,
+        "is_complete":         chat_session.is_complete,
+        "current_tags":        tags_to_return,
+        "is_job_request":      job_found,
+        "is_custom_category":  custom_category_flag,
+        "turns_used":          turns_used,
+        "turns_remaining":     turns_remaining,
+        "problem_description": chat_session.problem_description,
+        "categories":          categories_to_return
+    }
+
+
+def _get_address_from_coords(lat: float, lng: float) -> str:
+    """
+    Detects the physical location address text from latitude and longitude coordinates.
+    """
+    # FIX: Point to the actual OpenStreetMap Nominatim reverse geocoding API endpoint
+    url = "https://nominatim.openstreetmap.org/reverse"
     
-
-
-#### models for the Worker Interview Session, this will be used to store the worker interview session data, including the chat history, the current stage of the interview, and the final outcome. 
-class WorkerInterviewSession(Base):
-    __tablename__ = "worker_interview_sessions"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    history: Mapped[list[dict]] = mapped_column(JSONB, nullable=False) # this will store the chat history as a list of dictionaries
-    stage: Mapped[str]= mapped_column(String, server_default="interviewing", nullable=False) # what stage the interview is in, can be "interviewing", "completed", "rejected"
-    is_complete: Mapped[bool]= mapped_column(Boolean, server_default="FALSE", nullable=False) # check if the interview is complete or not
-    is_rejected: Mapped[bool] = mapped_column(Boolean, server_default="FALSE", nullable=False) # check if the interview is rejected or not
-    rejection_reason: Mapped[str | None]= mapped_column(Text, nullable=True) # reason for rejection if applicable
-    pending_sub_skill: Mapped[str | None]= mapped_column(Text, nullable=True) # this will store the sub skill that the worker is pending to complete
-    pending_scenario: Mapped[str | None]= mapped_column(Text, nullable=True) # this will store the scenario that the worker will give test with this pending scenario
-    has_verified_specialty: Mapped[bool | None]= mapped_column(Boolean, nullable=True) # after test they will be verifed
-    scenario_score: Mapped[int | None]= mapped_column(Integer, nullable=True) # store score
-    scenario_passed: Mapped[bool | None]= mapped_column(Boolean, nullable=True) # store passed or not
-    # Optional link to the canonical WorkerProfile created after a successful interview
-    worker_profile_id: Mapped[int | None] = mapped_column(ForeignKey("workers.id", ondelete="SET NULL"), nullable=True)
-    worker_profile: Mapped["WorkerProfile"] = relationship("WorkerProfile", back_populates="interview_sessions", lazy="selectin")
-
-    # Snapshot of profile data at interview time; keep small to avoid duplication
-    profile: Mapped[dict | None]= mapped_column(JSONB, nullable=True) # this will store the final profile of the worker after the interview is complete
-    created_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False) # this will store the time when the interview session is created
-    updated_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False) # this will store the time when the interview session is updated
-
-
-
-
-### model  for the Worker Profile, this will be used to store the worker profile data, including the skills, experience, and other relevant information. This will be used to match the worker with the job requests.
-class WorkerProfile(Base):
-    __tablename__ = "workers"
-
-        # Core Identifiers
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    worker_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
-    # Outer Metadata Fields
-    stage: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., "complete"
-    is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Nested Profile Content Fields
-    job_category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)  # e.g., "plumber"
-    category_tag: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g., "plumbing"
-    is_custom_category: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    # Lists mapped to native PostgreSQL string arrays
-    specialities: Mapped[list[str]] = mapped_column(ARRAY(String(100)), nullable=False, default=list)
-    specialized_tools_or_equipment: Mapped[list[str]] = mapped_column(ARRAY(String(100)), nullable=False, default=list)
-    # Text, Numerical, and License Fields
-    years_experience: Mapped[int] = mapped_column(Integer, nullable=False)
-    license_or_certification: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    job_description: Mapped[str] = mapped_column(Text, nullable=False)
-    # Status, Flags, and Scores
-    emergency_available: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    has_verified_specialty: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    scenario_passed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    scenario_score: Mapped[int] = mapped_column(Integer, nullable=False)
-    # AI Vector Column (CRUCIAL!)
-    # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from the 'job_description'
-    description_vector: Mapped[list[float]] = mapped_column(Vector(4096), nullable=True)
-    # Back-reference to interview sessions that produced or reference this profile
-    interview_sessions: Mapped[List["WorkerInterviewSession"]] = relationship("WorkerInterviewSession", back_populates="worker_profile", lazy="selectin")
+    params = {
+        "lat": lat,
+        "lon": lng,
+        "format": "json",
+        "addressdetails": 1
+    }
     
+    headers = {
+        # CRITICAL FIX: Nominatim demands a distinct application name and contact point
+        # to prevent automatic system blocking. Replace with your actual email.
+        "User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"
+    }
     
-class CustomerChatData(Base):
-    __tablename__ = "customer_chat_data"
+    try:
+        # Increased timeout to 8.0 seconds to give the free API tier time to respond
+        response = requests.get(url, params=params, headers=headers, timeout=8.0)
+        
+        if response.status_code == 200:
+            data = response.json()
+            # If the API succeeds, grab the precise real address text string
+            if "display_name" in data:
+                return data["display_name"]
+            else:
+                print(f"[Geocode Error] 'display_name' field missing in JSON response")
+        else:
+            # This logs the explicit error code to your terminal console for visibility
+            print(f"[Geocode Error] Server responded with code: {response.status_code}")
+            
+    except Exception as e:
+        # This will print the actual technical network error in your terminal console
+        print(f"[Geocode Exception] Network failure details: {e}")
+        
+    # Only fall back to this coordinate text string if the API call genuinely fails
+    return f"Location ({lat}, {lng})"
 
-    # Core Identifiers
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    booking_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
+
+@router.post(
+    "/{booking_chat_id}/complete",
+    summary="Complete the AI chat, extract job explained keys, generate embedding, and save to DB",
+)
+async def complete_customer_chat(
+    booking_chat_id: int, 
+    payload: schema.CompleteChatIn, 
+    db: Session = Depends(get_db), 
+    current_user: model.User = Depends(get_current_user)
+):
+    logger.info(f"Starting completion pipeline for booking_chat_id: {booking_chat_id}")
     
-    # Outer Metadata Fields
-    is_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_job_request: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    lng = payload.location.longitude
+    lat = payload.location.latitude
+    wkt_point = f"POINT({lng} {lat})"
+
+    # 1. Verify and fetch the chat session
+    chat_session = _get_own_session(booking_chat_id, db, current_user)
+
+    if not chat_session.is_complete:
+        logger.warning(f"Completion failed: Session {booking_chat_id} is not complete.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot process summary. The AI chat session is not complete yet.",
+        )
     
-    # Text, Numerical, and Description Fields
-    problem_description: Mapped[str] = mapped_column(Text, nullable=False)
+    # 2. Extract incoming values
+    job_desc = payload.edited_description.strip()
+    if not job_desc:
+        logger.warning("Completion failed: Job description is empty.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job description is missing. Cannot generate vector profile."
+        )
+
+    # 3. Request Vector Embedding from Nvidia
+    embedding_vector = None
+    try:
+        logger.info("Requesting embedding from Nvidia NIM...")
+        headers = {
+            "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
+            "Content-Type": "application/json"
+        }
+        nvidia_payload = {
+            "model": "nvidia/nv-embed-v1",
+            "input": [job_desc],
+            "input_type": "query",
+            "encoding_format": "float"
+        }
+
+        response = requests.post(
+           "https://integrate.api.nvidia.com/v1/embeddings",
+           headers=headers, 
+           json=nvidia_payload, 
+           timeout=20.0 # 10-> 20 seconds timeout to handle potential delays in Nvidia API response
+        )
+        
+        if response.status_code == 200:
+            embedding_vector = response.json()["data"][0]["embedding"]
+            logger.info("Successfully received embedding from Nvidia.")
+        else:
+            logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Nvidia API error: {response.status_code}"
+            )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to connect to Nvidia API: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to connect to Nvidia API: {e}"
+        )
+        
+    # 4 & 5. Upsert separately via Job Manager
+    logger.info("Syncing Job and Analytical records...")
     
-    # Nested Profile Content Fields (Stored as a native PostgreSQL JSONB Array)
-    # Stores: [{"category": str, "tags": [str], "is_custom_category": bool}, ...]
-    categories: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    # Data mapping
+    customer_fields = {
+        "is_complete": getattr(chat_session, "is_complete", False),
+        "is_job_request": getattr(chat_session, "is_job_request", False),
+        "categories": getattr(chat_session, "categories", []), 
+        "problem_description": job_desc,
+        "location": wkt_point,
+        "description_vector": embedding_vector 
+    }
+    address_text = _get_address_from_coords(lat, lng)
+
+
+    job_fields = {
+        "title": payload.title,
+        "description": job_desc,
+        "status": payload.status,
+        "is_job_request": getattr(chat_session, "is_job_request", True),
+        "categories": getattr(chat_session, "categories", []),
+        "contact_name": payload.contact_name,
+        "contact_phone": payload.contact_phone,
+        "mode": payload.mode,
+        "attachments": payload.attachments,
+        "latitude": lat,
+        "longitude": lng,
+        "location": wkt_point,
+        "description_vector": embedding_vector,
+        "address_text": address_text
+    }
+
+    # Atomic execution
+    try:
+        job_manager.upsert_chat_data(db, booking_chat_id, current_user.id, customer_fields)
+        job_manager.upsert_job(db, booking_chat_id, current_user.id, job_fields)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Persistence failed: {e}")
+        raise HTTPException(status_code=500, detail="Database update failed.")
+    getattr(chat_session, "categories", [])
+    job = db.execute(
+        select(model.Job).where(model.Job.booking_chat_id == booking_chat_id)
+    ).scalar_one_or_none()
+
+    if job:
+        try:
+            create_matches_for_job(db, job)
+        except Exception as e:
+            logger.error(f"Semantic matching failed: {e}")
     
-    # AI Vector Column
-    # Stores the 4,096 numbers from nvidia/nv-embed-v1 generated from 'problem_description'
-    description_vector: Mapped[List[float]] = mapped_column(Vector(4096), nullable=True)
+    category, _ = _extract_primary_category(job_data.categories or [])
+    
+    if category:
+        category_lower = category.lower()
+        stmt = (
+            select(model.WorkerProfile.worker_chat_id)
+            .join(model.User, model.User.id == model.WorkerProfile.user_id)
+            .where(
+                model.WorkerProfile.is_complete.is_(True),
+                model.WorkerProfile.is_rejected.is_(False),
+                or_(
+                    func.lower(model.WorkerProfile.job_category) == category_lower,
+                    func.lower(model.WorkerProfile.category_tag) == category_lower,
+                )
+            )
+            .limit(20)
+        )
+        worker_ids = [row[0] for row in db.execute(stmt).all()]
+        
+        job_payload = {
+            "booking_chat_id": booking_chat_id,
+            "title": payload.title,
+            "description": job_desc
+        }
+        
+        for worker_id in worker_ids:
+            manager.send_job_notification(worker_id, job_payload)
+    
+    return {"status": "success", "message": "Job created and dispatched to matched workers."}
+
+
+# ── 3. Retrieve conversation history ─────────────────────────────────────────
+
+@router.get(
+    "/{booking_chat_id}/history",
+    response_model=schema.ChatHistoryOut,
+    summary="Get the full conversation history for a session",
+)
+def get_history(
+    booking_chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    """
+    Returns the client-visible conversation (system prompt is stripped).
+    Useful for restoring the chat UI after a page reload.
+    """
+    chat_session = _get_own_session(booking_chat_id, db, current_user)
+
+    # Strip the raw [COMPLETE] tag from the assistant's own completion
+    # message only — never touch customer-typed content. A customer who
+    # happens to type the literal string "[COMPLETE]" should see exactly
+    # what they typed when the history is reloaded.
+    visible_history = [
+        {
+            "role": msg["role"],
+            "content": (
+                msg["content"].replace("[COMPLETE]", "").strip()
+                if msg["role"] == "assistant"
+                else msg["content"]
+            ),
+        }
+        for msg in chat_session.history
+        if msg["role"] != "system"
+    ]
+
+    #endpoint here
+    
+    return {
+        "booking_chat_id":  chat_session.id,
+        "history":          visible_history,
+        "is_complete":      chat_session.is_complete,
+        "turns_used":       count_user_turns(chat_session.history),
+        "turns_remaining":  max(0, MAX_TURNS - count_user_turns(chat_session.history)),
+    }
+
+
+# ── 4. Structured summary ─────────────────────────────────────────────────────
+
+@router.get(
+    "/{booking_chat_id}/summary",
+    response_model=schema.BookingSummaryOut,
+    summary="Get the structured extraction result (only available after completion)",
+)
+def get_booking_summary(
+    booking_chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    """
+    Returns the validated extraction payload.
+
+    is_job_request=False means no real job was ever extracted from this
+    session (off-topic conversation, or the extraction pipeline failed) —
+    callers should NOT dispatch a worker for it.
+
+    categories is a list of per-trade matches, most central trade first.
+    Each entry's is_custom_category=True means that trade's category/tags
+    came from the AI fallback rather than an exact SERVICE_REGISTRY match —
+    route that entry to a manual-matching / review flow instead of
+    automated worker-tag matching; entries with is_custom_category=False
+    can be auto-routed as-is.
+
+    Returns 409 Conflict if the session is not yet complete — don't
+    poll this; check the is_complete flag in the chat response instead.
+    """
+    chat_session = _get_own_session(booking_chat_id, db, current_user)
+
+    if not chat_session.is_complete:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session is not yet complete. No summary is available.",
+        )
+
+    return {
+        "categories":           chat_session.categories           or [],
+        "problem_description":  chat_session.problem_description  or "",
+        "is_complete":          chat_session.is_complete,
+        "is_job_request":       bool(chat_session.is_job_request),
+    }
+
+
+# ── Matching configuration ────────────────────────────────────────────────────
+
+DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km — hard cutoff, not a soft preference
+FALLBACK_SEARCH_RADIUS_METERS = 500_000  # 500 km — development fallback when no local matches found
+
+
+# ── Helper: pick the primary category ────────────────────────────────────────
+
+def _extract_primary_category(categories: list[dict]) -> tuple[str | None, bool]:
+    """
+    Pull the primary (most central) trade name straight from the
+    customer's extracted categories. categories is ordered most-central-trade-first.
+
+    Returns (category_name, is_custom). category_name is None if the
+    customer has no extracted categories at all.
+    """
+    if not categories:
+        return None, False
+    
+    top = categories[0]
+    return top.get("category"), bool(top.get("is_custom_category", False))
+
+
+# ── Helper: category (optional) + radius (mandatory) + vector rank ──────────
+
+def _search_workers(
+    db: Session,
+    query_vector: list[float],
+    customer_location,
+    category_tag: str | None,
+    radius_meters: int,
+    limit: int,
+):
+    """
+    Single-query funnel:
+      1. category_tag exact match — skipped entirely when category_tag is None
+      2. ST_DWithin hard radius cutoff against the customer's job location
+      3. ORDER BY cosine_distance — closest meaning first
+    Steps 2 and 3 always run, regardless of whether step 1 was applied.
+    """
+    distance = model.WorkerProfile.description_vector.cosine_distance(query_vector)
+
+    stmt = (
+        select(model.WorkerProfile, model.User.username, distance.label("distance"))
+        .join(model.User, model.User.id == model.WorkerProfile.user_id)
+        .where(
+            model.WorkerProfile.description_vector.isnot(None),
+            model.WorkerProfile.location.isnot(None),
+            model.WorkerProfile.is_complete.is_(True),
+            model.WorkerProfile.is_rejected.is_(False),
+            func.ST_DWithin(
+                model.WorkerProfile.location,
+                customer_location,
+                radius_meters,
+            ),
+        )
+    )
+
+    if category_tag:
+        stmt = stmt.where(
+            or_(
+                func.lower(model.WorkerProfile.job_category) == category_tag.lower(),
+                func.lower(model.WorkerProfile.category_tag) == category_tag.lower(),
+            )
+        )
+
+    stmt = stmt.order_by(distance).limit(limit)
+    return db.execute(stmt).all()
+
+
+# ── Find help ─────────────────────────────────────────────────────────────────
+
+@match_router.get(
+    "/match/{booking_chat_id}/find-help",
+    response_model=schema.FindHelpOut,
+    summary="Find the top 5 matching workers for a completed job request",
+)
+def find_help(
+    booking_chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    job_data = db.execute(
+        select(model.Job).where(
+            model.Job.booking_chat_id == booking_chat_id,
+            model.Job.customer_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+    if not job_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No operational job data found for this booking_chat_id. "
+                   "Call POST /dispatch/{booking_chat_id}/complete first.",
+        )
+
+    if job_data.description_vector is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This job has no embedding yet — cannot search for workers.",
+        )
+
+    if job_data.location is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This job has no location set — cannot search for nearby workers.",
+        )
+
+    if not job_data.is_job_request:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This chat session was not a dispatchable job request.",
+        )
+
+    category, is_custom = _extract_primary_category(job_data.categories or [])
+    
+    # We remove the `and not is_custom` condition here so both false and true custom categories 
+    # query the database exactly the same way before falling back.
+    used_category_filter = bool(category) 
+
+    matches = []
+    if used_category_filter:
+        matches = _search_workers(
+            db,
+            query_vector=job_data.description_vector,
+            customer_location=job_data.location,
+            category_tag=category,
+            radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
+            limit=5,
+        )
+        used_category_filter = bool(matches)
+
+    # Fallback: if category-filtered search yields nothing, broaden the radius
+    if not matches:
+        matches = _search_workers(
+            db,
+            query_vector=job_data.description_vector,
+            customer_location=job_data.location,
+            category_tag=category,
+            radius_meters=FALLBACK_SEARCH_RADIUS_METERS,
+            limit=5,
+        )
+        used_category_filter = bool(matches)
+
+    if not matches:
+        return {
+            "matched_by_category": used_category_filter,
+            "category": category,
+            "workers": [],
+        }
+
+    workers = [
+        {
+            "worker_chat_id": worker.worker_chat_id,
+            "username": username,
+            "job_category": worker.job_category,
+            "category_tag": worker.category_tag,
+            "job_description": worker.job_description,
+            "match_score": max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2))),
+        }
+        for worker, username, distance in matches
+    ]
+
+    return {
+        "matched_by_category": used_category_filter,
+        "category": category,
+        "workers": workers,
+    }

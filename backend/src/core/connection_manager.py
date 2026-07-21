@@ -22,4 +22,4 @@ class ConnectionManager:
             })
 
 # Global instance to be imported across the app
-manager = ConnectionManager()
+manager = ConnectionManager()   

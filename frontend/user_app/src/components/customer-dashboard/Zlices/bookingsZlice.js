@@ -117,16 +117,33 @@ export const createBookingsZlice = (set, get) => ({
 
       const data = await response.json();
       if (data.status === "success") {
+<<<<<<< HEAD
         console.log("🚀 Success! Job verified, vectorized, and stored securely.");
+=======
+        
+        console.log("🚀 Success! Job verified, vectorized by Nvidia, and stored securely.");
+        
+        const { fetchPendingJobs, fetchMatchedWorkersForJob } = get();
+        await fetchPendingJobs();
+        
+        const allPendingJobs = get().pendingJobs || [];
+        const newJob = allPendingJobs.find(j => j.booking_chat_id === booking_chat_id);
+        if (newJob && newJob.id) {
+          await fetchMatchedWorkersForJob(newJob.id);
+        }
+>>>>>>> e6fc4bda4a87373ffe068c6aa29d4a10148c2262
       }
     } catch (error) {
       console.error("❌ Failed to finalize job posting:", error);
     } finally {
       set({ isSubmitting: false });
     }
+<<<<<<< HEAD
     
     // 🛠️ FIX: Call the correct function name here to refresh the UI pipeline instantly
     await fetchBookingsPendingJobs();
+=======
+>>>>>>> e6fc4bda4a87373ffe068c6aa29d4a10148c2262
   },
 
   swapSlots: (clickedSlotName) =>

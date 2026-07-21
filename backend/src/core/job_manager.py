@@ -102,3 +102,4 @@ def get_workers_by_category(category: str, db):
     except Exception as e:
         print(f"❌ Error: {e}")
         return []
+    

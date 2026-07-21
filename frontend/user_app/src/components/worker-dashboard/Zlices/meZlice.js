@@ -484,6 +484,46 @@ export const createMeZlice = (set, get) => ({
         if (data.worker_chat_id) {
           get().fetchChatHistory(data.worker_chat_id);
         }
+
+        // Populate the worker profile state from the persisted WorkerProfile
+        // so the dashboard no longer shows empty/"None" details after the
+        // application is approved. Prefer the saved WorkerProfile columns;
+        // fall back to any previously extracted interview profile.
+        if (
+          data.job_category ||
+          data.specialities?.length ||
+          data.job_description
+        ) {
+          set({
+            extractedProfile: {
+              job_category: data.job_category,
+              category_tag: data.category_tag,
+              specialities: data.specialities || [],
+              specialized_tools_or_equipment:
+                data.specialized_tools_or_equipment || [],
+              years_experience: data.years_experience || 0,
+              license_or_certification: data.license_or_certification || "",
+              job_description: data.job_description || "",
+              emergency_available: data.emergency_available || false,
+              has_verified_specialty: data.has_verified_specialty || false,
+              scenario_passed: data.scenario_passed || false,
+              scenario_score: data.scenario_score || 0,
+            },
+            editableProfile: {
+              job_category: data.job_category || "",
+              category_tag: data.category_tag || "",
+              specialities: data.specialities || [],
+              specialized_tools_or_equipment:
+                data.specialized_tools_or_equipment || [],
+              years_experience: data.years_experience || 0,
+              license_or_certification: data.license_or_certification || "",
+              job_description: data.job_description || "",
+              emergency_available: data.emergency_available || false,
+              phone_number: data.phone_number || get().phoneNumber || "",
+              address_text: data.address_text || get().addressText || "",
+            },
+          });
+        }
       }
     } catch (error) {
       console.error("Failed to load applicant status:", error);
@@ -505,9 +545,13 @@ export const createMeZlice = (set, get) => ({
 
       if (response.ok) {
         const data = await response.json();
-        const visibleHistory = data.history.filter(
-          (m) => m.role && m.role !== "system"
-        );
+        const visibleHistory = (data.history || [])
+          .filter((m) => m && m.role && m.role !== "system")
+          .map((m) => ({
+            id: crypto.randomUUID(),
+            sender: m.role === "user" ? "user" : "assistant",
+            text: m.content ?? "",
+          }));
         set({
           chatMessages: visibleHistory.length > 0
             ? [

@@ -329,7 +329,7 @@ export default function Dash1Board({ viewSlug }) {
           <h2>AI CHAT TERMINAL</h2>
           <div className="chat-box">
             {chatMessages.map((m) => (
-              <p key={m.id}>
+              <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
                 <strong>{m.sender.toUpperCase()}:</strong> {m.text}
               </p>
             ))}
@@ -415,7 +415,7 @@ export default function Dash1Board({ viewSlug }) {
               value={jobDescriptionDraft}
               onChange={(e) => setJobDescription(e.target.value)}
               style={{
-                border: "2px dashed #000000",
+                border: "2px dashed var(--ind-border-strong)",
                 borderRadius: "4px",
                 padding: "10px",
                 outline: "none",
@@ -440,8 +440,8 @@ export default function Dash1Board({ viewSlug }) {
                   position: "absolute",
                   left: "-5px",
                   zIndex: 10,
-                  background: "#000",
-                  color: "#fff",
+                  background: "#FF6B1A",
+                  color: "#FFFFFF",
                   border: "none",
                   borderRadius: "50%",
                   width: "22px",
@@ -533,8 +533,8 @@ export default function Dash1Board({ viewSlug }) {
                   position: "absolute",
                   right: "-5px",
                   zIndex: 10,
-                  background: "#000",
-                  color: "#fff",
+                  background: "#FF6B1A",
+                  color: "#FFFFFF",
                   border: "none",
                   borderRadius: "50%",
                   width: "22px",
@@ -790,10 +790,10 @@ export default function Dash1Board({ viewSlug }) {
         >
           <div
             style={{
-              background: "#ffffff",
-              border: "3px solid #000000",
+              background: "var(--ind-surface)",
+              border: "1px solid var(--ind-border)",
               borderRadius: "16px",
-              boxShadow: "8px 8px 0px #000000",
+              boxShadow: "var(--ind-shadow-tight)",
               width: "450px",
               maxWidth: "90%",
               padding: "20px",
@@ -818,26 +818,28 @@ export default function Dash1Board({ viewSlug }) {
                   onChange={(e) => setModalSearchQuery(e.target.value)}
                   style={{
                     flex: 1,
-                    border: "2px solid #000000",
+                    border: "1px solid var(--ind-border)",
                     borderRadius: "6px",
                     padding: "6px 10px",
                     outline: "none",
                     font: "inherit",
                     fontSize: "11px",
+                    background: "var(--ind-surface-alpha-40)",
+                    color: "var(--ind-white)"
                   }}
                 />
                 <button
                   type="submit"
                   style={{
-                    background: "#000000",
-                    color: "#ffffff",
+                    background: "#FF6B1A",
+                    color: "#FFFFFF",
                     border: "none",
                     borderRadius: "6px",
                     padding: "0 12px",
                     font: "inherit",
                     fontSize: "11px",
                     fontWeight: "bold",
-                    cursor: "pointer",
+                    cursor: "pointer"
                   }}
                 >
                   FIND
@@ -849,8 +851,8 @@ export default function Dash1Board({ viewSlug }) {
                 onClick={handleModalLiveTracking}
                 title="Snap to My Current Position"
                 style={{
-                  background: "#e0f2fe",
-                  border: "2px solid #000000",
+                  background: "rgba(59, 130, 246, 0.15)",
+                  border: "1px solid rgba(59, 130, 246, 0.3)",
                   borderRadius: "6px",
                   padding: "0 10px",
                   cursor: "pointer",
@@ -858,7 +860,6 @@ export default function Dash1Board({ viewSlug }) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "2px 2px 0px #000000",
                 }}
               >
                 📍
@@ -870,18 +871,41 @@ export default function Dash1Board({ viewSlug }) {
               style={{
                 width: "100%",
                 height: "260px",
-                border: "2px solid #000000",
+                border: "1px solid var(--ind-border)",
                 borderRadius: "8px",
-                background: "#f0f0f0",
+                background: "var(--ind-surface-alpha-40)",
                 position: "relative",
-                boxShadow: "inset 2px 2px 5px rgba(0,0,0,0.1)",
               }}
             />
 
+<<<<<<< HEAD
             <div style={{ fontSize: "11px", background: "#f9f9f9", padding: "8px", border: "1px dashed #000", borderRadius: "6px" }}>
               <strong style={{ color: "#333" }}>SELECTED ADDRESS:</strong>
               <div style={{ textTransform: "uppercase", marginTop: "2px", fontWeight: "bold", wordBreak: "break-word" }}>
                 {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
+=======
+            {/* Resolved Preview Description Output Text Block */}
+            <div
+              style={{
+                fontSize: "11px",
+                background: "var(--ind-surface-alpha-40)",
+                padding: "8px",
+                border: "1px dashed var(--ind-border)",
+                borderRadius: "6px",
+              }}
+            >
+              <strong style={{ color: "var(--text-secondary)" }}>SELECTED ADDRESS:</strong>
+              <div
+                style={{
+                  textTransform: "uppercase",
+                  marginTop: "2px",
+                  fontWeight: "bold",
+                  wordBreak: "break-word",
+                }}
+              >
+                {modalAddrText ||
+                  "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
+>>>>>>> e6fc4bda4a87373ffe068c6aa29d4a10148c2262
               </div>
             </div>
 
@@ -892,14 +916,14 @@ export default function Dash1Board({ viewSlug }) {
                 style={{
                   flex: 1,
                   padding: "8px",
-                  background: "#f0f0f0",
-                  border: "2px solid #000",
+                  background: "var(--ind-surface-alpha-40)",
+                  border: "1px solid var(--ind-border)",
                   borderRadius: "8px",
                   font: "inherit",
                   fontSize: "13px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  boxShadow: "2px 2px 0px #000",
+                  color: "var(--text-secondary)"
                 }}
               >
                 CANCEL
@@ -915,15 +939,14 @@ export default function Dash1Board({ viewSlug }) {
                 style={{
                   flex: 1,
                   padding: "8px",
-                  background: "palegreen",
-                  border: "2px solid #000",
+                  background: "rgba(74, 222, 128, 0.15)",
+                  border: "1px solid rgba(74, 222, 128, 0.3)",
                   borderRadius: "8px",
                   font: "inherit",
                   fontSize: "13px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  boxShadow: "2px 2px 0px #000",
-                  color: "darkslategray",
+                  color: "#4ade80",
                 }}
               >
                 CONFIRM LOCATION
