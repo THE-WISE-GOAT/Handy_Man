@@ -1,14 +1,11 @@
 export const createBookingsZlice = (set, get) => ({
 
   userAddrText: "Bhaktapur, Nepal", 
-  userLng: 85.4280, // Default or null initially
-  userLat: 27.6710, // Default or null initially
-
-  //task: fetch city name from cords and set userAddrText
+  userLng: 85.4280, 
+  userLat: 27.6710, 
 
   setUserAddrText: (text) => set({ userAddrText: text }),
   setUserCoordinates: (lng, lat) => set({ userLng: lng, userLat: lat }),
-  //alternative
   setUserLocation: (address, lng, lat) => set({ 
     userAddrText: address, 
     userLng: lng, 
@@ -44,12 +41,10 @@ export const createBookingsZlice = (set, get) => ({
     bottom: "YourActivePosts",
   },
 
-fetchBookingsPendingJobs: async () => {
+  fetchBookingsPendingJobs: async () => {
     try {
-
       console.log("hellooooo");
       const token = localStorage.getItem("handy_man_access_token");
-      // We point to a new endpoint specifically for status-filtered tasks
       const response = await fetch("http://127.0.0.1:8000/jobs/status/pending", {
         method: "GET",
         headers: {
@@ -63,7 +58,6 @@ fetchBookingsPendingJobs: async () => {
 
       const data = await response.json();
       
-      // Assuming the backend returns { status: "success", tasks: [...] }
       if (data.status === "success") {
         set({ fetchedJobs: data.tasks });
         set({ activePostsCount: data.tasks.length });
@@ -72,28 +66,9 @@ fetchBookingsPendingJobs: async () => {
       console.error("❌ Failed to fetch pending jobs:", error);
     }
   },
-  // fetchCustomerJobs: async () => {
-  //   try {
-  //     const response = await fetch("http://127.0.0.1:8000/jobs/my-tasks");
 
-  //     if (!response.ok) {
-  //       throw new Error(`HTTP Error Status: ${response.status}`);
-  //     }
-
-  //     const data = await response.json();
-
-  //     if (data.status === "success") {
-  //       set({ fetchedJobs: data.tasks });
-  //       set({ activePostsCount: data.tasks.length });
-  //     }
-  //   } catch (error) {
-  //     console.error("❌ Frontend fetch failure:", error);
-  //   }
-  // },
-// Add this inside createBookingsZlice
-
-
- createJob: async () => {
+  createJob: async () => {
+    // 🛠️ FIX: Destructure the correct function name here
     const { 
       booking_chat_id, 
       jobTitleDraft, 
@@ -102,7 +77,7 @@ fetchBookingsPendingJobs: async () => {
       userLat,
       userName,
       userCont,
-      fetchPendingJobs
+      fetchBookingsPendingJobs 
     } = get();
 
     if (!booking_chat_id) {
@@ -115,7 +90,6 @@ fetchBookingsPendingJobs: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
 
-      // ── Hitting the updated data integration pipeline route ──
       const response = await fetch(`http://127.0.0.1:8000/dispatch/${booking_chat_id}/complete`, {
         method: "POST",
         headers: {
@@ -128,7 +102,6 @@ fetchBookingsPendingJobs: async () => {
             longitude: parseFloat(userLng) || 0.0,
             latitude: parseFloat(userLat) || 0.0
           },
-          // New Expanded Payload Data
           title: jobTitleDraft || "NEW JOB REQUEST",
           contact_name: userName || "",
           contact_phone: userCont || "",
@@ -144,6 +117,9 @@ fetchBookingsPendingJobs: async () => {
 
       const data = await response.json();
       if (data.status === "success") {
+<<<<<<< HEAD
+        console.log("🚀 Success! Job verified, vectorized, and stored securely.");
+=======
         
         console.log("🚀 Success! Job verified, vectorized by Nvidia, and stored securely.");
         
@@ -155,12 +131,19 @@ fetchBookingsPendingJobs: async () => {
         if (newJob && newJob.id) {
           await fetchMatchedWorkersForJob(newJob.id);
         }
+>>>>>>> e6fc4bda4a87373ffe068c6aa29d4a10148c2262
       }
     } catch (error) {
       console.error("❌ Failed to finalize job posting:", error);
     } finally {
       set({ isSubmitting: false });
     }
+<<<<<<< HEAD
+    
+    // 🛠️ FIX: Call the correct function name here to refresh the UI pipeline instantly
+    await fetchBookingsPendingJobs();
+=======
+>>>>>>> e6fc4bda4a87373ffe068c6aa29d4a10148c2262
   },
 
   swapSlots: (clickedSlotName) =>
@@ -204,20 +187,14 @@ fetchBookingsPendingJobs: async () => {
   turns_used: 0,
   turns_remaining: 5,
 
-  
-// ── Step 1: Initialize the Session (Protected by get_current_user) ──
   startNewSession: async () => {
     set({ isAiGenerating: true });
-
     try {
-      // Pull the JWT keycard out of localStorage
       const token = localStorage.getItem("handy_man_access_token"); 
-
       const response = await fetch("http://127.0.0.1:8000/dispatch/session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // The security guard (OAuth2PasswordBearer) reads this header line
           "Authorization": `Bearer ${token}` 
         },
       });
@@ -251,7 +228,6 @@ fetchBookingsPendingJobs: async () => {
           }
         ],
       });
-
     } catch (error) {
       console.error("❌ Failed to authenticate or establish chat session:", error);
     } finally {
@@ -259,27 +235,21 @@ fetchBookingsPendingJobs: async () => {
     }
   },
 
-  // ── Step 2: Send Message Turn (Protected by get_current_user) ──
   sendCustomerMessage: async (userMessage) => {
     const { booking_chat_id, addChatMessage, swapSlots } = get(); 
-    
     if (!booking_chat_id) {
       console.error("❌ No active booking_chat_id found. Initialize a session first.");
       return;
     }
 
-    // Instantly reflect user message on UI terminal screen
     addChatMessage(userMessage, "user");
 
     try {
-      // Pull the same JWT keycard out of localStorage
       const token = localStorage.getItem("handy_man_access_token");
-
       const response = await fetch("http://127.0.0.1:8000/dispatch/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Validates against _get_own_session to ensure they own this chat ID
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
@@ -293,8 +263,6 @@ fetchBookingsPendingJobs: async () => {
       }
 
       const data = await response.json(); 
-
-      // Determine the primary category title generated by AI (if any exist)
       const primaryCategory = data.categories && data.categories.length > 0 
         ? data.categories[0].category 
         : "";
@@ -302,22 +270,19 @@ fetchBookingsPendingJobs: async () => {
       set({
         booking_chat_id: data.booking_chat_id,
         ai_response: data.ai_response,
-        is_complete: data.is_complete ,
+        is_complete: data.is_complete,
         categories: data.categories,
         current_tags: data.current_tags,
         is_job_request: data.is_job_request,
         is_custom_category: data.is_custom_category,
         turns_used: data.turns_used,
         turns_remaining: data.turns_remaining,
-
-        // ── POPULATE THE DRAFTS AUTOMATICALLY IF COMPLETE ──
         ...(data.is_complete ? {
           jobDescriptionDraft: data.problem_description || "",
           jobTitleDraft: primaryCategory ? primaryCategory.toUpperCase() : "NEW JOB REQUEST"
         } : {})
       });
 
-      // Show AI reply bubble on UI screen
       set((state) => ({
         chatMessages: [
           ...state.chatMessages,
@@ -325,17 +290,11 @@ fetchBookingsPendingJobs: async () => {
         ]
       }));
 
-      // ── AUTO SWAP WINDOWS IF COMPLETED ──
-      // This will seamlessly slide the editable workspace right in front of the customer when chat finishes
       if (data.is_complete && get().slots.main !== "JobDescriptionWorkspace") {
         swapSlots("sidebar");
       }
-
     } catch (error) {
       console.error("❌ Failed to process chat turn over secure transport:", error);
     }
   },
-
-  // Add this inside your createBookingsZlice function
-
 });

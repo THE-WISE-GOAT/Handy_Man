@@ -30,11 +30,7 @@ export const createPostingsZlice = (set, get) => ({
   pendingJobs: [],
   selectedJob: null,
   selectedWorkerId: null,
-
-  // Dictionary to store matched workers by Job ID
   matchedWorkersMap: {}, 
-  
-  // NEW: Dictionary to store worker map coordinates by worker_chat_id
   workerLocations: {}, 
 
   biddingsStream: [
@@ -47,7 +43,7 @@ export const createPostingsZlice = (set, get) => ({
   customerSocket: null,
 
   // ==========================================
-  // 3. ACTIONS
+  // 3. ACTIONS AND INTEGRATION PIPELINES
   // ==========================================
   fetchPendingJobs: async () => {
     try {
@@ -66,18 +62,29 @@ export const createPostingsZlice = (set, get) => ({
       if (data.status === "success") {
         const jobs = data.tasks || [];
         
-        const mappedJobs = jobs.map(job => ({
+        // 🛠️ ARCHITECTURAL FIX: Flatten nested backend location parameters safely
+        const mappedJobs = jobs.map(job => {
+          const lat = job.latitude ?? job.location?.latitude;
+          const lng = job.longitude ?? job.location?.longitude;
+          return {
             ...job,
             id: job.booking_chat_id,
+            latitude: lat,
+            longitude: lng,
             matchedCount: job.matchedCount || 0,       
             interestedCount: job.interestedCount || 0  
-        }));
+          };
+        });
 
         set({ pendingJobs: mappedJobs });
         
+        // 🛠️ ARCHITECTURAL FIX: Ensure active selections automatically receive fresh data values
         const currentSelected = get().selectedJob;
-        if (mappedJobs.length > 0 && (!currentSelected || !mappedJobs.find(j => j.id === currentSelected.id))) {
-          set({ selectedJob: mappedJobs[0] });
+        if (mappedJobs.length > 0) {
+          const matchingActiveJob = currentSelected 
+            ? mappedJobs.find(j => j.id === currentSelected.id) 
+            : null;
+          set({ selectedJob: matchingActiveJob || mappedJobs[0] });
         }
 
         mappedJobs.forEach(job => {
@@ -89,15 +96,23 @@ export const createPostingsZlice = (set, get) => ({
     }
   },
 
-  updateJobMetrics: (jobId, metrics) => set((state) => ({
-    pendingJobs: state.pendingJobs.map(job => 
-      job.id === jobId 
-        ? { ...job, ...metrics }
-        : job
-    )
-  })),
+  // 🛠️ ARCHITECTURAL FIX: Dual-write updates to prevent decoupled stale states on-screen
+  updateJobMetrics: (jobId, metrics) => set((state) => {
+    const updatedJobs = state.pendingJobs.map(job => 
+      job.id === jobId ? { ...job, ...metrics } : job
+    );
+    
+    const currentSelected = state.selectedJob;
+    const updatedSelected = currentSelected && currentSelected.id === jobId
+      ? { ...currentSelected, ...metrics }
+      : currentSelected;
 
-  // NEW ACTION: Fetch GPS coordinates for matched professionals
+    return {
+      pendingJobs: updatedJobs,
+      selectedJob: updatedSelected
+    };
+  }),
+
   fetchWorkerLocations: async (workerChatIds) => {
     if (!workerChatIds || workerChatIds.length === 0) return;
 
@@ -119,7 +134,6 @@ export const createPostingsZlice = (set, get) => ({
       if (data.status === "success") {
         const locationsMap = { ...get().workerLocations };
         data.locations.forEach(loc => {
-          // Merge to preserve existing states (like 'is_interested') if they exist
           locationsMap[loc.worker_chat_id] = {
             ...locationsMap[loc.worker_chat_id],
             ...loc
@@ -132,10 +146,9 @@ export const createPostingsZlice = (set, get) => ({
     }
   },
 
-  // NEW ACTION: A test function so you can click a button to see the blinking animation
   toggleWorkerInterest: (workerChatId) => set((state) => {
     const locInfo = state.workerLocations[workerChatId];
-    if (!locInfo) return state;
+    if (!locInfo) return {};
     
     return {
       workerLocations: {
@@ -184,7 +197,6 @@ export const createPostingsZlice = (set, get) => ({
         }
       }));
 
-      // TRIGGER LOCATION FETCH FOR MATCHED WORKERS
       const workerIds = workers.map(w => w.worker_chat_id);
       if (workerIds.length > 0) {
         get().fetchWorkerLocations(workerIds);

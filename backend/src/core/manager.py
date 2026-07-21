@@ -1,33 +1,48 @@
 from fastapi import WebSocket
-from typing import Dict, List
+from typing import Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: Dict[str, List[WebSocket]] = {}
+        # Two separate pools to prevent ID collisions
+        self.worker_connections: Dict[int, WebSocket] = {}
+        self.customer_connections: Dict[int, WebSocket] = {}
 
-    async def connect(self, websocket: WebSocket, profession: str):
+    # --- WORKER METHODS ---
+    async def connect_worker(self, websocket: WebSocket, worker_chat_id: int):
         await websocket.accept()
-        profession_key = profession.lower().strip()
-        if profession_key not in self.active_connections:
-            self.active_connections[profession_key] = []
-        self.active_connections[profession_key].append(websocket)
-        print(f"🔌 Worker connected to live channel: [{profession_key}]")
+        self.worker_connections[worker_chat_id] = websocket
 
-    def disconnect(self, websocket: WebSocket, profession: str):
-        profession_key = profession.lower().strip()
-        if profession_key in self.active_connections:
-            self.active_connections[profession_key].remove(websocket)
-            if not self.active_connections[profession_key]:
-                del self.active_connections[profession_key]
-        print(f"🔌 Worker disconnected from channel: [{profession_key}]")
-    
-    async def broadcast_to_profession(self, profession: str, message: dict):
-        profession_key = profession.lower().strip()
-        if profession_key in self.active_connections:
-            for connection in self.active_connections[profession_key]:
-                try:
-                    await connection.send_json(message)
-                except Exception:
-                    pass
+    def disconnect_worker(self, worker_chat_id: int):
+        self.worker_connections.pop(worker_chat_id, None)
 
+    async def send_worker_notification(self, worker_chat_id: int, message: dict):
+        if worker_chat_id in self.worker_connections:
+            websocket = self.worker_connections[worker_chat_id]
+            try:
+                await websocket.send_json(message)
+            except Exception as e:
+                logger.error(f"Error sending notification to worker {worker_chat_id}: {e}")
+                self.disconnect_worker(worker_chat_id)
+
+    # --- CUSTOMER METHODS ---
+    async def connect_customer(self, websocket: WebSocket, booking_chat_id: int):
+        await websocket.accept()
+        self.customer_connections[booking_chat_id] = websocket
+
+    def disconnect_customer(self, booking_chat_id: int):
+        self.customer_connections.pop(booking_chat_id, None)
+
+    async def send_customer_notification(self, booking_chat_id: int, message: dict):
+        if booking_chat_id in self.customer_connections:
+            websocket = self.customer_connections[booking_chat_id]
+            try:
+                await websocket.send_json(message)
+            except Exception as e:
+                logger.error(f"Error sending notification to customer {booking_chat_id}: {e}")
+                self.disconnect_customer(booking_chat_id)
+
+# Create a global instance to be used across your app
 manager = ConnectionManager()

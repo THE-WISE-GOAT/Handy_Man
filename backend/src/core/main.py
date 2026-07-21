@@ -20,7 +20,8 @@ from src.core.router import (
     job_router,
     worker_onboarding,
     worker_table_router,
-    chat_worker_ws
+    # chat_worker_ws,
+    socket
 )
 
 # 1. Define the startup logic using a SINGLE lifespan block
@@ -68,7 +69,8 @@ app.include_router(chat_worker.router)
 app.include_router(job_router.router)
 app.include_router(worker_onboarding.router)
 app.include_router(worker_table_router.router)
-app.include_router(chat_worker_ws.router)
+# app.include_router(chat_worker_ws.router)
+app.include_router(socket.router)
 
 
 # 5. Core Alias Root Routes
