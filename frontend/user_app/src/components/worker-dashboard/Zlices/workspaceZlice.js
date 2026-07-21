@@ -38,29 +38,80 @@ export const createWorkspaceZlice = (set, get) => ({
 
   workerProfession: "plumber",
   socket: null,
+  activeJob: null, // New state for the incoming job
+  isInterested: false,
+  matchedJobs: [], // Jobs matched to this worker via semantic matching
 
-  connectToDispatch: () => {
-    const { workerProfession } = get();
+  setActiveJob: (job) => set({ activeJob: job }),
 
-    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${workerProfession}`);
+  fetchMatchedJobs: async () => {
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      const response = await fetch("http://127.0.0.1:8000/jobs/for-worker", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
 
-    socket.onopen = () => {
-      console.log(`Connected as ${workerProfession}`);
-    };
+      if (!response.ok) {
+        console.error("Failed to fetch matched jobs:", response.status);
+        return;
+      }
 
-    socket.onmessage = (event) => {
-      const job = JSON.parse(event.data);
-
-      console.log("Incoming Job:", job);
-    };
-
-    socket.onclose = () => {
-      console.log("Websocket disconnected");
-    };
-
-    set({ socket });
+      const data = await response.json();
+      if (data.status === "success") {
+        set({ matchedJobs: data.jobs || [] });
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch matched jobs:", error);
+    }
   },
 
+  connectToDispatch: (workerChatId, token) => {
+    // Connect using the token as a query param
+    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${workerChatId}?token=${token}`);
+
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === "NEW_JOB_NOTIFICATION") {
+        // This will update the state, which your React component will see
+        set({ activeJob: message.data });
+      }
+    };
+    
+    set({ socket });
+  },
+  
+  expressInterest: async (jobId, workerChatId) => {
+    const newInterestState = !get().isInterested;
+    set({ isInterested: newInterestState });
+
+    const payload = {
+      type: "TOGGLE_INTEREST",
+      data: { job_id: jobId, worker_chat_id: workerChatId, interested: newInterestState }
+    };
+
+    const socket = get().socket;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
+    } else {
+      try {
+        const token = localStorage.getItem("handy_man_access_token");
+        await fetch(`http://127.0.0.1:8000/jobs/${jobId}/interest`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ worker_chat_id: workerChatId, interested: newInterestState })
+        });
+      } catch (error) {
+        console.error("❌ Failed to express interest:", error);
+      }
+    }
+  },
+  
 
 });
 

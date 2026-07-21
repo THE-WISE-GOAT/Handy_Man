@@ -1,7 +1,8 @@
 # routers/job_router_3.py
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from src.core import model, job_manager
+from src.core import model, job_manager, schema
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 
@@ -73,3 +74,57 @@ def match_workers(category: str, db: Session = Depends(get_db)):
     # Now a standard synchronous call
     workers = get_workers_by_category(category, db) 
     return workers
+
+
+@router.get("/for-worker", response_model=schema.MatchedJobsForWorkerOut)
+def get_jobs_for_worker(
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user)
+):
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id,
+            model.WorkerProfile.is_complete.is_(True),
+        )
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        return schema.MatchedJobsForWorkerOut(jobs=[])
+
+    stmt = (
+        select(
+            model.JobWorkerMatch,
+            model.Job,
+        )
+        .join(model.Job, model.Job.id == model.JobWorkerMatch.job_id)
+        .where(
+            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.is_active.is_(True),
+        )
+        .order_by(model.JobWorkerMatch.match_rank.asc())
+    )
+
+    rows = db.execute(stmt).all()
+
+    jobs = []
+    for match, job in rows:
+        jobs.append(
+            schema.WorkerMatchedJobOut(
+                job_id=job.id,
+                booking_chat_id=job.booking_chat_id,
+                title=job.title,
+                description=job.description,
+                status=job.status,
+                categories=job.categories or [],
+                address_text=job.address_text,
+                latitude=job.latitude,
+                longitude=job.longitude,
+                match_score=match.match_score,
+                match_rank=match.match_rank,
+                interested=match.interested,
+                matched_count=job.matched_count or 0,
+                interested_count=job.interested_count or 0,
+            )
+        )
+
+    return schema.MatchedJobsForWorkerOut(jobs=jobs)

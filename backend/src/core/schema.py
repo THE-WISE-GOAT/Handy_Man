@@ -51,11 +51,21 @@ class WorkerAppStatusOut(BaseModel):
     rejection_reason: str | None = None
     job_category: str
     category_tag: str
+    is_custom_category: bool = False
     specialities: List[str]
+    specialized_tools_or_equipment: List[str]
     years_experience: int
+    license_or_certification: str | None = None
+    job_description: str
+    emergency_available: bool = False
+    has_verified_specialty: bool = False
+    scenario_passed: bool = False
+    scenario_score: int = 0
     worker_chat_id: int | None = None
     phone_number: str | None = None
     address_text: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 class AdminPendingAppOut(BaseModel):
     id: int
@@ -70,8 +80,12 @@ class AdminPendingAppOut(BaseModel):
     rejection_reason: str | None = None
     job_category: str
     category_tag: str
+    is_custom_category: bool = False
     specialities: List[str]
     years_experience: int
+    license_or_certification: str | None = None
+    job_description: str | None = None
+    emergency_available: bool = False
     worker_chat_id: int | None = None
     phone_number: str | None = None
     address_text: str | None = None
@@ -313,8 +327,28 @@ class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used
     category: Optional[str] = None     # the category that was searched (if any)
     workers: List[WorkerMatchOut]
-    
-    
+
+class WorkerMatchedJobOut(BaseModel):
+    job_id: int
+    booking_chat_id: int
+    title: str
+    description: str
+    status: str
+    categories: List[Dict[str, Any]]
+    address_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    match_score: float
+    match_rank: int
+    interested: bool
+    matched_count: int
+    interested_count: int
+
+class MatchedJobsForWorkerOut(BaseModel):
+    status: str = "success"
+    jobs: List[WorkerMatchedJobOut]
+
+
 class WorkerCompleteChatIn(BaseModel):
     location: LocationCoordinates
     phone_number: Optional[str] = None

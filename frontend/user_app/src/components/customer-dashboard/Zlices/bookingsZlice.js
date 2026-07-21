@@ -146,14 +146,21 @@ fetchBookingsPendingJobs: async () => {
       if (data.status === "success") {
         
         console.log("🚀 Success! Job verified, vectorized by Nvidia, and stored securely.");
-        // Optional: Reset drafts or trigger UI success view changes here
+        
+        const { fetchPendingJobs, fetchMatchedWorkersForJob } = get();
+        await fetchPendingJobs();
+        
+        const allPendingJobs = get().pendingJobs || [];
+        const newJob = allPendingJobs.find(j => j.booking_chat_id === booking_chat_id);
+        if (newJob && newJob.id) {
+          await fetchMatchedWorkersForJob(newJob.id);
+        }
       }
     } catch (error) {
       console.error("❌ Failed to finalize job posting:", error);
     } finally {
       set({ isSubmitting: false });
     }
-      await fetchPendingJobs();
   },
 
   swapSlots: (clickedSlotName) =>
