@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from src.core import model
 import logging
-
 from sqlalchemy import text
+
 logger = logging.getLogger(__name__)
 
 # --- EXISTING UPSERT FUNCTIONS ---
@@ -75,31 +75,36 @@ def get_jobs_by_status(db: Session, customer_id: int, status: str, skip: int = 0
         model.Job.customer_id == customer_id,
         model.Job.status == status
     ).offset(skip).limit(limit).all()
+# In job_manager.py
 
 def delete_job(db: Session, job_id: int, customer_id: int):
     """
-    Marks a job for deletion or deletes it entirely.
+    Deletes a job entirely and commits the transaction.
     Requires customer_id to prevent unauthorized cross-account deletions.
     """
     db_job = get_job_by_id(db, job_id, customer_id)
     if db_job:
         db.delete(db_job)
-        # Note: We do NOT db.commit() here. 
-        # The router should call db.commit() to maintain transaction control.
+        db.commit()  # Fixed: Added commit here to finalize the transaction
         return True
     return False
 
-# job_manager.py
-
-
-from sqlalchemy import text
-
-def get_workers_by_category(category: str, db):
-    query = text("SELECT id, job_category AS category, latitude, longitude FROM workers WHERE LOWER(TRIM(job_category)) = LOWER(TRIM(:category))")
+def get_workers_by_category(category: str, db: Session):
+    """Fetches workers by category using the ORM with error raising."""
     try:
-        result = db.execute(query, {"category": category})
-        return [dict(r._mapping) for r in result]
+        # Fixed: Swapped raw SQL for SQLAlchemy ORM
+        workers = db.query(
+            model.WorkerProfile.id,
+            model.WorkerProfile.job_category.label('category'),
+            model.WorkerProfile.latitude,
+            model.WorkerProfile.longitude
+        ).filter(
+            model.WorkerProfile.job_category.ilike(category)
+        ).all()
+        
+        return [{"id": w.id, "category": w.category, "latitude": w.latitude, "longitude": w.longitude} for w in workers]
     except Exception as e:
-        print(f"❌ Error: {e}")
-        return []
-    
+        logger.error(f"Failed to fetch workers by category '{category}': {e}")
+        # Fixed: Raise HTTPException so the API doesn't silently return empty lists on failure
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail="Database query failed while fetching workers.")

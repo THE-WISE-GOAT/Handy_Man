@@ -18,7 +18,7 @@ Endpoints
 """
 import logging
 import os
-import requests
+import httpx  # Swapped requests for httpx
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select, func, or_
@@ -67,7 +67,7 @@ def _get_own_session(
     return session
 
 
-def _get_address_from_coords(lat: float, lng: float) -> str:
+async def _get_address_from_coords(lat: float, lng: float) -> str:
     """Detects the physical location address text from latitude and longitude coordinates."""
     url = "https://nominatim.openstreetmap.org/reverse"
     params = {
@@ -80,21 +80,22 @@ def _get_address_from_coords(lat: float, lng: float) -> str:
         "User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"
     }
     try:
-        response = requests.get(url, params=params, headers=headers, timeout=8.0)
-        if response.status_code == 200:
-            data = response.json()
-            if "display_name" in data:
-                return data["display_name"]
-            logger.error("[Geocode Error] 'display_name' field missing in JSON response")
-        else:
-            logger.error(f"[Geocode Error] Server responded with code: {response.status_code}")
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, headers=headers, timeout=8.0)
+            if response.status_code == 200:
+                data = response.json()
+                if "display_name" in data:
+                    return data["display_name"]
+                logger.error("[Geocode Error] 'display_name' field missing in JSON response")
+            else:
+                logger.error(f"[Geocode Error] Server responded with code: {response.status_code}")
     except Exception as e:
         logger.error(f"[Geocode Exception] Network failure details: {e}")
         
     return f"Location ({lat}, {lng})"
 
 
-def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
+async def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
     """Requests a vector embedding from the Nvidia NIM API for a given job description."""
     api_key = os.getenv("NVIDIA_API_KEY")
     if not api_key:
@@ -117,21 +118,22 @@ def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
 
     try:
         logger.info("Requesting embedding from Nvidia NIM...")
-        response = requests.post(
-            "https://integrate.api.nvidia.com/v1/embeddings",
-            headers=headers, 
-            json=nvidia_payload, 
-            timeout=20.0
-        )
-        if response.status_code == 200:
-            return response.json()["data"][0]["embedding"]
-        else:
-            logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Nvidia API error: {response.status_code}"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://integrate.api.nvidia.com/v1/embeddings",
+                headers=headers, 
+                json=nvidia_payload, 
+                timeout=20.0
             )
-    except requests.exceptions.RequestException as e:
+            if response.status_code == 200:
+                return response.json()["data"][0]["embedding"]
+            else:
+                logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Nvidia API error: {response.status_code}"
+                )
+    except httpx.RequestError as e:
         logger.error(f"Failed to connect to Nvidia API: {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -143,7 +145,7 @@ async def _broadcast_notifications(worker_chat_ids: list[int], job_payload: dict
     """Helper to run async websocket broadcasts from a sync endpoint in the background."""
     for worker_chat_id in worker_chat_ids:
         try:
-            await manager.send_job_notification(worker_chat_id, job_payload)
+            await manager.send_worker_notification(worker_chat_id, job_payload)
         except Exception as ws_err:
             logger.warning(f"Failed live alert broadcast to worker {worker_chat_id}: {ws_err}")
 
@@ -286,7 +288,7 @@ def dispatch_chat(
     "/{booking_chat_id}/complete",
     summary="Complete the AI chat, write core records, invoke engine matching, and alert workers",
 )
-def complete_customer_chat(
+async def complete_customer_chat(  # Converted to async def
     booking_chat_id: int, 
     payload: schema.CompleteChatIn, 
     background_tasks: BackgroundTasks,
@@ -313,7 +315,9 @@ def complete_customer_chat(
             detail="Job description is missing. Cannot generate vector profile."
         )
 
-    embedding_vector = _fetch_nvidia_embedding(job_desc)
+    # Await the external network calls
+    embedding_vector = await _fetch_nvidia_embedding(job_desc)
+    address_text = await _get_address_from_coords(lat, lng)
         
     customer_fields = {
         "is_complete": getattr(chat_session, "is_complete", False),
@@ -321,7 +325,6 @@ def complete_customer_chat(
         "categories": getattr(chat_session, "categories", []), 
         "problem_description": job_desc
     }
-    address_text = _get_address_from_coords(lat, lng)
 
     job_fields = {
         "title": payload.title,

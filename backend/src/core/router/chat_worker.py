@@ -25,8 +25,7 @@ Endpoints
 
 import logging
 import os
-import requests
-# FIX: Added BackgroundTasks
+import httpx  # Swapped requests for httpx
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -80,7 +79,7 @@ def _get_own_worker_session(
     return chat_session
 
 
-def _get_address_from_coords(lat: float, lng: float) -> str:
+async def _get_address_from_coords(lat: float, lng: float) -> str:
     """Detects the physical location address text from latitude and longitude coordinates."""
     url = "https://nominatim.openstreetmap.org/reverse"
     params = {
@@ -94,21 +93,22 @@ def _get_address_from_coords(lat: float, lng: float) -> str:
     }
     
     try:
-        response = requests.get(url, params=params, headers=headers, timeout=8.0)
-        if response.status_code == 200:
-            data = response.json()
-            if "display_name" in data:
-                return data["display_name"]
-            logger.error("[Geocode Error] 'display_name' field missing in JSON response")
-        else:
-            logger.error(f"[Geocode Error] Server responded with code: {response.status_code}")
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, headers=headers, timeout=8.0)
+            if response.status_code == 200:
+                data = response.json()
+                if "display_name" in data:
+                    return data["display_name"]
+                logger.error("[Geocode Error] 'display_name' field missing in JSON response")
+            else:
+                logger.error(f"[Geocode Error] Server responded with code: {response.status_code}")
     except Exception as e:
         logger.error(f"[Geocode Exception] Network failure details: {e}")
         
     return f"Location ({lat}, {lng})"
 
 
-def _fetch_nvidia_passage_embedding(job_desc: str) -> list[float]:
+async def _fetch_nvidia_passage_embedding(job_desc: str) -> list[float]:
     """Requests a vector passage embedding from the Nvidia NIM API for a worker profile description."""
     api_key = os.getenv("NVIDIA_API_KEY")
     if not api_key:
@@ -131,29 +131,30 @@ def _fetch_nvidia_passage_embedding(job_desc: str) -> list[float]:
 
     try:
         logger.info("Requesting worker profile embedding from Nvidia NIM...")
-        response = requests.post(
-            "https://integrate.api.nvidia.com/v1/embeddings",
-            headers=headers, 
-            json=nvidia_payload, 
-            timeout=20.0
-        )
-        
-        if response.status_code == 200:
-            return response.json()["data"][0]["embedding"]
-        else:
-            logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Nvidia API error: {response.status_code}"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://integrate.api.nvidia.com/v1/embeddings",
+                headers=headers, 
+                json=nvidia_payload, 
+                timeout=20.0
             )
-    except requests.exceptions.RequestException as e:
+            
+            if response.status_code == 200:
+                return response.json()["data"][0]["embedding"]
+            else:
+                logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Nvidia API error: {response.status_code}"
+                )
+    except httpx.RequestError as e:
         logger.error(f"Failed to connect to Nvidia API: {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to connect to Nvidia API: {e}"
         )
 
-# FIX: Added async helper for WebSocket broadcasting
+
 async def _broadcast_live_alerts(worker_chat_id: int, matched_jobs: list[dict]):
     """Helper to run async websocket broadcasts from a sync endpoint in the background."""
     
@@ -596,10 +597,10 @@ def get_worker_summary(
     "/{worker_chat_id}/complete",
     summary="Complete the AI chat, extract profile keys, generate embedding, save to DB, and run reverse job matching funnel",
 )
-def complete_worker_chat( # FIX: Changed from async def to def
+async def complete_worker_chat(  # Converted back to async def
     worker_chat_id: int, 
     payload: schema.WorkerCompleteChatIn,
-    background_tasks: BackgroundTasks, # FIX: Added background tasks
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
@@ -627,16 +628,15 @@ def complete_worker_chat( # FIX: Changed from async def to def
     lat = payload.location.latitude
     wkt_point = f"POINT({lng} {lat})"
     
-    # 2. Fetch Vector Passage Embedding from isolated helper
-    embedding_vector = _fetch_nvidia_passage_embedding(job_desc)
+    # 2. Fetch Vector Passage Embedding and Address via async await
+    embedding_vector = await _fetch_nvidia_passage_embedding(job_desc)
+    address_text = await _get_address_from_coords(lat, lng)
         
     # 3. Synchronize core operational records
     db_profile = db.query(model.WorkerProfile).filter(
         model.WorkerProfile.worker_chat_id == worker_chat_id,
         model.WorkerProfile.user_id == current_user.id
     ).first()
-
-    address_text = _get_address_from_coords(lat, lng)
     
     profile_fields = {
         "stage": chat_session.stage,
@@ -697,7 +697,7 @@ def complete_worker_chat( # FIX: Changed from async def to def
         logger.error(f"Matching Engine reverse placement transaction failure: {engine_err}")
         raise HTTPException(status_code=500, detail="Failed to safely compile and match worker to existing marketplace jobs.")
 
-    # 5. FIX: Broadcast live edge updates safely via BackgroundTasks
+    # 5. Broadcast live edge updates safely via BackgroundTasks
     matched_jobs = matching_result.get("matched_jobs", [])
     if matched_jobs:
         background_tasks.add_task(_broadcast_live_alerts, worker_chat_id, matched_jobs)
