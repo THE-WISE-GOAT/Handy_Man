@@ -595,9 +595,9 @@ def get_worker_summary(
 
 @router.post(
     "/{worker_chat_id}/complete",
-    summary="Complete the AI chat, extract profile keys, generate embedding, save to DB, and run reverse job matching funnel",
+    summary="Complete AI chat, create profile, store expertise embedding, and run matching engine",
 )
-async def complete_worker_chat(  # Converted back to async def
+async def complete_worker_chat(
     worker_chat_id: int, 
     payload: schema.WorkerCompleteChatIn,
     background_tasks: BackgroundTasks,
@@ -606,7 +606,6 @@ async def complete_worker_chat(  # Converted back to async def
 ):
     logger.info(f"Starting registration completion pipeline for worker_chat_id: {worker_chat_id}")
     
-    # 1. Verify and fetch the chat session
     chat_session = _get_own_worker_session(worker_chat_id, db, current_user)
 
     if not chat_session.is_complete:
@@ -621,18 +620,16 @@ async def complete_worker_chat(  # Converted back to async def
     if not job_desc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Job description is missing from the extracted profile. Cannot generate vector profile."
+            detail="Job description is missing from extracted profile."
         )
 
     lng = payload.location.longitude
     lat = payload.location.latitude
     wkt_point = f"POINT({lng} {lat})"
     
-    # 2. Fetch Vector Passage Embedding and Address via async await
     embedding_vector = await _fetch_nvidia_passage_embedding(job_desc)
     address_text = await _get_address_from_coords(lat, lng)
         
-    # 3. Synchronize core operational records
     db_profile = db.query(model.WorkerProfile).filter(
         model.WorkerProfile.worker_chat_id == worker_chat_id,
         model.WorkerProfile.user_id == current_user.id
@@ -655,7 +652,6 @@ async def complete_worker_chat(  # Converted back to async def
         "has_verified_specialty": profile_data.get("has_verified_specialty", False),
         "scenario_passed": profile_data.get("scenario_passed", False),
         "scenario_score": profile_data.get("scenario_score", 0),
-        "description_vector": embedding_vector,
         "latitude": lat,
         "longitude": lng,
         "location": wkt_point,
@@ -673,21 +669,36 @@ async def complete_worker_chat(  # Converted back to async def
             **profile_fields
         )
     db.add(db_profile)
-    
-    # Stage record generation prior to executing the reverse matching funnel
-    try:
-        db.flush()
-    except Exception as e:
-        db.rollback()
-        logger.error(f"WorkerProfile entity staging failed: {e}")
-        raise HTTPException(status_code=500, detail="Database write failure during onboarding initialization.")
+    db.flush()  # Stages WorkerProfile so db_profile.id is available
 
-    # 4. Delegate matching directly to matching_manager as an independent dependency module
+    # ── UPSERT PRIMARY EXPERTISE RECORD ───────────────────────────────────────
+    primary_title = profile_data.get("job_category", "General Skill")
+    db_expertise = db.query(model.WorkerExpertise).filter(
+        model.WorkerExpertise.worker_id == db_profile.id,
+        model.WorkerExpertise.title == primary_title
+    ).first()
+
+    if db_expertise:
+        db_expertise.description = job_desc
+        db_expertise.embedding = embedding_vector
+        db_expertise.is_active = True
+    else:
+        db_expertise = model.WorkerExpertise(
+            worker_id=db_profile.id,
+            title=primary_title,
+            description=job_desc,
+            embedding=embedding_vector,
+            is_active=True
+        )
+        db.add(db_expertise)
+
+    db.flush()
+
+    # Run reverse matching across all worker expertise vectors
     try:
         matching_result = matching_manager.create_matches_for_worker(
             db=db,
             worker_id=db_profile.id,
-            query_vector=embedding_vector,
             worker_location=wkt_point,
             radius_meters=DEFAULT_SEARCH_RADIUS_METERS
         )
@@ -697,12 +708,11 @@ async def complete_worker_chat(  # Converted back to async def
         logger.error(f"Matching Engine reverse placement transaction failure: {engine_err}")
         raise HTTPException(status_code=500, detail="Failed to safely compile and match worker to existing marketplace jobs.")
 
-    # 5. Broadcast live edge updates safely via BackgroundTasks
     matched_jobs = matching_result.get("matched_jobs", [])
     if matched_jobs:
         background_tasks.add_task(_broadcast_live_alerts, worker_chat_id, matched_jobs)
 
     return {
         "status": "success", 
-        "message": f"Worker profile activated. Pre-calculated matches created for {matching_result.get('count', 0)} open jobs."
+        "message": f"Worker profile activated with multi-vector expertise. Pre-calculated matches created for {matching_result.get('count', 0)} open jobs."
     }

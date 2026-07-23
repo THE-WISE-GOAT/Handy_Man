@@ -190,11 +190,19 @@ class WorkerProfile(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+
+    expertises: Mapped[List["WorkerExpertise"]] = relationship(
+        "WorkerExpertise",
+        back_populates="worker",
+        cascade="all, delete-orphan",
+    )
+
     job_matches: Mapped[List["JobWorkerMatch"]] = relationship(
-    "JobWorkerMatch",
-    back_populates="worker",
-    cascade="all, delete-orphan",
-)
+        "JobWorkerMatch",
+        back_populates="worker",
+        cascade="all, delete-orphan",
+    )
+
 
 class CustomerChatData(Base):
     __tablename__ = "customer_chat_data"
@@ -317,3 +325,27 @@ class JobWorkerMatch(Base):
         "WorkerProfile",
         back_populates="job_matches",
     )
+
+
+    # --- ADD THIS NEW CLASS TO model.py ---
+
+class WorkerExpertise(Base):
+    __tablename__ = "worker_expertises"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    worker_id: Mapped[int] = mapped_column(
+        ForeignKey("workers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)  # e.g., "CCTV Installation"
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    # Nvidia NIM 4,096-dimensional embedding vector for this SPECIFIC skill/expertise
+    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(4096), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    worker: Mapped["WorkerProfile"] = relationship("WorkerProfile", back_populates="expertises")

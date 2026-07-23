@@ -40,22 +40,41 @@ def _search_workers(
     radius_meters: int,
 ) -> list[tuple[model.WorkerProfile, model.User, float]]:
     """
-    Executes a limitless semantic vector search query across eligible worker pools.
-    Relies entirely on the semantic vector as the absolute source of truth.
+    Executes vector search across all active WorkerExpertise vectors.
+    Collapses multiple expertise vectors per worker down to the SINGLE best matching
+    (lowest cosine distance) expertise vector using a SQL subquery.
     """
-    distance_expr = model.WorkerProfile.description_vector.cosine_distance(query_vector)
+    distance_expr = model.WorkerExpertise.embedding.cosine_distance(query_vector)
 
-    stmt = (
-        select(model.WorkerProfile, model.User, distance_expr.label("distance"))
-        .join(model.User, model.User.id == model.WorkerProfile.user_id)
+    # 1. Subquery: find the minimum distance among active expertise vectors per worker
+    best_expertise_subq = (
+        select(
+            model.WorkerProfile.id.label("worker_id"),
+            func.min(distance_expr).label("best_distance")
+        )
+        .join(model.WorkerExpertise, model.WorkerExpertise.worker_id == model.WorkerProfile.id)
         .where(
-            model.WorkerProfile.description_vector.isnot(None),
+            model.WorkerExpertise.embedding.isnot(None),
+            model.WorkerExpertise.is_active.is_(True),
             model.WorkerProfile.location.isnot(None),
             model.WorkerProfile.is_complete.is_(True),
             model.WorkerProfile.is_rejected.is_(False),
             func.ST_DWithin(model.WorkerProfile.location, customer_location, radius_meters),
         )
-        .order_by(distance_expr)
+        .group_by(model.WorkerProfile.id)
+        .subquery()
+    )
+
+    # 2. Main query: join candidates and order globally by their best distance
+    stmt = (
+        select(
+            model.WorkerProfile,
+            model.User,
+            best_expertise_subq.c.best_distance.label("distance")
+        )
+        .join(model.WorkerProfile, model.WorkerProfile.id == best_expertise_subq.c.worker_id)
+        .join(model.User, model.User.id == model.WorkerProfile.user_id)
+        .order_by(best_expertise_subq.c.best_distance.asc())
     )
 
     return db.execute(stmt).all()
@@ -77,15 +96,15 @@ def create_matches_for_job(
     radius_meters: int
 ) -> MatchingResult:
     """
-    Core Entry Point: Purges stale matches, processes every candidate crossing the 
-    threshold, ranks them according to DB distance order, and flushes changes to the session.
+    Core Entry Point: Purges stale matches, processes candidates whose BEST expertise 
+    crosses the threshold, ranks them, and flushes changes to the session.
     """
-    # 1. Clear out historical stale match rows for this specific job context
+    # 1. Clear historical stale match rows for this job
     db.query(model.JobWorkerMatch).filter(
         model.JobWorkerMatch.job_id == job_id
     ).delete(synchronize_session=False)
 
-    # 2. Extract every potential candidate profile within radius (ordered by database distance)
+    # 2. Extract potential candidate profiles (ordered by best expertise distance)
     search_results = _search_workers(db, query_vector, customer_location, radius_meters)
     
     new_match_records = []
@@ -93,18 +112,16 @@ def create_matches_for_job(
     notifiable_worker_chat_ids = []
     current_rank = 1
 
-# 3. Process all records matching the threshold without an artificial cap
     for worker, user, distance in search_results:
         score = calculate_match_score(float(distance))
             
         if score > SCORE_THRESHOLD:
-            # Core relationship mapping table execution
             match_row = model.JobWorkerMatch(
                 job_id=job_id,
                 worker_id=worker.id,
                 match_score=score,
                 match_rank=current_rank,
-                semantic_distance=float(distance),  # ─── ADD THIS LINE ───
+                semantic_distance=float(distance),
                 is_active=True,
                 is_interested=False,
                 is_selected=False,
@@ -112,7 +129,6 @@ def create_matches_for_job(
             )
             new_match_records.append(match_row)
             
-            # Populate rich structural payload for downstream router operations
             rich_matches.append({
                 "worker_profile": worker,
                 "user": user,
@@ -125,7 +141,7 @@ def create_matches_for_job(
 
     if new_match_records:
         db.add_all(new_match_records)
-        db.flush()  # Stages matches so primary keys/states are accessible without committing
+        db.flush()
         
     return {
         "matches": rich_matches,
@@ -137,34 +153,46 @@ def create_matches_for_job(
 def create_matches_for_worker(
     db: Session,
     worker_id: int,
-    query_vector: list[float],
     worker_location,
-    radius_meters: int
+    radius_meters: int = 60_000
 ) -> WorkerMatchingResult:
     """
-    Reverse Job Matching Entry Point: Triggered upon successful worker onboarding completion.
-    Purges stale historical matches for this worker, scans for compatible open/active jobs
-    in a 'pending' state within the marketplace radius, ranks them, and persists matches.
+    Reverse Job Matching Entry Point: Evaluates distance between all active pending jobs
+    and ALL active expertise vectors for this specific worker, selecting the best match per job.
     """
-    logger.info(f"Running reverse matching pipeline for worker_id: {worker_id}")
+    logger.info(f"Running reverse multi-vector matching pipeline for worker_id: {worker_id}")
 
-    # 1. Clear out historical stale match rows for this specific worker context
+    # 1. Clear out historical stale match rows for this worker
     db.query(model.JobWorkerMatch).filter(
         model.JobWorkerMatch.worker_id == worker_id
     ).delete(synchronize_session=False)
 
-    # 2. Execute semantic vector distance calculations against active, pending client jobs
-    distance_expr = model.Job.description_vector.cosine_distance(query_vector)
+    # 2. Compute cosine distance between open jobs and worker's expertise vectors
+    distance_expr = model.Job.description_vector.cosine_distance(model.WorkerExpertise.embedding)
 
-    stmt = (
-        select(model.Job, distance_expr.label("distance"))
+    # Subquery: calculate best distance for each pending job across ALL of this worker's expertise records
+    best_job_match_subq = (
+        select(
+            model.Job.id.label("job_id"),
+            func.min(distance_expr).label("best_distance")
+        )
+        .join(model.WorkerExpertise, model.WorkerExpertise.worker_id == worker_id)
         .where(
             model.Job.description_vector.isnot(None),
             model.Job.location.isnot(None),
-            model.Job.status == "pending",  # Enforce matching ONLY open, unresolved opportunities
+            model.Job.status == "pending",
+            model.WorkerExpertise.embedding.isnot(None),
+            model.WorkerExpertise.is_active.is_(True),
             func.ST_DWithin(model.Job.location, worker_location, radius_meters),
         )
-        .order_by(distance_expr)
+        .group_by(model.Job.id)
+        .subquery()
+    )
+
+    stmt = (
+        select(model.Job, best_job_match_subq.c.best_distance.label("distance"))
+        .join(model.Job, model.Job.id == best_job_match_subq.c.job_id)
+        .order_by(best_job_match_subq.c.best_distance.asc())
     )
 
     search_results = db.execute(stmt).all()
@@ -173,7 +201,6 @@ def create_matches_for_worker(
     matched_jobs_payload: list[MatchedJobDetail] = []
     current_rank = 1
 
-# 3. Filter candidates through the standard sigmoid score boundary
     for job, distance in search_results:
         score = calculate_match_score(float(distance))
 
@@ -183,7 +210,7 @@ def create_matches_for_worker(
                 worker_id=worker_id,
                 match_score=score,
                 match_rank=current_rank,
-                semantic_distance=float(distance),  # ─── ADD THIS LINE ───
+                semantic_distance=float(distance),
                 is_active=True,
                 is_interested=False,
                 is_selected=False,
@@ -191,7 +218,6 @@ def create_matches_for_worker(
             )
             new_match_records.append(match_row)
 
-            # Construct structured output required by chat_worker onboarding router
             matched_jobs_payload.append({
                 "booking_chat_id": job.booking_chat_id,
                 "title": job.title,
@@ -203,9 +229,9 @@ def create_matches_for_worker(
 
     if new_match_records:
         db.add_all(new_match_records)
-        db.flush()  # Stages matches so primary keys are available downstream before transaction commit
+        db.flush()
 
     return {
         "matched_jobs": matched_jobs_payload,
         "count": len(matched_jobs_payload)
-    } 
+    }

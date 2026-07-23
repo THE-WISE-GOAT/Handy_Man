@@ -329,3 +329,18 @@ class WorkerCompleteChatIn(BaseModel):
     location: LocationCoordinates
     phone_number: Optional[str] = None
     
+
+class WorkerExpertiseIn(BaseModel):
+    title: str = Field(..., max_length=255, description="E.g., CCTV Installation, Electrical Repair")
+    description: str = Field(..., max_length=3000, description="Detailed breakdown of experience or tools owned")
+
+class WorkerExpertiseOut(BaseModel):
+    id: int
+    worker_id: int
+    title: str
+    description: str
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
