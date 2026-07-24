@@ -232,7 +232,7 @@ class CustomerProblemSchema(BaseModel):
 class UserRolesOut(BaseModel):
     roles: list[str]
     
- # for now this support in worker.py   
+  # for now this support in worker_onboarding.py
 class WorkerOnboardIn(BaseModel):
     latitude: float
     longitude: float
