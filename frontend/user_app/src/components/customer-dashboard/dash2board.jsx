@@ -43,8 +43,6 @@ const blinkingWorkerIcon = L.divIcon({
   popupAnchor: [0, -15]
 });
 
-<<<<<<< HEAD
-=======
 const goldenWorkerIcon = L.divIcon({
   className: 'custom-worker-icon golden-worker-icon',
   html: `<div style="color: #FFD700; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
@@ -54,7 +52,6 @@ const goldenWorkerIcon = L.divIcon({
 });
 
 
->>>>>>> e6fc4bda4a87373ffe068c6aa29d4a10148c2262
 const MapUpdater = ({ center }) => {
   const map = useMap();
   useEffect(() => {
@@ -215,12 +212,8 @@ export default function Dash2Board({ viewSlug }) {
                   </Marker>
                 )}
 
-<<<<<<< HEAD
-                {currentWorkers.map(worker => {
-=======
                 {/* 2. Worker Location Markers */}
                 {currentWorkers.map((worker, index) => {
->>>>>>> e6fc4bda4a87373ffe068c6aa29d4a10148c2262
                   const locInfo = workerLocations[worker.worker_chat_id];
                   if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
                   
