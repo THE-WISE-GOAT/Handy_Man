@@ -190,6 +190,9 @@ class WorkerProfile(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    @property
+    def worker_id(self) -> int:
+        return self.id
 
     expertises: Mapped[List["WorkerExpertise"]] = relationship(
         "WorkerExpertise",
