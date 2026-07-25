@@ -41,7 +41,7 @@ from src.ai.customer_chat_analyser_nvidia import (
 router = APIRouter(prefix="/dispatch", tags=["Dispatch"])
 logger = logging.getLogger(__name__)
 
-DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km — hard cutoff
+DEFAULT_SEARCH_RADIUS_METERS = 600_000  # 60 km — hard cutoff
 
 
 # ── Helper ───────────────────────────────────────────────────────────────────
