@@ -20,6 +20,19 @@ class CompleteChatIn(BaseModel):
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
     phone_number: Optional[str] = None
 
+class CreateJobIn(BaseModel):
+    title: str
+    description: str
+    location: LocationCoordinates
+    category: Optional[str] = None
+    budget: Optional[float] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: str = "pending"
+    mode: str = "regular"
+    attachments: List[Dict[str, Any]] = Field(default_factory=list)
+    phone_number: Optional[str] = None
+
 class InitializeWorkerAppIn(BaseModel):
     pass
 
