@@ -34,6 +34,15 @@ def _require_worker_profile(user_id: int, db: Session) -> model.WorkerProfile:
         )
     return profile
 
+def require_approved_worker(current_user: model.User = Depends(get_current_user), db: Session = Depends(get_db)) -> model.WorkerProfile:
+    profile = _get_own_worker_profile(current_user.id, db)
+    if not profile or profile.stage != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Worker application not approved.",
+        )
+    return profile
+
 def _is_admin(user: model.User) -> bool:
     return any(role.name and role.name.lower() == "admin" for role in user.roles)
 
