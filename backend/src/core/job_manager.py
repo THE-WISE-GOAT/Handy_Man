@@ -90,6 +90,13 @@ def delete_job(db: Session, job_id: int, customer_id: int):
         return True
     return False
 
+def create_job_direct(db: Session, user_id: int, fields: dict) -> model.Job:
+    """Create a Job record directly without a booking_chat_id."""
+    db_job = model.Job(customer_id=user_id, **fields)
+    db.add(db_job)
+    db.flush()
+    return db_job
+
 def get_workers_by_category(category: str, db: Session):
     """Fetches workers by category using the ORM with error raising."""
     try:
