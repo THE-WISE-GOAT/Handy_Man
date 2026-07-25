@@ -3,15 +3,14 @@ Worker onboarding router — application state management and admin review.
 """
 
 import logging
-import os
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema
-from src.ai.worker_chat_analyser_nvidia import build_fresh_history, INITIAL_GREETING
+from src.core.worker_profile_helper import sync_profile_extracted_fields, upsert_worker_expertise
+from src.ai.worker_chat_analyser_nvidia import build_fresh_history, INITIAL_GREETING, get_worker_description_embedding
 
 logger = logging.getLogger(__name__)
 
@@ -19,58 +18,12 @@ router = APIRouter(prefix="/worker-onboarding", tags=["Worker Onboarding"])
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-async def _generate_description_vector(text: str):
-    """
-    Asynchronous embed generation via NVIDIA nv-embed-v1 using httpx.
-    """
-    if not text:
-        return None
-    try:
-        headers = {
-            "Authorization": f"Bearer {os.getenv('NVIDIA_API_KEY')}",
-            "Content-Type": "application/json",
-        }
-        nvidia_payload = {
-            "model": "nvidia/nv-embed-v1",
-            "input": [text],
-            "input_type": "passage",
-            "encoding_format": "float",
-        }
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://integrate.api.nvidia.com/v1/embeddings",
-                headers=headers,
-                json=nvidia_payload,
-                timeout=20.0,
-            )
-            if response.status_code == 200:
-                return response.json()["data"][0]["embedding"]
-            
-            logger.error("NVIDIA embedding error: %s - %s", response.status_code, response.text)
-    except Exception as exc:
-        logger.error("Failed to embed worker job_description: %s", exc)
-    return None
-
-def _sync_profile_data(profile: model.WorkerProfile, extracted: dict):
-    """Centralized helper to map extracted AI profile data to the DB model."""
-    profile.job_category = extracted.get("job_category", profile.job_category)
-    profile.category_tag = extracted.get("category_tag", profile.category_tag)
-    profile.is_custom_category = extracted.get("is_custom_category", profile.is_custom_category)
-    profile.specialities = extracted.get("specialities", []) or []
-    profile.years_experience = extracted.get("years_experience", 0) or 0
-    profile.license_or_certification = extracted.get("license_or_certification")
-    profile.specialized_tools_or_equipment = extracted.get("specialized_tools_or_equipment", []) or []
-    profile.job_description = extracted.get("job_description", "") or ""
-    profile.emergency_available = extracted.get("emergency_available", False) or False
-    profile.has_verified_specialty = extracted.get("has_verified_specialty", False) or False
-    profile.scenario_passed = extracted.get("scenario_passed", False) or False
-    profile.scenario_score = extracted.get("scenario_score", 0) or 0
-
 def _get_own_worker_profile(user_id: int, db: Session) -> model.WorkerProfile | None:
     return db.execute(
-        select(model.WorkerProfile).where(model.WorkerProfile.user_id == user_id)
-    ).scalar_one_or_none()
+        select(model.WorkerProfile)
+        .where(model.WorkerProfile.user_id == user_id)
+        .order_by(model.WorkerProfile.id.desc())
+    ).scalars().first()
 
 def _require_worker_profile(user_id: int, db: Session) -> model.WorkerProfile:
     profile = _get_own_worker_profile(user_id, db)
@@ -78,6 +31,15 @@ def _require_worker_profile(user_id: int, db: Session) -> model.WorkerProfile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Worker profile not found. Initialize your application first.",
+        )
+    return profile
+
+def require_approved_worker(current_user: model.User = Depends(get_current_user), db: Session = Depends(get_db)) -> model.WorkerProfile:
+    profile = _get_own_worker_profile(current_user.id, db)
+    if not profile or profile.stage != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Worker application not approved.",
         )
     return profile
 
@@ -188,31 +150,17 @@ async def submit_worker_application(
     session = db.execute(stmt).scalars().first()
 
     if session and session.profile:
-        _sync_profile_data(profile, session.profile)
+        sync_profile_extracted_fields(profile, session.profile)
 
-    # Handle Vector Embedding asynchronously
     if profile.job_description:
-        embedding_vec = await _generate_description_vector(profile.job_description)
-        primary_title = profile.job_category or "General Skill"
-        
-        db_expertise = db.query(model.WorkerExpertise).filter(
-            model.WorkerExpertise.worker_id == profile.id,
-            model.WorkerExpertise.title == primary_title
-        ).first()
+        try:
+            embedding_vec = await get_worker_description_embedding(profile.job_description)
+        except Exception as exc:
+            logger.error("Failed to embed worker job_description: %s", exc)
+            embedding_vec = None
 
-        if db_expertise:
-            db_expertise.description = profile.job_description
-            db_expertise.embedding = embedding_vec
-            db_expertise.is_active = True
-        else:
-            db_expertise = model.WorkerExpertise(
-                worker_id=profile.id,
-                title=primary_title,
-                description=profile.job_description,
-                embedding=embedding_vec,
-                is_active=True
-            )
-            db.add(db_expertise)
+        primary_title = profile.job_category or "General Skill"
+        upsert_worker_expertise(db, profile.id, primary_title, profile.job_description, embedding_vec)
 
     try:
         db.commit()
@@ -263,8 +211,7 @@ def list_pending_applications(
         .join(model.User, model.WorkerProfile.user_id == model.User.id)
         .outerjoin(model.WorkerInterviewSession, model.WorkerProfile.worker_chat_id == model.WorkerInterviewSession.id)
         .where(
-            model.WorkerProfile.stage == "pending_admin_review",
-            model.WorkerProfile.is_complete == False
+            model.WorkerProfile.stage.in_(["pending_admin_review", "complete"]),
         )
         .order_by(model.WorkerProfile.id.desc())
     )
@@ -302,7 +249,7 @@ async def approve_worker_application(
 
     profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
 
-    if not profile or profile.stage != "pending_admin_review":
+    if not profile or profile.stage not in ("pending_admin_review", "complete"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Valid pending application not found.")
 
     profile.is_complete = True
@@ -313,24 +260,17 @@ async def approve_worker_application(
     if not profile.job_category and profile.worker_chat_id:
         session = db.execute(select(model.WorkerInterviewSession).where(model.WorkerInterviewSession.id == profile.worker_chat_id)).scalar_one_or_none()
         if session and session.profile:
-            _sync_profile_data(profile, session.profile)
+            sync_profile_extracted_fields(profile, session.profile)
 
     if profile.job_description:
-        existing_expertise = db.query(model.WorkerExpertise).filter(
-            model.WorkerExpertise.worker_id == profile.id,
-            model.WorkerExpertise.embedding.isnot(None)
-        ).first()
+        try:
+            embedding_vec = await get_worker_description_embedding(profile.job_description)
+        except Exception as exc:
+            logger.error("Failed to embed worker job_description on approve: %s", exc)
+            embedding_vec = None
 
-        if not existing_expertise:
-            embedding_vec = await _generate_description_vector(profile.job_description)
-            db_expertise = model.WorkerExpertise(
-                worker_id=profile.id,
-                title=profile.job_category or "General Skill",
-                description=profile.job_description,
-                embedding=embedding_vec,
-                is_active=True
-            )
-            db.add(db_expertise)
+        primary_title = profile.job_category or "General Skill"
+        upsert_worker_expertise(db, profile.id, primary_title, profile.job_description, embedding_vec)
 
     user = db.query(model.User).filter(model.User.id == profile.user_id).first()
     worker_role = db.query(model.Role).filter(model.Role.name.ilike("worker")).first()
@@ -361,7 +301,7 @@ def reject_worker_application(
 
     profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
 
-    if not profile or profile.stage != "pending_admin_review":
+    if not profile or profile.stage not in ("pending_admin_review", "complete"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Valid pending application not found.")
 
     profile.is_complete = False
@@ -402,4 +342,4 @@ def update_my_worker_profile(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update worker profile.")
 
-    return {**profile.__dict__, "message": "Profile updated successfully."}
+    return {**profile.__dict__, "worker_id": profile.id, "message": "Profile updated successfully."}
