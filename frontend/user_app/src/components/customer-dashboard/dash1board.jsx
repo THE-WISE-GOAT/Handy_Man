@@ -878,12 +878,6 @@ export default function Dash1Board({ viewSlug }) {
               }}
             />
 
-<<<<<<< HEAD
-            <div style={{ fontSize: "11px", background: "#f9f9f9", padding: "8px", border: "1px dashed #000", borderRadius: "6px" }}>
-              <strong style={{ color: "#333" }}>SELECTED ADDRESS:</strong>
-              <div style={{ textTransform: "uppercase", marginTop: "2px", fontWeight: "bold", wordBreak: "break-word" }}>
-                {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
-=======
             {/* Resolved Preview Description Output Text Block */}
             <div
               style={{
@@ -905,7 +899,6 @@ export default function Dash1Board({ viewSlug }) {
               >
                 {modalAddrText ||
                   "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
->>>>>>> e6fc4bda4a87373ffe068c6aa29d4a10148c2262
               </div>
             </div>
 

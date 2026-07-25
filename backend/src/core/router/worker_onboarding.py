@@ -1,35 +1,10 @@
 """
 Worker onboarding router — application state management and admin review.
-
-Endpoints
----------
-  POST /worker-onboarding/initialize
-      Create a WorkerProfile record for the current user with default
-      applicant states, and start a WorkerInterviewSession. Returns the
-      new worker_chat_id so the client can begin the AI interview.
-
-  POST /worker-onboarding/submit
-      Update the current user's WorkerProfile stage to 'pending_admin_review'
-      and persist phone/address/location data collected during onboarding.
-
-  GET  /worker-onboarding/my-status
-      Fetch the current user's WorkerProfile and basic interview session info.
-
-  GET  /admin/worker-applications
-      Admin-only. List all WorkerProfile records where stage == 'pending_admin_review'
-      and is_complete == False, joined with user info and chat history.
-
-  POST /admin/worker-applications/{worker_id}/approve
-      Admin-only. Mark the application as approved (is_complete=True, stage='approved').
-
-  POST /admin/worker-applications/{worker_id}/reject
-      Admin-only. Mark the application as rejected (is_rejected=True) and
-      save the admin-provided reason.
 """
 
 import logging
 import os
-import requests
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -40,13 +15,13 @@ from src.ai.worker_chat_analyser_nvidia import build_fresh_history, INITIAL_GREE
 
 logger = logging.getLogger(__name__)
 
+router = APIRouter(prefix="/worker-onboarding", tags=["Worker Onboarding"])
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _generate_description_vector(text: str):
+async def _generate_description_vector(text: str):
     """
-    Embed a worker's job_description via NVIDIA nv-embed-v1 so it can be
-    cosine-matched against customer job vectors in the matching engine.
-    Returns the embedding list, or None if embedding is unavailable.
+    Asynchronous embed generation via NVIDIA nv-embed-v1 using httpx.
     """
     if not text:
         return None
@@ -61,36 +36,41 @@ def _generate_description_vector(text: str):
             "input_type": "passage",
             "encoding_format": "float",
         }
-        response = requests.post(
-            "https://integrate.api.nvidia.com/v1/embeddings",
-            headers=headers,
-            json=nvidia_payload,
-            timeout=20.0,
-        )
-        if response.status_code == 200:
-            return response.json()["data"][0]["embedding"]
-        logger.error(
-            "NVIDIA embedding error in worker onboarding: %s - %s",
-            response.status_code, response.text,
-        )
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://integrate.api.nvidia.com/v1/embeddings",
+                headers=headers,
+                json=nvidia_payload,
+                timeout=20.0,
+            )
+            if response.status_code == 200:
+                return response.json()["data"][0]["embedding"]
+            
+            logger.error("NVIDIA embedding error: %s - %s", response.status_code, response.text)
     except Exception as exc:
         logger.error("Failed to embed worker job_description: %s", exc)
     return None
 
+def _sync_profile_data(profile: model.WorkerProfile, extracted: dict):
+    """Centralized helper to map extracted AI profile data to the DB model."""
+    profile.job_category = extracted.get("job_category", profile.job_category)
+    profile.category_tag = extracted.get("category_tag", profile.category_tag)
+    profile.is_custom_category = extracted.get("is_custom_category", profile.is_custom_category)
+    profile.specialities = extracted.get("specialities", []) or []
+    profile.years_experience = extracted.get("years_experience", 0) or 0
+    profile.license_or_certification = extracted.get("license_or_certification")
+    profile.specialized_tools_or_equipment = extracted.get("specialized_tools_or_equipment", []) or []
+    profile.job_description = extracted.get("job_description", "") or ""
+    profile.emergency_available = extracted.get("emergency_available", False) or False
+    profile.has_verified_specialty = extracted.get("has_verified_specialty", False) or False
+    profile.scenario_passed = extracted.get("scenario_passed", False) or False
+    profile.scenario_score = extracted.get("scenario_score", 0) or 0
 
-router = APIRouter(prefix="/worker-onboarding", tags=["Worker Onboarding"])
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _get_own_worker_profile(
-    user_id: int,
-    db: Session,
-) -> model.WorkerProfile | None:
+def _get_own_worker_profile(user_id: int, db: Session) -> model.WorkerProfile | None:
     return db.execute(
         select(model.WorkerProfile).where(model.WorkerProfile.user_id == user_id)
     ).scalar_one_or_none()
-
 
 def _require_worker_profile(user_id: int, db: Session) -> model.WorkerProfile:
     profile = _get_own_worker_profile(user_id, db)
@@ -101,14 +81,11 @@ def _require_worker_profile(user_id: int, db: Session) -> model.WorkerProfile:
         )
     return profile
 
-
 def _is_admin(user: model.User) -> bool:
-    return any(
-        role.name and role.name.lower() == "admin" for role in user.roles
-    )
+    return any(role.name and role.name.lower() == "admin" for role in user.roles)
 
 
-# ── 1. Initialize Application ─────────────────────────────────────────────────
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post(
     "/initialize",
@@ -122,32 +99,17 @@ def initialize_worker_application(
 ):
     existing = _get_own_worker_profile(current_user.id, db)
     if existing:
-        return {
-            "worker_id": existing.id,
-            "user_id": existing.user_id,
-            "stage": existing.stage,
-            "is_complete": existing.is_complete,
-            "is_rejected": existing.is_rejected,
-            "worker_chat_id": existing.worker_chat_id,
-        }
+        return existing
 
-    worker_role = (
-        db.query(model.Role)
-        .filter(model.Role.name.ilike("worker"))
-        .first()
-    )
+    worker_role = db.query(model.Role).filter(model.Role.name.ilike("worker")).first()
     if not worker_role:
         worker_role = model.Role(name="worker")
         db.add(worker_role)
         db.flush()
 
-    already_worker = any(
-        role.name and role.name.lower() == "worker" for role in current_user.roles
-    )
-    if not already_worker:
+    if not any(role.name and role.name.lower() == "worker" for role in current_user.roles):
         current_user.roles.append(worker_role)
 
-    # Build the proper AI history and inject the first question so it saves to the DB immediately
     initial_history = build_fresh_history()
     initial_history.append({"role": "assistant", "content": INITIAL_GREETING})
 
@@ -164,7 +126,7 @@ def initialize_worker_application(
     worker_profile = model.WorkerProfile(
         user_id=current_user.id,
         worker_chat_id=interview_session.id,
-        stage="interviewing",  # Align the profile stage with the chat stage
+        stage="interviewing",
         is_complete=False,
         is_rejected=False,
         job_category="",
@@ -187,107 +149,70 @@ def initialize_worker_application(
             detail="Failed to initialize worker application.",
         )
 
-    return {
-        "worker_id": worker_profile.id,
-        "user_id": worker_profile.user_id,
-        "stage": worker_profile.stage,
-        "is_complete": worker_profile.is_complete,
-        "is_rejected": worker_profile.is_rejected,
-        "worker_chat_id": worker_profile.worker_chat_id,
-    }
+    return worker_profile
 
-
-# ── 2. Submit Application ─────────────────────────────────────────────────────
 
 @router.post(
     "/submit",
     response_model=schema.SubmitWorkerAppOut,
     summary="Submit the worker application for admin review",
 )
-def submit_worker_application(
+async def submit_worker_application(
     payload: schema.SubmitWorkerAppIn,
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
     profile = _require_worker_profile(current_user.id, db)
 
-    if profile.is_complete:
+    if profile.is_complete or profile.is_rejected:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Application is already complete.",
-        )
-
-    if profile.is_rejected:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Application has been rejected.",
+            detail="Application is already completed or rejected.",
         )
 
     profile.stage = "pending_admin_review"
     profile.phone_number = payload.phone_number
     profile.address_text = payload.address_text
-    profile.latitude = payload.latitude
-    profile.longitude = payload.longitude
-
-    # ── Carry the AI-extracted interview profile into the WorkerProfile ──
-    # The interview router stores the validated WorkerProfileSchema dict on
-    # WorkerInterviewSession.profile. The admin review and the matching
-    # engine both read the WorkerProfile columns, so we MUST copy the
-    # extracted fields across here — otherwise an approved worker keeps an
-    # empty profile (all "None") and the job matcher finds no vector.
-    session = db.execute(
-        select(model.WorkerInterviewSession).where(
-            model.WorkerInterviewSession.id == payload.worker_chat_id,
-            model.WorkerInterviewSession.user_id == current_user.id,
-        )
-    ).scalar_one_or_none()
-
-    # Guard against the dual-session drift: if the session linked to
-    # worker_chat_id has no extracted profile, fall back to the user's
-    # COMPLETED session (the one that actually holds the data).
-    if not (session and session.profile):
-        session = db.execute(
-            select(model.WorkerInterviewSession)
-            .where(
-                model.WorkerInterviewSession.user_id == current_user.id,
-                model.WorkerInterviewSession.is_complete.is_(True),
-                model.WorkerInterviewSession.profile.isnot(None),
-            )
-            .order_by(model.WorkerInterviewSession.id.desc())
-        ).scalars().first()
-
-    if session and session.profile:
-        extracted = session.profile
-        profile.job_category = extracted.get("job_category", profile.job_category)
-        profile.category_tag = extracted.get("category_tag", profile.category_tag)
-        profile.is_custom_category = extracted.get("is_custom_category", profile.is_custom_category)
-        profile.specialities = extracted.get("specialities", []) or []
-        profile.years_experience = extracted.get("years_experience", 0) or 0
-        profile.license_or_certification = extracted.get("license_or_certification")
-        profile.specialized_tools_or_equipment = (
-            extracted.get("specialized_tools_or_equipment", []) or []
-        )
-        profile.job_description = extracted.get("job_description", "") or ""
-        profile.emergency_available = extracted.get("emergency_available", False) or False
-        profile.has_verified_specialty = extracted.get("has_verified_specialty", False) or False
-        profile.scenario_passed = extracted.get("scenario_passed", False) or False
-        profile.scenario_score = extracted.get("scenario_score", 0) or 0
-
-    # ── Generate the semantic embedding + geolocation ──
-    # The matching engine (chat_customer.find_help / matching_manager) only
-    # considers workers whose description_vector AND location are non-null
-    # and is_complete=True. Without these, an approved worker never
-    # receives routed jobs. The embedding is derived from job_description,
-    # which the extraction step produced above.
+    
     if payload.latitude is not None and payload.longitude is not None:
         profile.latitude = payload.latitude
         profile.longitude = payload.longitude
         profile.location = f"POINT({payload.longitude} {payload.latitude})"
 
+    # Fetch latest valid profile session directly utilizing sorting
+    stmt = select(model.WorkerInterviewSession).where(
+        model.WorkerInterviewSession.user_id == current_user.id,
+        model.WorkerInterviewSession.profile.isnot(None)
+    ).order_by(model.WorkerInterviewSession.id.desc())
+    
+    session = db.execute(stmt).scalars().first()
+
+    if session and session.profile:
+        _sync_profile_data(profile, session.profile)
+
+    # Handle Vector Embedding asynchronously
     if profile.job_description:
-        profile.description_vector = _generate_description_vector(
-            profile.job_description
-        )
+        embedding_vec = await _generate_description_vector(profile.job_description)
+        primary_title = profile.job_category or "General Skill"
+        
+        db_expertise = db.query(model.WorkerExpertise).filter(
+            model.WorkerExpertise.worker_id == profile.id,
+            model.WorkerExpertise.title == primary_title
+        ).first()
+
+        if db_expertise:
+            db_expertise.description = profile.job_description
+            db_expertise.embedding = embedding_vec
+            db_expertise.is_active = True
+        else:
+            db_expertise = model.WorkerExpertise(
+                worker_id=profile.id,
+                title=primary_title,
+                description=profile.job_description,
+                embedding=embedding_vec,
+                is_active=True
+            )
+            db.add(db_expertise)
 
     try:
         db.commit()
@@ -305,8 +230,6 @@ def submit_worker_application(
     }
 
 
-# ── 3. My Application Status ──────────────────────────────────────────────────
-
 @router.get(
     "/my-status",
     response_model=schema.WorkerAppStatusOut,
@@ -316,35 +239,8 @@ def get_my_application_status(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    profile = _require_worker_profile(current_user.id, db)
+    return _require_worker_profile(current_user.id, db)
 
-    return {
-        "worker_id": profile.id,
-        "stage": profile.stage,
-        "is_complete": profile.is_complete,
-        "is_rejected": profile.is_rejected,
-        "rejection_reason": profile.rejection_reason,
-        "job_category": profile.job_category,
-        "category_tag": profile.category_tag,
-        "is_custom_category": profile.is_custom_category,
-        "specialities": profile.specialities,
-        "specialized_tools_or_equipment": profile.specialized_tools_or_equipment,
-        "years_experience": profile.years_experience,
-        "license_or_certification": profile.license_or_certification,
-        "job_description": profile.job_description,
-        "emergency_available": profile.emergency_available,
-        "has_verified_specialty": profile.has_verified_specialty,
-        "scenario_passed": profile.scenario_passed,
-        "scenario_score": profile.scenario_score,
-        "worker_chat_id": profile.worker_chat_id,
-        "phone_number": profile.phone_number,
-        "address_text": profile.address_text,
-        "latitude": profile.latitude,
-        "longitude": profile.longitude,
-    }
-
-
-# ── 4. Admin: List Pending Applications ──────────────────────────────────────
 
 @router.get(
     "/admin/applications",
@@ -361,163 +257,94 @@ def list_pending_applications(
             detail="Admin access required.",
         )
 
+    # Optimized to prevent N+1 Queries
     stmt = (
-        select(model.WorkerProfile, model.User)
+        select(model.WorkerProfile, model.User, model.WorkerInterviewSession)
         .join(model.User, model.WorkerProfile.user_id == model.User.id)
+        .outerjoin(model.WorkerInterviewSession, model.WorkerProfile.worker_chat_id == model.WorkerInterviewSession.id)
         .where(
             model.WorkerProfile.stage == "pending_admin_review",
-            model.WorkerProfile.is_complete == False,  # noqa: E712
+            model.WorkerProfile.is_complete == False
         )
         .order_by(model.WorkerProfile.id.desc())
     )
 
     results = db.execute(stmt).all()
     applications = []
-    for profile, user in results:
-        session = db.execute(
-            select(model.WorkerInterviewSession).where(
-                model.WorkerInterviewSession.id == profile.worker_chat_id
-            )
-        ).scalar_one_or_none()
-        if not (session and (session.history or session.profile)):
-            session = db.execute(
-                select(model.WorkerInterviewSession)
-                .where(
-                    model.WorkerInterviewSession.user_id == profile.user_id,
-                    model.WorkerInterviewSession.is_complete.is_(True),
-                )
-                .order_by(model.WorkerInterviewSession.id.desc())
-            ).scalars().first()
-
-        raw_history = (session.history if session and session.history else []) or []
-        raw_profile = (session.profile if session and session.profile else None)
-
-        applications.append({
-            "id": profile.id,
-            "user_id": profile.user_id,
+    
+    for profile, user, session in results:
+        # Dictionary unpacking safely merges objects for the Pydantic model
+        app_data = {
+            **profile.__dict__,
             "username": user.username,
             "email": user.email,
             "firstName": user.firstName,
             "lastName": user.lastName,
-            "stage": profile.stage,
-            "is_complete": profile.is_complete,
-            "is_rejected": profile.is_rejected,
-            "rejection_reason": profile.rejection_reason,
-            "job_category": profile.job_category,
-            "category_tag": profile.category_tag,
-            "is_custom_category": profile.is_custom_category,
-            "specialities": profile.specialities,
-            "years_experience": profile.years_experience,
-            "license_or_certification": profile.license_or_certification,
-            "job_description": profile.job_description,
-            "emergency_available": profile.emergency_available,
-            "worker_chat_id": profile.worker_chat_id,
-            "phone_number": profile.phone_number,
-            "address_text": profile.address_text,
-            "history": raw_history,
-            "profile": raw_profile,
-        })
+            "history": session.history if session else [],
+            "profile": session.profile if session else None,
+        }
+        applications.append(app_data)
 
     return applications
 
-
-# ── 5. Admin: Approve Application ─────────────────────────────────────────────
 
 @router.post(
     "/admin/applications/{worker_id}/approve",
     summary="Admin-only: approve a worker application",
 )
-def approve_worker_application(
+async def approve_worker_application(
     worker_id: int,
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
     if not _is_admin(current_user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required.",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
 
-    profile = db.query(model.WorkerProfile).filter(
-        model.WorkerProfile.id == worker_id
-    ).first()
+    profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
 
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Worker application not found.",
-        )
-
-    if profile.stage != "pending_admin_review":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Application is in stage '{profile.stage}', not pending review.",
-        )
+    if not profile or profile.stage != "pending_admin_review":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Valid pending application not found.")
 
     profile.is_complete = True
     profile.stage = "approved"
     profile.is_rejected = False
     profile.rejection_reason = None
 
-    # ── Backstop: ensure the AI-extracted profile is present ──
-    # If the approved WorkerProfile still has empty core fields (e.g. the
-    # submit step ran before extraction was copied, or an edge-case flow),
-    # pull them from the linked interview session so the worker's dashboard
-    # and the matching engine both see the real details.
     if not profile.job_category and profile.worker_chat_id:
-        session = db.execute(
-            select(model.WorkerInterviewSession).where(
-                model.WorkerInterviewSession.id == profile.worker_chat_id
-            )
-        ).scalar_one_or_none()
+        session = db.execute(select(model.WorkerInterviewSession).where(model.WorkerInterviewSession.id == profile.worker_chat_id)).scalar_one_or_none()
         if session and session.profile:
-            extracted = session.profile
-            profile.job_category = extracted.get("job_category", profile.job_category)
-            profile.category_tag = extracted.get("category_tag", profile.category_tag)
-            profile.is_custom_category = extracted.get("is_custom_category", profile.is_custom_category)
-            profile.specialities = extracted.get("specialities", []) or []
-            profile.years_experience = extracted.get("years_experience", 0) or 0
-            profile.license_or_certification = extracted.get("license_or_certification")
-            profile.specialized_tools_or_equipment = (
-                extracted.get("specialized_tools_or_equipment", []) or []
-            )
-            profile.job_description = extracted.get("job_description", "") or ""
-            profile.emergency_available = extracted.get("emergency_available", False) or False
-            profile.has_verified_specialty = extracted.get("has_verified_specialty", False) or False
-            profile.scenario_passed = extracted.get("scenario_passed", False) or False
-            profile.scenario_score = extracted.get("scenario_score", 0) or 0
+            _sync_profile_data(profile, session.profile)
 
-    # ── Generate the semantic embedding on approval ──
-    # The matching engine (chat_customer.find_help) only routes jobs to
-    # workers whose description_vector is non-null. If submit didn't persist
-    # one (e.g. embedding API was down), (re)generate it now from the
-    # job_description so the approved worker actually receives jobs.
-    if profile.job_description and profile.description_vector is None:
-        profile.description_vector = _generate_description_vector(profile.job_description)
+    if profile.job_description:
+        existing_expertise = db.query(model.WorkerExpertise).filter(
+            model.WorkerExpertise.worker_id == profile.id,
+            model.WorkerExpertise.embedding.isnot(None)
+        ).first()
+
+        if not existing_expertise:
+            embedding_vec = await _generate_description_vector(profile.job_description)
+            db_expertise = model.WorkerExpertise(
+                worker_id=profile.id,
+                title=profile.job_category or "General Skill",
+                description=profile.job_description,
+                embedding=embedding_vec,
+                is_active=True
+            )
+            db.add(db_expertise)
 
     user = db.query(model.User).filter(model.User.id == profile.user_id).first()
-    if user:
-        worker_role = (
-            db.query(model.Role)
-            .filter(model.Role.name.ilike("worker"))
-            .first()
-        )
-        if worker_role and worker_role not in user.roles:
-            user.roles.append(worker_role)
+    worker_role = db.query(model.Role).filter(model.Role.name.ilike("worker")).first()
+    if user and worker_role and worker_role not in user.roles:
+        user.roles.append(worker_role)
 
     try:
         db.commit()
     except Exception:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to approve application.",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to approve application.")
 
     return {"message": "Application approved successfully.", "worker_id": worker_id}
 
-
-# ── 6. Admin: Reject Application ──────────────────────────────────────────────
 
 @router.post(
     "/admin/applications/{worker_id}/reject",
@@ -530,26 +357,12 @@ def reject_worker_application(
     current_user: model.User = Depends(get_current_user),
 ):
     if not _is_admin(current_user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required.",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
 
-    profile = db.query(model.WorkerProfile).filter(
-        model.WorkerProfile.id == worker_id
-    ).first()
+    profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
 
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Worker application not found.",
-        )
-
-    if profile.stage != "pending_admin_review":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Application is in stage '{profile.stage}', not pending review.",
-        )
+    if not profile or profile.stage != "pending_admin_review":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Valid pending application not found.")
 
     profile.is_complete = False
     profile.is_rejected = True
@@ -560,15 +373,10 @@ def reject_worker_application(
         db.commit()
     except Exception:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to reject application.",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to reject application.")
 
     return {"message": "Application rejected.", "worker_id": worker_id, "reason": payload.reason}
 
-
-# ── 7. Update Worker Profile ──────────────────────────────────────────────────
 
 @router.patch(
     "/my-profile",
@@ -581,7 +389,6 @@ def update_my_worker_profile(
     current_user: model.User = Depends(get_current_user),
 ):
     profile = _require_worker_profile(current_user.id, db)
-
     update_data = payload.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
@@ -593,21 +400,6 @@ def update_my_worker_profile(
         db.refresh(profile)
     except Exception:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update worker profile.",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update worker profile.")
 
-    return {
-        "worker_id": profile.id,
-        "job_category": profile.job_category,
-        "category_tag": profile.category_tag,
-        "specialities": profile.specialities,
-        "years_experience": profile.years_experience,
-        "license_or_certification": profile.license_or_certification,
-        "job_description": profile.job_description,
-        "emergency_available": profile.emergency_available,
-        "phone_number": profile.phone_number,
-        "address_text": profile.address_text,
-        "message": "Profile updated successfully.",
-    }
+    return {**profile.__dict__, "message": "Profile updated successfully."}

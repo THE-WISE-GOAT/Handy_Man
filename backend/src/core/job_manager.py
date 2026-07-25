@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from src.core import model
 import logging
 from sqlalchemy import text
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -106,5 +107,4 @@ def get_workers_by_category(category: str, db: Session):
     except Exception as e:
         logger.error(f"Failed to fetch workers by category '{category}': {e}")
         # Fixed: Raise HTTPException so the API doesn't silently return empty lists on failure
-        from fastapi import HTTPException
         raise HTTPException(status_code=500, detail="Database query failed while fetching workers.")

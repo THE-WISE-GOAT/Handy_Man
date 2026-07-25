@@ -27,6 +27,7 @@ from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema, job_manager, matching_manager
 from src.core.manager import manager
+import math
 
 from src.ai.customer_chat_analyser_nvidia import (
     _nvidia_client,
@@ -39,9 +40,10 @@ from src.ai.customer_chat_analyser_nvidia import (
 )
 
 router = APIRouter(prefix="/dispatch", tags=["Dispatch"])
+match_router = APIRouter( tags=["Matching"])  # Separate router for matching endpoints
 logger = logging.getLogger(__name__)
 
-DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km — hard cutoff
+DEFAULT_SEARCH_RADIUS_METERS = 600_000  # 60 km — hard cutoff
 
 
 # ── Helper ───────────────────────────────────────────────────────────────────
@@ -284,6 +286,65 @@ def dispatch_chat(
     }
 
 
+@router.get(
+    "/{booking_chat_id}/history",
+    response_model=schema.ChatHistoryOut,
+    summary="Get the full conversation history for a session",
+)
+def get_history(
+    booking_chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    chat_session = _get_own_session(booking_chat_id, db, current_user)
+    visible_history = [
+        {
+            "role": msg["role"],
+            "content": (
+                msg["content"].replace("[COMPLETE]", "").strip()
+                if msg["role"] == "assistant"
+                else msg["content"]
+            ),
+        }
+        for msg in chat_session.history
+        if msg["role"] != "system"
+    ]
+
+    return {
+        "booking_chat_id":  chat_session.id,
+        "history":          visible_history,
+        "is_complete":      chat_session.is_complete,
+        "turns_used":       count_user_turns(chat_session.history),
+        "turns_remaining":  max(0, MAX_TURNS - count_user_turns(chat_session.history)),
+    }
+
+
+@router.get(
+    "/{booking_chat_id}/summary",
+    response_model=schema.BookingSummaryOut,
+    summary="Get the structured extraction result (only available after completion)",
+)
+def get_booking_summary(
+    booking_chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    chat_session = _get_own_session(booking_chat_id, db, current_user)
+
+    if not chat_session.is_complete:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session is not yet complete. No summary is available.",
+        )
+
+    return {
+        "categories":           chat_session.categories           or [],
+        "problem_description":  chat_session.problem_description  or "",
+        "is_complete":          chat_session.is_complete,
+        "is_job_request":       bool(chat_session.is_job_request),
+    }
+
+
 @router.post(
     "/{booking_chat_id}/complete",
     summary="Complete the AI chat, write core records, invoke engine matching, and alert workers",
@@ -357,7 +418,8 @@ async def complete_customer_chat(  # Converted to async def
             job_id=job_data.id,
             query_vector=embedding_vector,
             customer_location=wkt_point,
-            radius_meters=DEFAULT_SEARCH_RADIUS_METERS
+            radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
+            job_description=job_desc,
         )
         db.commit()
     except Exception as engine_err:
@@ -381,72 +443,11 @@ async def complete_customer_chat(  # Converted to async def
         "message": f"Job registered. Established {matching_result.get('count', 0)} matches successfully."
     }
 
-
-@router.get(
-    "/{booking_chat_id}/history",
-    response_model=schema.ChatHistoryOut,
-    summary="Get the full conversation history for a session",
-)
-def get_history(
-    booking_chat_id: int,
-    db: Session = Depends(get_db),
-    current_user: model.User = Depends(get_current_user),
-):
-    chat_session = _get_own_session(booking_chat_id, db, current_user)
-    visible_history = [
-        {
-            "role": msg["role"],
-            "content": (
-                msg["content"].replace("[COMPLETE]", "").strip()
-                if msg["role"] == "assistant"
-                else msg["content"]
-            ),
-        }
-        for msg in chat_session.history
-        if msg["role"] != "system"
-    ]
-
-    return {
-        "booking_chat_id":  chat_session.id,
-        "history":          visible_history,
-        "is_complete":      chat_session.is_complete,
-        "turns_used":       count_user_turns(chat_session.history),
-        "turns_remaining":  max(0, MAX_TURNS - count_user_turns(chat_session.history)),
-    }
-
-
-@router.get(
-    "/{booking_chat_id}/summary",
-    response_model=schema.BookingSummaryOut,
-    summary="Get the structured extraction result (only available after completion)",
-)
-def get_booking_summary(
-    booking_chat_id: int,
-    db: Session = Depends(get_db),
-    current_user: model.User = Depends(get_current_user),
-):
-    chat_session = _get_own_session(booking_chat_id, db, current_user)
-
-    if not chat_session.is_complete:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Session is not yet complete. No summary is available.",
-        )
-
-    return {
-        "categories":           chat_session.categories           or [],
-        "problem_description":  chat_session.problem_description  or "",
-        "is_complete":          chat_session.is_complete,
-        "is_job_request":       bool(chat_session.is_job_request),
-    }
-
-
 def _extract_primary_category(categories: list[dict]) -> tuple[str | None, bool]:
     if not categories:
         return None, False
     top = categories[0]
-    return top.get("category"), bool(top.get("is_custom_category", False))
-
+    return top.get("category"), bool(top.get("is_custom_category", False)) 
 
 @router.get(
     "/match/{booking_chat_id}/find-help",
@@ -509,3 +510,90 @@ def find_help(
         "category": category,
         "workers": workers,
     }
+    
+
+import io
+import matplotlib.pyplot as plt
+import seaborn as sns
+from fastapi import Response
+
+@match_router.get(
+    "/match/{booking_chat_id}/validate-vectors",
+    summary="Generate vector reliability validation charts",
+)
+def validate_vectors(
+    booking_chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    # 1. Fetch the job request data exactly like your find_help route
+    job_data = db.execute(
+        select(model.Job).where(
+            model.Job.booking_chat_id == booking_chat_id,
+            model.Job.customer_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+    if not job_data or job_data.description_vector is None or job_data.location is None:
+        raise HTTPException(status_code=400, detail="Invalid job data or missing vector.")
+
+    # 2. Grab a wider pool of workers (limit=50) to evaluate the model distribution
+    distance = model.WorkerProfile.description_vector.cosine_distance(job_data.description_vector)
+    stmt = (
+        select(model.WorkerProfile, distance.label("distance"))
+        .where(
+            model.WorkerProfile.description_vector.isnot(None),
+            model.WorkerProfile.location.isnot(None),
+            model.WorkerProfile.is_complete.is_(True),
+            model.WorkerProfile.is_rejected.is_(False),
+            func.ST_DWithin(model.WorkerProfile.location, job_data.location, DEFAULT_SEARCH_RADIUS_METERS),
+        )
+        .order_by(distance)
+        .limit(50)
+    )
+    
+    results = db.execute(stmt).all()
+    if not results:
+        raise HTTPException(status_code=404, detail="No regional workers found to validate against.")
+
+    # 3. Extract the math data points
+    raw_distances = []
+    calculated_scores = []
+    
+    for worker, dist in results:
+        raw_distances.append(dist)
+        # FIXED: Changed 'distance' to 'dist', and removed trailing comma
+        score = max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(25.0 * (dist - 0.90)))) * 100.0, 2)))
+        calculated_scores.append(score)
+
+    # 4. Generate the graph purely in memory
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    # Graph A: Score vs Distance Curve Validation
+    ax1.scatter(raw_distances, calculated_scores, color='purple', alpha=0.7, edgecolors='k', s=60, label='Worker Matches')
+    # UPDATED: Moved line to 0.90 to match new formula
+    ax1.axvline(x=0.90, color='red', linestyle='--', label='Inflection Threshold (0.90)')
+    ax1.axhline(y=50.0, color='gray', linestyle=':')
+    ax1.set_title('Sigmoid Scoring Curve Validation')
+    ax1.set_xlabel('Raw Cosine Distance (Lower = Closer Meaning)')
+    ax1.set_ylabel('Calculated Match Score (0 - 100)')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+
+    # Graph B: Score Density Spread
+    sns.kdeplot(calculated_scores, fill=True, color='teal', ax=ax2, bw_adjust=0.5)
+    ax2.set_title('Distribution Spectrum of Match Scores')
+    ax2.set_xlabel('Match Score Output')
+    ax2.set_ylabel('Density of Workers')
+    ax2.set_xlim(-5, 105)
+
+    plt.suptitle(f"Vector Reliability Analysis for Booking Chat ID: {booking_chat_id}", fontsize=14, y=0.98)
+    plt.tight_layout()
+
+    # 5. Stream the chart binary image directly to your browser
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+    
+    return Response(content=buf.getvalue(), media_type="image/png")

@@ -1,32 +1,23 @@
-from select import select
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from src.core import model
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
-from src.core.schema import WorkerOnboardIn
-from geoalchemy2.functions import ST_Point
-from sqlalchemy import select
 
 router = APIRouter(
     prefix="/workers",
     tags=["workers"]
 )
 
-@router.post("/apply", status_code=status.HTTP_200_OK)
+@router.post("/apply", status_code=status.HTTP_200_OK, deprecated=True, summary="Deprecated: Use Onboarding Pipeline")
 def apply_worker_role(current_user: model.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    worker_role = db.query(model.Role).filter(model.Role.name == "worker").first()
-    if not worker_role:
-        worker_role = model.Role(name="worker")
-        db.add(worker_role)
-        db.flush() 
-    
-    if worker_role not in current_user.roles:
-        current_user.roles.append(worker_role)
-        db.commit()
-        db.refresh(current_user)
-    
-    return {"message": "Worker role activated successfully"}
+    """
+    DEPRECATED: Worker role activation is now securely handled by the application state machine.
+    Please direct the client to POST /worker-onboarding/initialize to begin the application properly.
+    """
+    return {
+        "message": "Role updates are now safely handled by the onboarding pipeline.",
+        "redirect_to": "/worker-onboarding/initialize"
+    }
 
-  #  remaining to maintain the worker profile after applying for the worker role
+# Future pure worker-profile operational endpoints (stats, shifts, etc.) can be placed here.
