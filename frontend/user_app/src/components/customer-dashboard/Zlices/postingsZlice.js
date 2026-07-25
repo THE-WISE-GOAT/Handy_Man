@@ -1,5 +1,7 @@
 // Zlices/postingsZlice.js
 
+import { apiClient, normalizeApiError } from "@shared/api/client";
+
 export const createPostingsZlice = (set, get) => ({
   // ==========================================
   // 1. DYNAMIC LAYOUT POSITIONS (4-Slot Map)
@@ -47,17 +49,7 @@ export const createPostingsZlice = (set, get) => ({
   // ==========================================
   fetchPendingJobs: async () => {
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/jobs/status/pending", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-      
-      const data = await response.json();
+      const data = await apiClient.get("/jobs/status/pending");
 
       if (data.status === "success") {
         const jobs = data.tasks || [];
@@ -92,7 +84,7 @@ export const createPostingsZlice = (set, get) => ({
         });
       }
     } catch (error) {
-      console.error("❌ Failed to fetch pending jobs:", error);
+      console.error("❌ Failed to fetch pending jobs:", normalizeApiError(error));
     }
   },
 
@@ -117,19 +109,9 @@ export const createPostingsZlice = (set, get) => ({
     if (!workerChatIds || workerChatIds.length === 0) return;
 
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/workers/locations", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ worker_chat_ids: workerChatIds })
+      const data = await apiClient.post("/workers/locations", {
+        worker_chat_ids: workerChatIds
       });
-
-      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-      
-      const data = await response.json();
       
       if (data.status === "success") {
         const locationsMap = { ...get().workerLocations };
@@ -142,7 +124,7 @@ export const createPostingsZlice = (set, get) => ({
         set({ workerLocations: locationsMap });
       }
     } catch (error) {
-      console.error("❌ Failed to fetch worker locations:", error);
+      console.error("❌ Failed to fetch worker locations:", normalizeApiError(error));
     }
   },
 
@@ -165,23 +147,7 @@ export const createPostingsZlice = (set, get) => ({
     if (!jobId) return;
 
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch(`http://127.0.0.1:8000/match/${jobId}/find-help`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        get().updateJobMetrics(jobId, { matchedCount: 0 });
-        set((state) => ({
-          matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] }
-        }));
-        return;
-      }
-
-      const data = await response.json();
+      const data = await apiClient.get(`/match/${jobId}/find-help`);
       const workers = data.workers || [];
 
       get().updateJobMetrics(jobId, { 
@@ -203,7 +169,11 @@ export const createPostingsZlice = (set, get) => ({
       }
 
     } catch (error) {
-      console.error(`❌ Failed to fetch matched workers for Job ${jobId}:`, error);
+      get().updateJobMetrics(jobId, { matchedCount: 0 });
+      set((state) => ({
+        matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] }
+      }));
+      console.error(`❌ Failed to fetch matched workers for Job ${jobId}:`, normalizeApiError(error));
     }
   },
 

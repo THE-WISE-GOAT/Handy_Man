@@ -1,3 +1,5 @@
+import { apiClient, normalizeApiError } from "@shared/api/client";
+
 export const createBookingsZlice = (set, get) => ({
 
   userAddrText: "Bhaktapur, Nepal", 
@@ -43,32 +45,18 @@ export const createBookingsZlice = (set, get) => ({
 
   fetchBookingsPendingJobs: async () => {
     try {
-      console.log("hellooooo");
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/jobs/status/pending", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+      const data = await apiClient.get("/jobs/status/pending");
 
-      if (!response.ok) {
-        throw new Error(`HTTP Error Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
       if (data.status === "success") {
         set({ fetchedJobs: data.tasks });
         set({ activePostsCount: data.tasks.length });
       }
     } catch (error) {
-      console.error("❌ Failed to fetch pending jobs:", error);
+      console.error("❌ Failed to fetch pending jobs:", normalizeApiError(error));
     }
   },
 
   createJob: async () => {
-    // 🛠️ FIX: Destructure the correct function name here
     const { 
       booking_chat_id, 
       jobTitleDraft, 
@@ -85,37 +73,41 @@ export const createBookingsZlice = (set, get) => ({
       return;
     }
 
+    const trimmedDescription = (jobDescriptionDraft || "").trim();
+    const trimmedTitle = (jobTitleDraft || "").trim();
+
+    if (!trimmedDescription) {
+      console.error("❌ Cannot post job. Job description is empty.");
+      alert("Please provide a job description before posting.");
+      return;
+    }
+
+    if (!trimmedTitle) {
+      console.error("❌ Cannot post job. Job title is empty.");
+      alert("Please provide a job title before posting.");
+      return;
+    }
+
     set({ isSubmitting: true });
 
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-
-      const response = await fetch(`http://127.0.0.1:8000/dispatch/${booking_chat_id}/complete`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          edited_description: jobDescriptionDraft || "",
+      const data = await apiClient.post(
+        `/dispatch/${booking_chat_id}/complete`,
+        {
+          edited_description: trimmedDescription,
           location: {
             longitude: parseFloat(userLng) || 0.0,
             latitude: parseFloat(userLat) || 0.0
           },
-          title: jobTitleDraft || "NEW JOB REQUEST",
+          title: trimmedTitle,
           contact_name: userName || "",
           contact_phone: userCont || "",
           status: "pending",
           mode: "regular",
           attachments: [] 
-        }),
-      });
+        }
+      );
 
-      if (!response.ok) {
-        throw new Error(`Posting pipeline rejected by server: ${response.status}`);
-      }
-
-      const data = await response.json();
       if (data.status === "success") {
         console.log("🚀 Success! Job verified, vectorized by Nvidia, and stored securely.");
         
@@ -129,13 +121,74 @@ export const createBookingsZlice = (set, get) => ({
         }
       }
     } catch (error) {
-      console.error("❌ Failed to finalize job posting:", error);
+      console.error("❌ Failed to finalize job posting:", normalizeApiError(error));
+      console.error("[DEBUG] Full API error response body:", error.data);
+      alert(`Failed to post job: ${normalizeApiError(error).message}`);
     } finally {
       set({ isSubmitting: false });
     }
     
-    // 🛠️ FIX: Call the correct function name here to refresh the UI pipeline instantly
     await fetchBookingsPendingJobs();
+  },
+
+  createJobDirect: async (jobData) => {
+    const {
+      userLng,
+      userLat,
+      userName,
+      userCont,
+      fetchBookingsPendingJobs,
+      fetchPendingJobs,
+    } = get();
+
+    const trimmedTitle = (jobData.title || "").trim();
+    const trimmedDescription = (jobData.description || "").trim();
+
+    if (!trimmedTitle) {
+      console.error("❌ Cannot create job. Title is empty.");
+      alert("Please provide a job title.");
+      return;
+    }
+
+    if (!trimmedDescription) {
+      console.error("❌ Cannot create job. Description is empty.");
+      alert("Please provide a job description.");
+      return;
+    }
+
+    set({ isSubmitting: true });
+
+    try {
+      const data = await apiClient.post("/jobs", {
+        title: trimmedTitle,
+        description: trimmedDescription,
+        location: {
+          longitude: parseFloat(userLng) || parseFloat(jobData.lng) || 0.0,
+          latitude: parseFloat(userLat) || parseFloat(jobData.lat) || 0.0,
+        },
+        category: jobData.category || "",
+        budget: jobData.budget || null,
+        contact_name: userName || jobData.contactName || "",
+        contact_phone: userCont || jobData.contactPhone || "",
+        status: "pending",
+        mode: "regular",
+        attachments: [],
+        phone_number: jobData.phoneNumber || "",
+      });
+
+      if (data.status === "success") {
+        console.log("🚀 Direct job created successfully.", data);
+      }
+
+      await fetchPendingJobs();
+      await fetchBookingsPendingJobs();
+    } catch (error) {
+      console.error("❌ Failed to create job directly:", normalizeApiError(error));
+      console.error("[DEBUG] Full API error response body:", error.data);
+      alert(`Failed to create job: ${normalizeApiError(error).message}`);
+    } finally {
+      set({ isSubmitting: false });
+    }
   },
 
   swapSlots: (clickedSlotName) =>
@@ -146,9 +199,9 @@ export const createBookingsZlice = (set, get) => ({
       return {
         slots: {
           ...state.slots,
-          main: incomingTargetModule,
-          [clickedSlotName]: outgoingMainModule,
-        },
+          main: incomingTargetModule,           
+          [clickedSlotName]: outgoingMainModule 
+        }
       };
     }),
 
@@ -182,20 +235,7 @@ export const createBookingsZlice = (set, get) => ({
   startNewSession: async () => {
     set({ isAiGenerating: true });
     try {
-      const token = localStorage.getItem("handy_man_access_token"); 
-      const response = await fetch("http://127.0.0.1:8000/dispatch/session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Session authorization failed: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.post("/dispatch/session", {});
 
       set({
         booking_chat_id: data.booking_chat_id,
@@ -221,7 +261,7 @@ export const createBookingsZlice = (set, get) => ({
         ],
       });
     } catch (error) {
-      console.error("❌ Failed to authenticate or establish chat session:", error);
+      console.error("❌ Failed to authenticate or establish chat session:", normalizeApiError(error));
     } finally {
       set({ isAiGenerating: false });
     }
@@ -237,24 +277,11 @@ export const createBookingsZlice = (set, get) => ({
     addChatMessage(userMessage, "user");
 
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/dispatch/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          booking_chat_id: parseInt(booking_chat_id),
-          message: userMessage,
-        }),
+      const data = await apiClient.post("/dispatch/chat", {
+        booking_chat_id: parseInt(booking_chat_id),
+        message: userMessage,
       });
 
-      if (!response.ok) {
-        throw new Error(`Chat turn rejected by server: ${response.status}`);
-      }
-
-      const data = await response.json(); 
       const primaryCategory = data.categories && data.categories.length > 0 
         ? data.categories[0].category 
         : "";
@@ -286,7 +313,7 @@ export const createBookingsZlice = (set, get) => ({
         swapSlots("sidebar");
       }
     } catch (error) {
-      console.error("❌ Failed to process chat turn over secure transport:", error);
+      console.error("❌ Failed to process chat turn over secure transport:", normalizeApiError(error));
     }
   },
 });
