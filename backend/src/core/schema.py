@@ -2,8 +2,9 @@
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, TypedDict
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from src.core import model
 
 class LocationCoordinates(BaseModel):
     longitude: float = Field(..., description="Longitude coordinate (X)", ge=-180, le=180)
@@ -344,3 +345,28 @@ class WorkerExpertiseOut(BaseModel):
 
     class Config:
         from_attributes = True
+        
+        
+# ___________________ for mathcing worker with job request ___________________________
+class MatchDetail(TypedDict):
+    worker_profile: model.WorkerProfile
+    user: model.User
+    score: float
+    rank: int
+    worker_chat_id: int
+
+class MatchingResult(TypedDict):
+    matches: list[MatchDetail]
+    worker_chat_ids: list[int]
+    count: int
+
+class MatchedJobDetail(TypedDict):
+    booking_chat_id: int
+    title: str
+    description: str
+    score: float
+    rank: int
+
+class WorkerMatchingResult(TypedDict):
+    matched_jobs: list[MatchedJobDetail]
+    count: int
