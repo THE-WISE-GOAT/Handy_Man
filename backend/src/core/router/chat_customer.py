@@ -302,17 +302,15 @@ async def complete_customer_chat(  # Converted to async def
     wkt_point = f"POINT({lng} {lat})"
 
     chat_session = _get_own_session(booking_chat_id, db, current_user)
-    if not chat_session.is_complete:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot process summary. The AI chat session is not complete yet."
-        )
     
     job_desc = payload.edited_description.strip()
     if not job_desc:
+        job_desc = f"{payload.title}: {payload.contact_name or ''}".strip()
+    
+    if not chat_session.is_complete and not job_desc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Job description is missing. Cannot generate vector profile."
+            detail="Cannot process summary. The AI chat session is not complete yet. Please provide a job description."
         )
 
     # Await the external network calls
