@@ -595,17 +595,17 @@ def get_worker_summary(
 
 @router.post(
     "/{worker_chat_id}/complete",
-    summary="Complete AI chat, create profile, store expertise embedding, and run matching engine",
+    summary="Complete AI chat, create a worker profile row for this trade, embed it, and run reverse matching",
 )
 async def complete_worker_chat(
-    worker_chat_id: int, 
+    worker_chat_id: int,
     payload: schema.WorkerCompleteChatIn,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user)
 ):
     logger.info(f"Starting registration completion pipeline for worker_chat_id: {worker_chat_id}")
-    
+
     chat_session = _get_own_worker_session(worker_chat_id, db, current_user)
 
     if not chat_session.is_complete:
@@ -613,10 +613,10 @@ async def complete_worker_chat(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot process summary. The AI chat session is not complete yet.",
         )
-        
+
     profile_data = chat_session.profile if chat_session.profile else {}
     job_desc = profile_data.get("job_description", "").strip()
-    
+
     if not job_desc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -626,15 +626,19 @@ async def complete_worker_chat(
     lng = payload.location.longitude
     lat = payload.location.latitude
     wkt_point = f"POINT({lng} {lat})"
-    
+
     embedding_vector = await _fetch_nvidia_passage_embedding(job_desc)
     address_text = await _get_address_from_coords(lat, lng)
-        
+
+    # Each completed interview is its own trade: one worker_chat_id, one WorkerProfile
+    # row, one job_category. A second interview for the same user (e.g. registering as
+    # an electrician after already being a plumber) produces a SECOND row — that's why
+    # this looks up by worker_chat_id (unique per chat session) rather than user_id alone.
     db_profile = db.query(model.WorkerProfile).filter(
         model.WorkerProfile.worker_chat_id == worker_chat_id,
         model.WorkerProfile.user_id == current_user.id
     ).first()
-    
+
     profile_fields = {
         "stage": chat_session.stage,
         "is_complete": chat_session.is_complete,
@@ -655,6 +659,7 @@ async def complete_worker_chat(
         "latitude": lat,
         "longitude": lng,
         "location": wkt_point,
+        "description_vector": embedding_vector,  # was previously computed and never saved here
         "phone_number": payload.phone_number,
         "address_text": address_text
     }
@@ -671,30 +676,7 @@ async def complete_worker_chat(
     db.add(db_profile)
     db.flush()  # Stages WorkerProfile so db_profile.id is available
 
-    # ── UPSERT PRIMARY EXPERTISE RECORD ───────────────────────────────────────
-    primary_title = profile_data.get("job_category", "General Skill")
-    db_expertise = db.query(model.WorkerExpertise).filter(
-        model.WorkerExpertise.worker_id == db_profile.id,
-        model.WorkerExpertise.title == primary_title
-    ).first()
-
-    if db_expertise:
-        db_expertise.description = job_desc
-        db_expertise.embedding = embedding_vector
-        db_expertise.is_active = True
-    else:
-        db_expertise = model.WorkerExpertise(
-            worker_id=db_profile.id,
-            title=primary_title,
-            description=job_desc,
-            embedding=embedding_vector,
-            is_active=True
-        )
-        db.add(db_expertise)
-
-    db.flush()
-
-    # Run reverse matching across all worker expertise vectors
+    # Run reverse matching against all open pending jobs
     try:
         matching_result = matching_manager.create_matches_for_worker(
             db=db,
@@ -713,6 +695,6 @@ async def complete_worker_chat(
         background_tasks.add_task(_broadcast_live_alerts, worker_chat_id, matched_jobs)
 
     return {
-        "status": "success", 
-        "message": f"Worker profile activated with multi-vector expertise. Pre-calculated matches created for {matching_result.get('count', 0)} open jobs."
+        "status": "success",
+        "message": f"Worker profile activated. Pre-calculated matches created for {matching_result.get('count', 0)} open jobs."
     }
