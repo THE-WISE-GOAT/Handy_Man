@@ -339,7 +339,7 @@ export default function Dash3Worker({ viewSlug }) {
   // RENDER: Under Review / Rejected State
   // ====================================================
   const renderStatusView = () => {
-    if (applicationSubmitted && !isApplicantRejected) {
+    if ((applicationSubmitted || applicantStage === "pending_admin_review") && !isApplicantRejected) {
       return (
         <div className="dashboard-card slot-main">
           <div className="card-header">••• APPLICATION STATUS</div>
@@ -350,7 +350,7 @@ export default function Dash3Worker({ viewSlug }) {
               You will be notified once a decision is made.
             </p>
             <div className="status-badge status-badge--review">
-              Pending Admin Review
+              Pending Admin Approval
             </div>
           </div>
         </div>
