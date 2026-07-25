@@ -31,6 +31,9 @@ class InitializeWorkerAppOut(BaseModel):
     is_rejected: bool
     worker_chat_id: int | None = None
 
+    class Config:
+        from_attributes = True
+
 class SubmitWorkerAppIn(BaseModel):
     worker_chat_id: int
     phone_number: str | None = None
@@ -56,6 +59,9 @@ class WorkerAppStatusOut(BaseModel):
     worker_chat_id: int | None = None
     phone_number: str | None = None
     address_text: str | None = None
+
+    class Config:
+        from_attributes = True
 
 class AdminPendingAppOut(BaseModel):
     id: int
@@ -107,6 +113,9 @@ class UpdateWorkerProfileOut(BaseModel):
     phone_number: str | None = None
     address_text: str | None = None
     message: str
+
+    class Config:
+        from_attributes = True
 
 class UpdateUserIn(BaseModel):
     firstName: Optional[str] = None
