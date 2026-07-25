@@ -596,8 +596,8 @@ async def complete_worker_chat(
     ).first()
 
     core_fields = {
-        "stage": chat_session.stage,
-        "is_complete": chat_session.is_complete,
+        "stage": "pending_admin_review",
+        "is_complete": False,
         "is_rejected": chat_session.is_rejected,
         "rejection_reason": chat_session.rejection_reason,
         "latitude": lat,
