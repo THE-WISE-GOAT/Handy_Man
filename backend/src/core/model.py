@@ -151,9 +151,9 @@ class WorkerProfile(Base):
     
     # ADDED unique=True HERE
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), 
-        unique=True, 
-        nullable=False
+    ForeignKey("users.id", ondelete="CASCADE"),
+    nullable=False,
+    index=True,  # no longer unique — a user can complete multiple interviews, one row per trade
     )
     
     worker_chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
@@ -191,11 +191,11 @@ class WorkerProfile(Base):
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
-    expertises: Mapped[List["WorkerExpertise"]] = relationship(
-        "WorkerExpertise",
-        back_populates="worker",
-        cascade="all, delete-orphan",
-    )
+    # expertises: Mapped[List["WorkerExpertise"]] = relationship(
+    #     "WorkerExpertise",
+    #     back_populates="worker",
+    #     cascade="all, delete-orphan",
+    # )
 
     job_matches: Mapped[List["JobWorkerMatch"]] = relationship(
         "JobWorkerMatch",
@@ -303,18 +303,8 @@ class JobWorkerMatch(Base):
     is_selected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     job: Mapped["Job"] = relationship(
         "Job",
@@ -329,23 +319,23 @@ class JobWorkerMatch(Base):
 
     # --- ADD THIS NEW CLASS TO model.py ---
 
-class WorkerExpertise(Base):
-    __tablename__ = "worker_expertises"
+# class WorkerExpertise(Base):
+#     __tablename__ = "worker_expertises"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    worker_id: Mapped[int] = mapped_column(
-        ForeignKey("workers.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    title: Mapped[str] = mapped_column(String(255), nullable=False)  # e.g., "CCTV Installation"
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    # Nvidia NIM 4,096-dimensional embedding vector for this SPECIFIC skill/expertise
-    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(4096), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
-    )
+#     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+#     worker_id: Mapped[int] = mapped_column(
+#         ForeignKey("workers.id", ondelete="CASCADE"), nullable=False, index=True
+#     )
+#     title: Mapped[str] = mapped_column(String(255), nullable=False)  # e.g., "CCTV Installation"
+#     description: Mapped[str] = mapped_column(Text, nullable=False)
+#     # Nvidia NIM 4,096-dimensional embedding vector for this SPECIFIC skill/expertise
+#     embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(4096), nullable=True)
+#     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+#     created_at: Mapped[datetime] = mapped_column(
+#         DateTime(timezone=True), server_default=func.now(), nullable=False
+#     )
+#     updated_at: Mapped[datetime] = mapped_column(
+#         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+#     )
 
-    worker: Mapped["WorkerProfile"] = relationship("WorkerProfile", back_populates="expertises")
+#     worker: Mapped["WorkerProfile"] = relationship("WorkerProfile", back_populates="expertises")
