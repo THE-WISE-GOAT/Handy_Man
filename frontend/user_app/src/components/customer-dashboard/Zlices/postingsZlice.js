@@ -1,5 +1,3 @@
-// Zlices/postingsZlice.js
-
 export const createPostingsZlice = (set, get) => ({
   // ==========================================
   // 1. DYNAMIC LAYOUT POSITIONS (4-Slot Map)
@@ -33,10 +31,7 @@ export const createPostingsZlice = (set, get) => ({
   matchedWorkersMap: {}, 
   workerLocations: {}, 
 
-  biddingsStream: [
-    { id: "bid-1", provider: "John Doe Plumbing", offer: "$120", status: "Incoming" },
-    { id: "bid-2", provider: "Elite Fixers", offer: "$145", status: "Reviewing" }
-  ],
+  biddingsStream: [], 
   feedbackRating: "Verified Feedback - 5.0 Star Average",
   pipelineStatus: "Post Network Pipeline Monitor Active",
 
@@ -62,7 +57,7 @@ export const createPostingsZlice = (set, get) => ({
       if (data.status === "success") {
         const jobs = data.tasks || [];
         
-        // 🛠️ ARCHITECTURAL FIX: Flatten nested backend location parameters safely
+        // Flatten nested backend location parameters safely
         const mappedJobs = jobs.map(job => {
           const lat = job.latitude ?? job.location?.latitude;
           const lng = job.longitude ?? job.location?.longitude;
@@ -78,7 +73,7 @@ export const createPostingsZlice = (set, get) => ({
 
         set({ pendingJobs: mappedJobs });
         
-        // 🛠️ ARCHITECTURAL FIX: Ensure active selections automatically receive fresh data values
+        // Ensure active selections automatically receive fresh data values
         const currentSelected = get().selectedJob;
         if (mappedJobs.length > 0) {
           const matchingActiveJob = currentSelected 
@@ -96,7 +91,27 @@ export const createPostingsZlice = (set, get) => ({
     }
   },
 
-  // 🛠️ ARCHITECTURAL FIX: Dual-write updates to prevent decoupled stale states on-screen
+  fetchJobBids: async (jobId) => {
+    if (!jobId) return;
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      // Updated endpoint path to match worker_router.py prefix
+      const response = await fetch(`http://127.0.0.1:8000/workers/jobs/${jobId}/bids`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      if (!response.ok) throw new Error("Failed to fetch existing bids");
+      
+      const data = await response.json();
+      if (data.status === "success") {
+        set({ biddingsStream: data.bids || [] });
+      }
+    } catch (error) {
+      console.error(`❌ Failed to fetch bids for Job ${jobId}:`, error);
+    }
+  },
+
   updateJobMetrics: (jobId, metrics) => set((state) => {
     const updatedJobs = state.pendingJobs.map(job => 
       job.id === jobId ? { ...job, ...metrics } : job
@@ -166,7 +181,7 @@ export const createPostingsZlice = (set, get) => ({
 
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch(`http://127.0.0.1:8000/match/${jobId}/find-help`, {
+      const response = await fetch(`http://127.0.0.1:8000/dispatch/match/${jobId}/find-help`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -208,12 +223,35 @@ export const createPostingsZlice = (set, get) => ({
   },
 
   setSelectedWorkerId: (workerId) => set({ selectedWorkerId: workerId }),
-  setSelectedJob: (job) => set({ selectedJob: job, selectedWorkerId: null }),
+  
+  setSelectedJob: (job) => {
+    set({ selectedJob: job, selectedWorkerId: null });
+    if (job && job.id) {
+      get().fetchJobBids(job.id); 
+    }
+  },
 
-  connectCustomerDispatch: (customerId, token) => {
-    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/customer/${customerId}?token=${token}`);
+  disconnectCustomerDispatch: () => {
+    const { customerSocket } = get();
+    if (customerSocket) {
+      customerSocket.close();
+      set({ customerSocket: null });
+    }
+  },
+
+  connectCustomerDispatch: (bookingChatId, token) => {
+    get().disconnectCustomerDispatch();
+
+    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
+    const socket = new WebSocket(`${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`);
+    
+    socket.onopen = () => console.log("🟢 Live Dispatch WebSocket Connected");
+    socket.onerror = (err) => console.error("❌ Live Dispatch WebSocket Error:", err);
+    socket.onclose = () => console.log("🔴 Live Dispatch WebSocket Disconnected");
+
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
+      
       if (message.type === "WORKER_INTEREST_UPDATE") {
         const { job_id, worker_chat_id, interested } = message.data;
         set((state) => ({
@@ -231,6 +269,7 @@ export const createPostingsZlice = (set, get) => ({
           }
         }));
       }
+      
       if (message.type === "NEW_BID") {
         const { job_id, bid } = message.data;
         set((state) => ({
@@ -238,6 +277,7 @@ export const createPostingsZlice = (set, get) => ({
         }));
       }
     };
+    
     set({ customerSocket: socket });
   },
 });
