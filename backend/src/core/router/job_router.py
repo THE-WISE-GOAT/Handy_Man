@@ -15,9 +15,6 @@ def get_jobs_by_status_endpoint(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user)
 ):
-    # Fixed: Removed inline imports and redundant 'if not current_user' check
-    # Depends(get_current_user) guarantees authentication before this code runs.
-    
     results = job_manager.get_jobs_by_status(db, current_user.id, status_val, skip, limit)
     
     formatted_tasks = [
@@ -50,5 +47,4 @@ def delete_job_endpoint(
     if not success:
         raise HTTPException(status_code=404, detail="Job not found or unauthorized")
     
-    # Fixed: Removed db.commit() here, now safely encapsulated in job_manager
     return {"status": "success", "message": "Job deleted successfully"}
