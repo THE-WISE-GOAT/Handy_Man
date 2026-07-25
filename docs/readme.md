@@ -12,7 +12,7 @@ Handy_Man is a location-aware gig marketplace that connects local customers with
   - `backend/src/core/router/auth.py`: user registration with password hashing and default customer role assignment.
   - `backend/src/core/router/login.py`: login endpoint using OAuth2 password flow and JWT token issuance.
 - Worker management:
-  - `backend/src/core/router/worker.py`: worker role application endpoint.
+  - `backend/src/core/router/worker_onboarding.py`: worker onboarding state machine (initialize, submit, status, approve, reject, profile update).
 - Service task flow:
   - `backend/src/core/router/service_task.py`: create service tasks, fetch current user tasks, query available workers by geospatial radius, and logout placeholder.
 - Database and models:

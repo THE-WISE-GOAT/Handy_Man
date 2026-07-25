@@ -21,6 +21,19 @@ class CompleteChatIn(BaseModel):
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
     phone_number: Optional[str] = None
 
+class CreateJobIn(BaseModel):
+    title: str
+    description: str
+    location: LocationCoordinates
+    category: Optional[str] = None
+    budget: Optional[float] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: str = "pending"
+    mode: str = "regular"
+    attachments: List[Dict[str, Any]] = Field(default_factory=list)
+    phone_number: Optional[str] = None
+
 class InitializeWorkerAppIn(BaseModel):
     pass
 
@@ -31,6 +44,9 @@ class InitializeWorkerAppOut(BaseModel):
     is_complete: bool
     is_rejected: bool
     worker_chat_id: int | None = None
+
+    class Config:
+        from_attributes = True
 
 class SubmitWorkerAppIn(BaseModel):
     worker_chat_id: int
@@ -57,6 +73,9 @@ class WorkerAppStatusOut(BaseModel):
     worker_chat_id: int | None = None
     phone_number: str | None = None
     address_text: str | None = None
+
+    class Config:
+        from_attributes = True
 
 class AdminPendingAppOut(BaseModel):
     id: int
@@ -108,6 +127,9 @@ class UpdateWorkerProfileOut(BaseModel):
     phone_number: str | None = None
     address_text: str | None = None
     message: str
+
+    class Config:
+        from_attributes = True
 
 class UpdateUserIn(BaseModel):
     firstName: Optional[str] = None
@@ -233,7 +255,7 @@ class CustomerProblemSchema(BaseModel):
 class UserRolesOut(BaseModel):
     roles: list[str]
     
- # for now this support in worker.py   
+  # for now this support in worker_onboarding.py
 class WorkerOnboardIn(BaseModel):
     latitude: float
     longitude: float

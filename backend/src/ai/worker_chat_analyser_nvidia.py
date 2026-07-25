@@ -88,8 +88,10 @@ Design notes on the interview flow itself
     problem — no first-person voice, no sales language, no credentials.
 """
 
+import httpx
 import json
 import logging
+import os
 import re
 
 from src.ai.customer_chat_analyser_nvidia import (
@@ -549,3 +551,37 @@ def extract_worker_profile(
     profile.is_custom_category = profile.category_tag not in PROBLEM_CATEGORIES
 
     return profile
+
+
+async def get_worker_description_embedding(text: str) -> list[float]:
+    """
+    Generate a 4096-dim embedding for a worker job description via
+    NVIDIA nv-embed-v1.
+    """
+    if not text:
+        raise ValueError("text must not be empty for embedding.")
+
+    api_key = os.getenv("NVIDIA_API_KEY")
+    if not api_key:
+        raise ValueError("NVIDIA_API_KEY is not configured.")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "nvidia/nv-embed-v1",
+        "input": [text],
+        "input_type": "passage",
+        "encoding_format": "float",
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://integrate.api.nvidia.com/v1/embeddings",
+            headers=headers,
+            json=payload,
+            timeout=20.0,
+        )
+        response.raise_for_status()
+        return response.json()["data"][0]["embedding"]

@@ -24,7 +24,6 @@ Endpoints
 """
 
 import logging
-import os
 import httpx  # Swapped requests for httpx
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select
@@ -41,6 +40,7 @@ from src.ai.worker_chat_analyser_nvidia import (
     generate_scenario,
     evaluate_answer,
     extract_worker_profile,
+    get_worker_description_embedding,
     INITIAL_GREETING,
     MAX_PRETEST_TURNS,
     MODEL_NAME,
@@ -49,6 +49,7 @@ from src.ai.worker_chat_analyser_nvidia import (
     COMPLETE_TOKEN,
     SCENARIO_PASS_THRESHOLD,
 )
+from src.core.worker_profile_helper import sync_profile_extracted_fields, upsert_worker_expertise
 
 router = APIRouter(prefix="/worker-interview", tags=["Worker Interview"])
 logger = logging.getLogger(__name__)
@@ -106,53 +107,6 @@ async def _get_address_from_coords(lat: float, lng: float) -> str:
         logger.error(f"[Geocode Exception] Network failure details: {e}")
         
     return f"Location ({lat}, {lng})"
-
-
-async def _fetch_nvidia_passage_embedding(job_desc: str) -> list[float]:
-    """Requests a vector passage embedding from the Nvidia NIM API for a worker profile description."""
-    api_key = os.getenv("NVIDIA_API_KEY")
-    if not api_key:
-        logger.error("NVIDIA_API_KEY environment variable is missing.")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Embedding configuration error."
-        )
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    nvidia_payload = {
-        "model": "nvidia/nv-embed-v1",
-        "input": [job_desc],
-        "input_type": "passage",  
-        "encoding_format": "float"
-    }
-
-    try:
-        logger.info("Requesting worker profile embedding from Nvidia NIM...")
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://integrate.api.nvidia.com/v1/embeddings",
-                headers=headers, 
-                json=nvidia_payload, 
-                timeout=20.0
-            )
-            
-            if response.status_code == 200:
-                return response.json()["data"][0]["embedding"]
-            else:
-                logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"Nvidia API error: {response.status_code}"
-                )
-    except httpx.RequestError as e:
-        logger.error(f"Failed to connect to Nvidia API: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to connect to Nvidia API: {e}"
-        )
 
 
 async def _broadcast_live_alerts(worker_chat_id: int, matched_jobs: list[dict]):
@@ -595,17 +549,17 @@ def get_worker_summary(
 
 @router.post(
     "/{worker_chat_id}/complete",
-    summary="Complete AI chat, create a worker profile row for this trade, embed it, and run reverse matching",
+    summary="Complete AI chat, create profile, store expertise embedding, and run matching engine",
 )
 async def complete_worker_chat(
-    worker_chat_id: int,
+    worker_chat_id: int, 
     payload: schema.WorkerCompleteChatIn,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), 
     current_user: model.User = Depends(get_current_user)
 ):
     logger.info(f"Starting registration completion pipeline for worker_chat_id: {worker_chat_id}")
-
+    
     chat_session = _get_own_worker_session(worker_chat_id, db, current_user)
 
     if not chat_session.is_complete:
@@ -613,10 +567,10 @@ async def complete_worker_chat(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot process summary. The AI chat session is not complete yet.",
         )
-
+        
     profile_data = chat_session.profile if chat_session.profile else {}
     job_desc = profile_data.get("job_description", "").strip()
-
+    
     if not job_desc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -626,57 +580,53 @@ async def complete_worker_chat(
     lng = payload.location.longitude
     lat = payload.location.latitude
     wkt_point = f"POINT({lng} {lat})"
-
-    embedding_vector = await _fetch_nvidia_passage_embedding(job_desc)
+    
+    try:
+        embedding_vector = await get_worker_description_embedding(job_desc)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Nvidia API error: {exc}",
+        )
     address_text = await _get_address_from_coords(lat, lng)
-
-    # Each completed interview is its own trade: one worker_chat_id, one WorkerProfile
-    # row, one job_category. A second interview for the same user (e.g. registering as
-    # an electrician after already being a plumber) produces a SECOND row — that's why
-    # this looks up by worker_chat_id (unique per chat session) rather than user_id alone.
+        
     db_profile = db.query(model.WorkerProfile).filter(
         model.WorkerProfile.worker_chat_id == worker_chat_id,
         model.WorkerProfile.user_id == current_user.id
     ).first()
 
-    profile_fields = {
-        "stage": chat_session.stage,
-        "is_complete": chat_session.is_complete,
+    core_fields = {
+        "stage": "pending_admin_review",
+        "is_complete": False,
         "is_rejected": chat_session.is_rejected,
         "rejection_reason": chat_session.rejection_reason,
-        "job_category": profile_data.get("job_category"),
-        "category_tag": profile_data.get("category_tag"),
-        "is_custom_category": profile_data.get("is_custom_category", False),
-        "specialities": profile_data.get("specialities", []),
-        "years_experience": profile_data.get("years_experience", 0),
-        "license_or_certification": profile_data.get("license_or_certification"),
-        "specialized_tools_or_equipment": profile_data.get("specialized_tools_or_equipment", []),
-        "job_description": job_desc,
-        "emergency_available": profile_data.get("emergency_available", False),
-        "has_verified_specialty": profile_data.get("has_verified_specialty", False),
-        "scenario_passed": profile_data.get("scenario_passed", False),
-        "scenario_score": profile_data.get("scenario_score", 0),
         "latitude": lat,
         "longitude": lng,
         "location": wkt_point,
-        "description_vector": embedding_vector,  # was previously computed and never saved here
         "phone_number": payload.phone_number,
-        "address_text": address_text
+        "address_text": address_text,
     }
 
     if db_profile:
-        for key, value in profile_fields.items():
+        for key, value in core_fields.items():
             setattr(db_profile, key, value)
+        sync_profile_extracted_fields(db_profile, profile_data)
     else:
         db_profile = model.WorkerProfile(
             user_id=current_user.id,
             worker_chat_id=worker_chat_id,
-            **profile_fields
+            **core_fields,
+            **(profile_data or {}),
         )
     db.add(db_profile)
-    db.flush()  # Stages WorkerProfile so db_profile.id is available
+    db.flush()
 
-    # Run reverse matching against all open pending jobs
+    primary_title = profile_data.get("job_category", "General Skill")
+    upsert_worker_expertise(db, db_profile.id, primary_title, job_desc, embedding_vector)
+
+    db.flush()
+
+    # Run reverse matching across all worker expertise vectors
     try:
         matching_result = matching_manager.create_matches_for_worker(
             db=db,
@@ -695,6 +645,6 @@ async def complete_worker_chat(
         background_tasks.add_task(_broadcast_live_alerts, worker_chat_id, matched_jobs)
 
     return {
-        "status": "success",
-        "message": f"Worker profile activated. Pre-calculated matches created for {matching_result.get('count', 0)} open jobs."
+        "status": "success", 
+        "message": f"Worker profile activated with multi-vector expertise. Pre-calculated matches created for {matching_result.get('count', 0)} open jobs."
     }
