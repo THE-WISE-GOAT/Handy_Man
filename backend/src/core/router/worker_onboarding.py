@@ -20,8 +20,10 @@ router = APIRouter(prefix="/worker-onboarding", tags=["Worker Onboarding"])
 
 def _get_own_worker_profile(user_id: int, db: Session) -> model.WorkerProfile | None:
     return db.execute(
-        select(model.WorkerProfile).where(model.WorkerProfile.user_id == user_id)
-    ).scalar_one_or_none()
+        select(model.WorkerProfile)
+        .where(model.WorkerProfile.user_id == user_id)
+        .order_by(model.WorkerProfile.id.desc())
+    ).scalars().first()
 
 def _require_worker_profile(user_id: int, db: Session) -> model.WorkerProfile:
     profile = _get_own_worker_profile(user_id, db)
@@ -200,8 +202,7 @@ def list_pending_applications(
         .join(model.User, model.WorkerProfile.user_id == model.User.id)
         .outerjoin(model.WorkerInterviewSession, model.WorkerProfile.worker_chat_id == model.WorkerInterviewSession.id)
         .where(
-            model.WorkerProfile.stage == "pending_admin_review",
-            model.WorkerProfile.is_complete == False
+            model.WorkerProfile.stage.in_(["pending_admin_review", "complete"]),
         )
         .order_by(model.WorkerProfile.id.desc())
     )
@@ -239,7 +240,7 @@ async def approve_worker_application(
 
     profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
 
-    if not profile or profile.stage != "pending_admin_review":
+    if not profile or profile.stage not in ("pending_admin_review", "complete"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Valid pending application not found.")
 
     profile.is_complete = True
@@ -291,7 +292,7 @@ def reject_worker_application(
 
     profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
 
-    if not profile or profile.stage != "pending_admin_review":
+    if not profile or profile.stage not in ("pending_admin_review", "complete"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Valid pending application not found.")
 
     profile.is_complete = False
@@ -332,4 +333,4 @@ def update_my_worker_profile(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update worker profile.")
 
-    return {**profile.__dict__, "message": "Profile updated successfully."}
+    return {**profile.__dict__, "worker_id": profile.id, "message": "Profile updated successfully."}
