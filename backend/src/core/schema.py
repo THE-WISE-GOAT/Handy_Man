@@ -392,3 +392,17 @@ class MatchedJobDetail(TypedDict):
 class WorkerMatchingResult(TypedDict):
     matched_jobs: list[MatchedJobDetail]
     count: int
+
+
+class MatchedJobOut(BaseModel):
+    job_id: int
+    title: str
+    description: str
+    budget: float | None
+    location: str | None
+    match_score: float
+    created_at: datetime
+    status: str
+
+    class Config:
+        from_attributes = True
