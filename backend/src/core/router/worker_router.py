@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func, cast
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
-from src.core import model
+from src.core import model, schema
 from geoalchemy2 import Geometry
 
 
@@ -93,3 +93,47 @@ def get_worker_job_bids(
     ]
     
     return {"status": "success", "bids": formatted_bids}
+
+
+@router.get("/matched-jobs", summary="Fetch all active matched jobs for the authenticated worker", response_model=list[schema.MatchedJobOut])
+def get_worker_matched_jobs(
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user)
+):
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        return []
+
+    stmt = (
+        select(model.JobWorkerMatch, model.Job)
+        .join(model.Job, model.JobWorkerMatch.job_id == model.Job.id)
+        .where(
+            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.is_active == True,
+            model.JobWorkerMatch.is_rejected == False,
+        )
+        .order_by(model.JobWorkerMatch.created_at.desc())
+    )
+
+    results = db.execute(stmt).all()
+
+    matched_jobs = [
+        {
+            "job_id": job.id,
+            "title": job.title,
+            "description": job.description,
+            "budget": None,
+            "location": job.address_text,
+            "match_score": match.match_score,
+            "created_at": match.created_at,
+            "status": job.status,
+        }
+        for match, job in results
+    ]
+
+    return matched_jobs
