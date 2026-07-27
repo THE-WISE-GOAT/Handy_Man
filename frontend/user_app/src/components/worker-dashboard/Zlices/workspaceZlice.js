@@ -47,7 +47,7 @@ export const createWorkspaceZlice = (set, get) => ({
   fetchMatchedJobs: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/jobs/for-worker", {
+      const response = await fetch("http://127.0.0.1:8000/worker/matched-jobs", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -60,29 +60,62 @@ export const createWorkspaceZlice = (set, get) => ({
       }
 
       const data = await response.json();
-      if (data.status === "success") {
-        set({ matchedJobs: data.jobs || [] });
-      }
+      set({ matchedJobs: data || [] });
     } catch (error) {
       console.error("❌ Failed to fetch matched jobs:", error);
     }
   },
 
   connectToDispatch: (workerChatId, token) => {
-    // Connect using the token as a query param
-    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${workerChatId}?token=${token}`);
+    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/worker/${workerChatId}?token=${token}`);
 
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      if (message.type === "NEW_JOB_NOTIFICATION") {
-        // This will update the state, which your React component will see
-        set({ activeJob: message.data });
+      if (message.event === "new_job_match") {
+        set((state) => {
+          const exists = state.matchedJobs.some(
+            (job) => job.booking_chat_id === message.booking_chat_id
+          );
+          if (exists) return {};
+          return {
+            matchedJobs: [
+              {
+                job_id: 0,
+                title: message.title || "New Job Match",
+                description: message.description || "",
+                budget: null,
+                location: null,
+                match_score: 0,
+                created_at: new Date().toISOString(),
+                status: "matched",
+                booking_chat_id: message.booking_chat_id,
+              },
+              ...state.matchedJobs,
+            ],
+          };
+        });
       }
     };
-    
+
+    socket.onclose = () => {
+      set({ socket: null });
+    };
+
+    socket.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
+
     set({ socket });
   },
-  
+
+  disconnectFromDispatch: () => {
+    const { socket } = get();
+    if (socket) {
+      socket.close();
+      set({ socket: null });
+    }
+  },
+
   expressInterest: async (jobId, workerChatId) => {
     const newInterestState = !get().isInterested;
     set({ isInterested: newInterestState });
@@ -111,7 +144,6 @@ export const createWorkspaceZlice = (set, get) => ({
       }
     }
   },
-  
 
 });
 
