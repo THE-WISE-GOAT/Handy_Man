@@ -392,3 +392,9 @@ class MatchedJobDetail(TypedDict):
 class WorkerMatchingResult(TypedDict):
     matched_jobs: list[MatchedJobDetail]
     count: int
+
+
+class WorkerBidIn(BaseModel):
+    bid_amount: float
+    bid_message: str | None = None
+    is_interested: bool = True
