@@ -9,7 +9,7 @@ from sqlalchemy import select
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema
-from src.core.worker_profile_helper import sync_profile_extracted_fields, upsert_worker_expertise
+from src.core.worker_profile_helper import sync_profile_extracted_fields, upsert_baseline_skill
 from src.ai.worker_chat_analyser_nvidia import build_fresh_history, INITIAL_GREETING, get_worker_description_embedding
 
 logger = logging.getLogger(__name__)
@@ -160,7 +160,11 @@ async def submit_worker_application(
             embedding_vec = None
 
         primary_title = profile.job_category or "General Skill"
-        upsert_worker_expertise(db, profile.id, primary_title, profile.job_description, embedding_vec)
+        # This path has only the composed job_description to work with (it never
+        # ran the two-layer split), so it becomes the baseline. upsert_baseline_skill
+        # updates in place, so re-submitting cannot create a second baseline, and a
+        # failed embedding leaves any existing good vector alone.
+        upsert_baseline_skill(db, profile.id, primary_title, profile.job_description, embedding_vec)
 
     try:
         db.commit()
@@ -262,7 +266,20 @@ async def approve_worker_application(
         if session and session.profile:
             sync_profile_extracted_fields(profile, session.profile)
 
-    if profile.job_description:
+    # Only build a baseline here if the worker doesn't already have a usable one.
+    # The chat registration path writes a better baseline — layered text embedded
+    # on its own — and re-deriving it from the composed job_description on every
+    # approve would overwrite that with a weaker vector and burn an embedding call.
+    existing_baseline = db.execute(
+        select(model.WorkerSkill).where(
+            model.WorkerSkill.worker_id == profile.id,
+            model.WorkerSkill.skill_type == model.SkillType.BASELINE,
+        )
+    ).scalar_one_or_none()
+
+    needs_baseline = existing_baseline is None or existing_baseline.embedding is None
+
+    if profile.job_description and needs_baseline:
         try:
             embedding_vec = await get_worker_description_embedding(profile.job_description)
         except Exception as exc:
@@ -270,7 +287,7 @@ async def approve_worker_application(
             embedding_vec = None
 
         primary_title = profile.job_category or "General Skill"
-        upsert_worker_expertise(db, profile.id, primary_title, profile.job_description, embedding_vec)
+        upsert_baseline_skill(db, profile.id, primary_title, profile.job_description, embedding_vec)
 
     user = db.query(model.User).filter(model.User.id == profile.user_id).first()
     worker_role = db.query(model.Role).filter(model.Role.name.ilike("worker")).first()
