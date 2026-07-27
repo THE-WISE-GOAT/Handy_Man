@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func, cast
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
-from src.core import model
+from src.core import model, schema
+from src.core.manager import manager  # Ensure manager is imported for live broadcasts
 from geoalchemy2 import Geometry
 
 
@@ -50,7 +51,7 @@ def get_worker_locations(
     return {"status": "success", "locations": locations}
 
 
-@router.get("/jobs/{job_id}/bids", summary="Fetch all bids from JobWorkerMatch for a specific job")
+@router.get("/jobs/{job_id}/getbids", summary="Fetch all bids from JobWorkerMatch for a specific job")
 def get_worker_job_bids(
     job_id: int,
     db: Session = Depends(get_db),
@@ -93,3 +94,88 @@ def get_worker_job_bids(
     ]
     
     return {"status": "success", "bids": formatted_bids}
+
+
+# Endpoint for bidding (Worker side) with Live WebSocket Broadcast
+@router.post("/jobs/{job_id}/postbids", summary="Submit or update a worker's bid for a job and broadcast live")
+async def submit_worker_bid(
+    job_id: int,
+    payload: schema.WorkerBidIn,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user)
+):
+    # 1. Retrieve worker profile(s) linked to the authenticated user ID
+    worker_profiles = db.execute(
+        select(model.WorkerProfile).where(model.WorkerProfile.user_id == current_user.id)
+    ).scalars().all()
+
+    if not worker_profiles:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Worker profile not found for this user."
+        )
+    
+    worker_profile_ids = [wp.id for wp in worker_profiles]
+
+    # 2. Query the match record using the job ID and the worker's profile IDs
+    match_record = db.execute(
+        select(model.JobWorkerMatch).where(
+            model.JobWorkerMatch.job_id == job_id,
+            model.JobWorkerMatch.worker_id.in_(worker_profile_ids)
+        )
+    ).scalar_one_or_none()
+
+    if not match_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Match record not found for this worker and job."
+        )
+
+    # 3. Update the record with the incoming bid details
+    match_record.is_interested = payload.is_interested
+    match_record.bid_amount = payload.bid_amount
+    match_record.bid_message = payload.bid_message
+
+    db.commit()
+    db.refresh(match_record)
+
+    # 4. Fetch the Job record to get the customer's booking_chat_id room
+    job_record = db.execute(
+        select(model.Job).where(model.Job.id == job_id)
+    ).scalar_one_or_none()
+
+    # 5. Broadcast the real-time update to the customer via WebSocket
+    if job_record and job_record.booking_chat_id:
+        active_worker_profile = db.execute(
+            select(model.WorkerProfile).where(model.WorkerProfile.id == match_record.worker_id)
+        ).scalar_one_or_none()
+
+        worker_chat_id = active_worker_profile.worker_chat_id if active_worker_profile else None
+
+        notification_payload = {
+            "type": "NEW_BID",
+            "data": {
+                "job_id": job_id,
+                "bid": {
+                    "id": match_record.id,
+                    "worker_id": match_record.worker_id,
+                    "worker_chat_id": worker_chat_id,
+                    "amount": float(match_record.bid_amount) if match_record.bid_amount is not None else 0.0,
+                    "proposal_text": match_record.bid_message,
+                    "is_interested": match_record.is_interested,
+                    "status": "Pending",
+                    "created_at": match_record.created_at.isoformat() if match_record.created_at else None
+                }
+            }
+        }
+        await manager.send_customer_notification(job_record.booking_chat_id, notification_payload)
+
+    return {
+        "status": "success",
+        "message": "Bid submitted successfully",
+        "data": {
+            "job_id": job_id,
+            "bid_amount": match_record.bid_amount,
+            "is_interested": match_record.is_interested
+        }
+    }
