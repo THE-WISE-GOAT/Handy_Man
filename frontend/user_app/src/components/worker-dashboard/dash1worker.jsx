@@ -1,11 +1,12 @@
 // components/worker-dashboard/dash1worker.jsx
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWorkerDashboardData } from "./useWorkerDashboardData";
 import "./dash1worker.css";
 
 export default function Dash1Worker({ viewSlug }) {
   const navigate = useNavigate();
+  const wsConnected = useRef(false);
 
   const {
     workspaceSlots,
@@ -20,11 +21,30 @@ export default function Dash1Worker({ viewSlug }) {
     matchedJobs,
     fetchMatchedJobs,
     setActiveJob,
+    connectToDispatch,
+    disconnectFromDispatch,
   } = useWorkerDashboardData();
 
   useEffect(() => {
     fetchMatchedJobs();
   }, [fetchMatchedJobs]);
+
+  useEffect(() => {
+    if (workerChatId && !wsConnected.current) {
+      const token = localStorage.getItem("handy_man_access_token");
+      if (token) {
+        connectToDispatch(workerChatId, token);
+        wsConnected.current = true;
+      }
+    }
+
+    return () => {
+      if (wsConnected.current) {
+        disconnectFromDispatch();
+        wsConnected.current = false;
+      }
+    };
+  }, [workerChatId, connectToDispatch, disconnectFromDispatch]);
 
   // Route state synchronization layer
   useEffect(() => {
