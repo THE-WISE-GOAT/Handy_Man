@@ -52,6 +52,7 @@ Thumbs.db
 # === Kilo ===
 .kilo/
 .kilo
+AGENTS.md
 
 # === Docker Compose ===
 docker-compose.override.yml
