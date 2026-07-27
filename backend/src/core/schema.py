@@ -284,7 +284,22 @@ class WorkerProfileSchema(BaseModel):
     scenario_passed: bool
     scenario_score: int
 
-    @field_validator("job_description", "license_or_certification", "job_category", mode="before")
+    # The two layers kept SEPARATE for embedding. job_description above remains
+    # the composed, human-readable text (admin views, match cards); these two are
+    # what actually get embedded, each into its own worker_skills row.
+    #
+    # They are populated by extract_worker_profile, not by the extraction model,
+    # so they carry defaults for backward compatibility with profiles stored
+    # before the split.
+    baseline_description: str = ""
+    speciality_title: str = ""
+    speciality_description: str = ""
+
+    @field_validator(
+        "job_description", "license_or_certification", "job_category",
+        "baseline_description", "speciality_title", "speciality_description",
+        mode="before",
+    )
     @classmethod
     def sanitize_string_fields(cls, value: Any) -> str:
         # If AI sends a list, join it into a single string
@@ -341,6 +356,10 @@ class WorkerMatchOut(BaseModel):
     category_tag: str
     job_description: str
     match_score: float  # 1.0 = near-identical meaning, 0 = unrelated, negative = opposite
+    # Which of the worker's capabilities won this match. None for matches recorded
+    # before per-skill matching, or if the skill has since been removed.
+    matched_skill: Optional[str] = None
+    matched_skill_description: Optional[str] = None
 
 class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used
@@ -351,7 +370,60 @@ class FindHelpOut(BaseModel):
 class WorkerCompleteChatIn(BaseModel):
     location: LocationCoordinates
     phone_number: Optional[str] = None
-    
+
+
+# ── Add-skill flow (already-verified worker adds another speciality) ──────────
+
+class WorkerSkillOut(BaseModel):
+    """One independently matchable capability of a worker."""
+    id: int
+    skill_type: str          # "baseline" | "speciality"
+    title: str
+    description: str
+    scenario_score: Optional[int] = None
+    is_active: bool
+    has_vector: bool         # False means it is stored but not yet matchable
+
+    class Config:
+        from_attributes = True
+
+
+class WorkerSkillsListOut(BaseModel):
+    worker_chat_id: int
+    worker_id: int
+    job_category: str
+    skills: List[WorkerSkillOut]
+
+
+class AddSkillStartOut(BaseModel):
+    worker_chat_id: int
+    ai_response: str
+    existing_skills: List[str]
+    stage: str               # always "adding_skill"
+
+
+class AddSkillMessageIn(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("message")
+    @classmethod
+    def message_must_have_content(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("message cannot be empty or whitespace-only")
+        return stripped
+
+
+class AddSkillMessageOut(BaseModel):
+    worker_chat_id: int
+    ai_response: str
+    stage: str                              # "adding_skill" | "awaiting_skill_scenario" | "skill_complete" | "skill_declined"
+    scenario_question: Optional[str] = None
+    # Populated only once a scenario has been graded.
+    skill_added: bool = False
+    skill_title: Optional[str] = None
+    scenario_score: Optional[int] = None
+
 
 class WorkerExpertiseIn(BaseModel):
     title: str = Field(..., max_length=255, description="E.g., CCTV Installation, Electrical Repair")
@@ -370,24 +442,40 @@ class WorkerExpertiseOut(BaseModel):
         
         
 # ___________________ for mathcing worker with job request ___________________________
-class MatchDetail(TypedDict):
+class _MatchDetailRequired(TypedDict):
     worker_profile: model.WorkerProfile
     user: model.User
     score: float
     rank: int
     worker_chat_id: int
 
+class MatchDetail(_MatchDetailRequired, total=False):
+    """
+    Which single capability actually won the vector search for this worker.
+
+    Split into a total=False half rather than made mandatory so older producers
+    (and the reranker's .get() reads) stay valid without every call site having
+    to populate them.
+    """
+    matched_skill_id: Optional[int]
+    matched_skill_title: Optional[str]
+    matched_skill_description: Optional[str]
+
 class MatchingResult(TypedDict):
     matches: list[MatchDetail]
     worker_chat_ids: list[int]
     count: int
 
-class MatchedJobDetail(TypedDict):
+class _MatchedJobDetailRequired(TypedDict):
     booking_chat_id: int
     title: str
     description: str
     score: float
     rank: int
+
+class MatchedJobDetail(_MatchedJobDetailRequired, total=False):
+    """matched_skill_title = which of the worker's skills won this job."""
+    matched_skill_title: Optional[str]
 
 class WorkerMatchingResult(TypedDict):
     matched_jobs: list[MatchedJobDetail]

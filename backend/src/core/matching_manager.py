@@ -2,28 +2,24 @@ import os
 import json
 import math
 import logging
-from typing import TypedDict, Any
 from openai import OpenAI
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from src.core import model
 from src.core.schema import MatchingResult, MatchDetail, WorkerMatchingResult, MatchedJobDetail
-from dotenv import load_dotenv  # 1. Add this import
+from dotenv import load_dotenv
 
-# 2. Force load the environment variables from your local config files
 load_dotenv()
-
 logger = logging.getLogger(__name__)
 
 SCORE_THRESHOLD = 70
 
-# --- LLM reranker config ---
 _nvidia_client = OpenAI(
     base_url="https://integrate.api.nvidia.com/v1",
     api_key=os.environ.get("NVIDIA_API_KEY"),
 )
 RERANK_MODEL = "meta/llama-3.1-8b-instruct"
-MAX_CANDIDATES_FOR_RERANK = 25  # keep the prompt bounded no matter how many clear threshold
+MAX_CANDIDATES_FOR_RERANK = 25
 
 
 def _search_workers(
@@ -31,72 +27,90 @@ def _search_workers(
     query_vector: list[float],
     customer_location,
     radius_meters: int,
-) -> list[tuple[model.WorkerProfile, model.User, float]]:
-    """
-    Vector search against each worker's profile-level embedding
-    (WorkerProfile.description_vector).
+) -> list[tuple]:
+    distance_expr = model.WorkerSkill.embedding.cosine_distance(query_vector)
 
-    NOTE: WorkerExpertise (per-skill vectors) is not populated anywhere in the
-    current write path, so matching cannot depend on it. This queries the one
-    embedding that actually exists per worker today.
-    """
-    distance_expr = model.WorkerProfile.description_vector.cosine_distance(query_vector)
+    best_skill = (
+        select(
+            model.WorkerSkill.worker_id.label("worker_id"),
+            model.WorkerSkill.id.label("skill_id"),
+            model.WorkerSkill.title.label("skill_title"),
+            model.WorkerSkill.description.label("skill_description"),
+            model.WorkerSkill.skill_type.label("skill_type"),
+            distance_expr.label("distance"),
+        )
+        .where(
+            model.WorkerSkill.embedding.isnot(None),
+            model.WorkerSkill.is_active.is_(True),
+        )
+        .distinct(model.WorkerSkill.worker_id)
+        .order_by(model.WorkerSkill.worker_id, distance_expr.asc())
+        .subquery()
+    )
 
     stmt = (
-        select(model.WorkerProfile, model.User, distance_expr.label("distance"))
+        select(
+            model.WorkerProfile,
+            model.User,
+            best_skill.c.distance,
+            best_skill.c.skill_id,
+            best_skill.c.skill_title,
+            best_skill.c.skill_description,
+            best_skill.c.skill_type,
+        )
+        .join(best_skill, best_skill.c.worker_id == model.WorkerProfile.id)
         .join(model.User, model.User.id == model.WorkerProfile.user_id)
         .where(
-            model.WorkerProfile.description_vector.isnot(None),
             model.WorkerProfile.location.isnot(None),
             model.WorkerProfile.is_complete.is_(True),
             model.WorkerProfile.is_rejected.is_(False),
             func.ST_DWithin(model.WorkerProfile.location, customer_location, radius_meters),
         )
-        .order_by(distance_expr.asc())
+        .order_by(best_skill.c.distance.asc())
     )
 
     return db.execute(stmt).all()
 
 
 def calculate_match_score(distance: float) -> float:
-    """The system's single source of truth scoring mechanism (Sigmoid)."""
     try:
         return max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2)))
     except Exception:
         return 0.0
 
 
-def _deduplicate_by_user(
-    search_results: list[tuple[model.WorkerProfile, model.User, float]]
-) -> list[tuple[model.WorkerProfile, model.User, float]]:
-    """
-    Safety net, not currently load-bearing: WorkerProfile.user_id is unique in the
-    schema, so a user can only ever have one profile today. Kept in case that
-    constraint is ever relaxed — search_results is already best-distance-first,
-    so the first occurrence of a user_id is always the one to keep.
-    """
+def _deduplicate_by_user(search_results: list[tuple]) -> list[tuple]:
     seen_user_ids: set[int] = set()
-    deduped: list[tuple[model.WorkerProfile, model.User, float]] = []
-
-    for worker, user, distance in search_results:
+    deduped: list[tuple] = []
+    for row in search_results:
+        user = row[1]
         if user.id in seen_user_ids:
             continue
         seen_user_ids.add(user.id)
-        deduped.append((worker, user, distance))
-
+        deduped.append(row)
     return deduped
 
 
-def _build_candidate_summary(worker: model.WorkerProfile, score: float, rank: int) -> dict:
-    """Lightweight, text-only view of a candidate for the reranker prompt."""
-    return {
+def _build_candidate_summary(
+    worker: model.WorkerProfile,
+    score: float,
+    rank: int,
+    skill_title: str | None = None,
+    skill_description: str | None = None,
+) -> dict:
+    summary = {
         "worker_id": worker.id,
         "vector_rank": rank,
         "vector_score": score,
-        "job_category": worker.job_category,
-        "category_tag": worker.category_tag,
+        "primary_trade": worker.job_category,
+        "trade_tag": worker.category_tag,
         "profile_summary": worker.job_description,
     }
+    if skill_title:
+        summary["matched_skill_title"] = skill_title
+    if skill_description:
+        summary["matched_skill_description"] = skill_description
+    return summary
 
 
 def _llm_rerank_matches(
@@ -104,63 +118,59 @@ def _llm_rerank_matches(
     job_category: str | None,
     rich_matches: list[MatchDetail],
 ) -> list[MatchDetail]:
-    """
-    Final decision step: the vector search ranks by semantic similarity, which
-    conflates "this text talks about fixing/repairing things" with "this trade
-    can actually do this job" — an electrician or a cleaner can score highly
-    against a plumbing description just from shared repair-ish vocabulary.
-
-    This step hands the vector-qualified, per-user-deduplicated candidates to an
-    LLM whose job is specifically to DROP anyone whose actual trade doesn't fit,
-    regardless of how high their vector_score was.
-
-    Fails open: any error/unparsable response falls back to the unfiltered vector
-    order, so a reranker outage never blocks matching entirely — the tradeoff is
-    that a temporary LLM failure means mismatched trades could slip through for
-    that one request rather than the whole pipeline going down.
-    """
     if not rich_matches:
-        logger.info("No candidate matches passed to LLM reranker.")
         return rich_matches
 
     candidates = rich_matches[:MAX_CANDIDATES_FOR_RERANK]
     leftover = rich_matches[MAX_CANDIDATES_FOR_RERANK:]
 
     candidate_payload = [
-        _build_candidate_summary(m["worker_profile"], m["score"], m["rank"])
+        _build_candidate_summary(
+            m["worker_profile"], m["score"], m["rank"],
+            m.get("matched_skill_title"), m.get("matched_skill_description"),
+        )
         for m in candidates
     ]
 
     prompt = (
-        "You are the final filter deciding which tradespeople genuinely fit a customer's job.\n\n"
-        f"Job category (as identified by the intake system): {job_category or 'unknown'}\n"
-        f"Job description:\n{job_description}\n\n"
-        f"Candidates (JSON):\n{json.dumps(candidate_payload)}\n\n"
-        "Each candidate has a vector_score from semantic text similarity, but that score alone is "
-        "NOT reliable for trade fit — e.g. an electrician or a cleaner can score highly similar to a "
-        "plumbing job just because both descriptions use words like 'fix', 'repair', or 'install'.\n\n"
-        "Only keep candidates whose actual trade (job_category / category_tag / profile_summary) can "
-        "genuinely perform this specific job. Drop anyone from a different trade, no matter how high "
-        "their vector_score is.\n\n"
-        "Return ONLY a JSON array of the worker_id integers you are keeping, ordered best fit first. "
-        "No text outside the JSON array."
+        "You are a strict trade-fit filter. Your only job is to decide which workers can "
+        "PRIMARILY perform the customer's job — not workers who merely mention related objects.\n\n"
+        f"Job category: {job_category or 'unknown'}\n"
+        f"Job description: {job_description}\n\n"
+        f"Candidates:\n{json.dumps(candidate_payload, indent=2)}\n\n"
+        "CRITICAL RULES:\n"
+        "1. INCIDENTAL MENTION IS NOT QUALIFICATION.\n"
+        "   A worker whose description mentions an object does NOT qualify for jobs centred on that object.\n"
+        "   - An ELECTRICIAN who 'connects water heaters' CANNOT install a solar water heater system. "
+        "Solar water heater installation is a plumbing or solar trade. The electrical connection is a "
+        "minor secondary step that does not make an electrician the right hire.\n"
+        "   - An ELECTRICIAN who 'installs air conditioners' CANNOT do HVAC ductwork or refrigerant work.\n"
+        "   - A CLEANER who 'cleans pipes' CANNOT do plumbing repairs.\n"
+        "   Ask yourself: is this worker's PRIMARY trade the one that performs the CORE of this job? "
+        "If no, drop them regardless of vector_score.\n\n"
+        "2. USE matched_skill_title / matched_skill_description AS PRIMARY EVIDENCE.\n"
+        "   This is the specific capability that caused the worker to surface. If that skill belongs "
+        "to a different trade than the job requires, drop the worker.\n\n"
+        "3. WHEN IN DOUBT, DROP.\n"
+        "   A customer with zero matches will be told no one is available. "
+        "A customer matched to the wrong trade wastes everyone's time. Prefer zero over wrong.\n\n"
+        "Return ONLY a JSON array of worker_id integers you are keeping, best fit first. "
+        "No explanation, no text outside the array."
     )
 
     try:
         response = _nvidia_client.chat.completions.create(
             model=RERANK_MODEL,
-            max_tokens=1024,
+            max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
         )
         raw_text = (response.choices[0].message.content or "").strip()
         raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-
         parsed_ids = json.loads(raw_text)
         ordered_ids = [int(x) for x in parsed_ids if isinstance(x, (int, str)) and str(x).isdigit()]
         logger.info(f"LLM reranker kept {len(ordered_ids)}/{len(candidates)} candidates: {ordered_ids}")
-
     except Exception as e:
-        logger.error(f"LLM reranker failed, falling back to unfiltered vector order: {e}")
+        logger.error(f"LLM reranker failed, falling back to vector order: {e}")
         return rich_matches
 
     by_worker_id = {int(m["worker_profile"].id): m for m in candidates}
@@ -176,12 +186,9 @@ def _llm_rerank_matches(
         seen_ids.add(worker_id)
 
     if not reranked:
-        logger.warning("LLM reranker kept zero candidates — falling back to unfiltered vector order.")
+        logger.warning("LLM reranker kept zero candidates — falling back to vector order.")
         return rich_matches
 
-    # Candidates beyond MAX_CANDIDATES_FOR_RERANK were never shown to the LLM at all;
-    # keep them (unfiltered) after the reranked set rather than silently dropping them.
-    # Anyone the LLM explicitly excluded is NOT re-added here — that's the whole point.
     for i, match in enumerate(leftover, start=len(reranked) + 1):
         match["rank"] = i
 
@@ -197,58 +204,52 @@ def create_matches_for_job(
     job_description: str,
     job_category: str | None = None,
 ) -> MatchingResult:
-    """
-    Core Entry Point: Purges stale matches, dedupes candidates down to one profile per
-    user, scores + threshold-filters, sends the survivors to the LLM reranker to drop
-    trade mismatches and make the final call, then persists and flushes the matches.
-    """
     logger.info(
         f"[job {job_id}] starting match run — radius_meters={radius_meters}, "
         f"job_category={job_category}, query_vector_len={len(query_vector) if query_vector else 0}"
     )
 
-    # 1. Clear historical stale match rows for this job
     db.query(model.JobWorkerMatch).filter(
         model.JobWorkerMatch.job_id == job_id
     ).delete(synchronize_session=False)
 
-    # 2. Extract potential candidate profiles (ordered by distance)
     search_results = _search_workers(db, query_vector, customer_location, radius_meters)
-    logger.info(f"[job {job_id}] _search_workers returned {len(search_results)} candidate profiles")
+    logger.info(f"[job {job_id}] _search_workers returned {len(search_results)} raw candidates")
 
     search_results = _deduplicate_by_user(search_results)
-    logger.info(f"[job {job_id}] {len(search_results)} candidates remain after per-user dedup")
+    logger.info(f"[job {job_id}] {len(search_results)} candidates after per-user dedup")
 
     rich_matches: list[MatchDetail] = []
     distance_by_worker_id: dict[int, float] = {}
+    skill_id_by_worker_id: dict[int, int | None] = {}
     vector_rank = 1
 
-    for worker, user, distance in search_results:
+    for (worker, user, distance, skill_id, skill_title, skill_description, skill_type) in search_results:
         score = calculate_match_score(float(distance))
-
         logger.info(
-            f"[job {job_id}] candidate worker_id={worker.id} category={worker.job_category} "
-            f"distance={float(distance):.4f} score={score} (threshold={SCORE_THRESHOLD})"
+            f"[job {job_id}] worker_id={worker.id} trade={worker.job_category} "
+            f"skill={skill_title!r} ({skill_type}) distance={float(distance):.4f} score={score}"
         )
-
         if score > SCORE_THRESHOLD:
             rich_matches.append({
                 "worker_profile": worker,
                 "user": user,
                 "score": score,
                 "rank": vector_rank,
-                "worker_chat_id": worker.worker_chat_id
+                "worker_chat_id": worker.worker_chat_id,
+                "matched_skill_id": skill_id,
+                "matched_skill_title": skill_title,
+                "matched_skill_description": skill_description,
             })
             distance_by_worker_id[worker.id] = float(distance)
+            skill_id_by_worker_id[worker.id] = skill_id
             vector_rank += 1
 
-    logger.info(f"[job {job_id}] {len(rich_matches)} candidates cleared SCORE_THRESHOLD={SCORE_THRESHOLD}")
+    logger.info(f"[job {job_id}] {len(rich_matches)} candidates cleared score threshold")
 
-    # 3. LLM makes the final trade-fit decision
     rich_matches = _llm_rerank_matches(job_description, job_category, rich_matches)
-    logger.info(f"[job {job_id}] {len(rich_matches)} candidates remain after LLM reranker")
+    logger.info(f"[job {job_id}] {len(rich_matches)} candidates after LLM reranker")
 
-    # 4. Persist the final match set
     new_match_records = []
     notifiable_worker_chat_ids = []
 
@@ -260,10 +261,11 @@ def create_matches_for_job(
             match_score=match["score"],
             match_rank=match["rank"],
             semantic_distance=distance_by_worker_id[worker.id],
+            matched_skill_id=skill_id_by_worker_id.get(worker.id),
             is_active=True,
             is_interested=False,
             is_selected=False,
-            is_rejected=False
+            is_rejected=False,
         )
         new_match_records.append(match_row)
         notifiable_worker_chat_ids.append(match["worker_chat_id"])
@@ -275,7 +277,7 @@ def create_matches_for_job(
     return {
         "matches": rich_matches,
         "worker_chat_ids": notifiable_worker_chat_ids,
-        "count": len(rich_matches)
+        "count": len(rich_matches),
     }
 
 
@@ -283,39 +285,61 @@ def create_matches_for_worker(
     db: Session,
     worker_id: int,
     worker_location,
-    radius_meters: int = 60_000
+    radius_meters: int = 60_000,
 ) -> WorkerMatchingResult:
-    """
-    Reverse Job Matching Entry Point: Compares all active pending jobs against this
-    worker's single profile-level embedding.
-    """
     logger.info(f"Running reverse matching pipeline for worker_id: {worker_id}")
 
-    # 1. Clear out historical stale match rows for this worker
     db.query(model.JobWorkerMatch).filter(
         model.JobWorkerMatch.worker_id == worker_id
     ).delete(synchronize_session=False)
 
-    # 2. Fetch this worker's single profile-level embedding
-    worker_profile = db.execute(
-        select(model.WorkerProfile).where(model.WorkerProfile.id == worker_id)
+    has_matchable_skill = db.execute(
+        select(model.WorkerSkill.id)
+        .where(
+            model.WorkerSkill.worker_id == worker_id,
+            model.WorkerSkill.embedding.isnot(None),
+            model.WorkerSkill.is_active.is_(True),
+        )
+        .limit(1)
     ).scalar_one_or_none()
 
-    if worker_profile is None or worker_profile.description_vector is None:
-        logger.warning(f"Worker {worker_id} has no profile / no description_vector — skipping reverse match.")
+    if has_matchable_skill is None:
+        logger.warning(f"Worker {worker_id} has no active embedded skills — skipping reverse match.")
         return {"matched_jobs": [], "count": 0}
 
-    distance_expr = model.Job.description_vector.cosine_distance(worker_profile.description_vector)
+    distance_expr = model.Job.description_vector.cosine_distance(model.WorkerSkill.embedding)
 
-    stmt = (
-        select(model.Job, distance_expr.label("distance"))
+    best_skill_per_job = (
+        select(
+            model.Job.id.label("job_id"),
+            model.WorkerSkill.id.label("skill_id"),
+            model.WorkerSkill.title.label("skill_title"),
+            distance_expr.label("distance"),
+        )
+        .select_from(model.Job)
+        .join(model.WorkerSkill, model.WorkerSkill.worker_id == worker_id)
         .where(
+            model.WorkerSkill.embedding.isnot(None),
+            model.WorkerSkill.is_active.is_(True),
             model.Job.description_vector.isnot(None),
             model.Job.location.isnot(None),
             model.Job.status == "pending",
             func.ST_DWithin(model.Job.location, worker_location, radius_meters),
         )
-        .order_by(distance_expr.asc())
+        .distinct(model.Job.id)
+        .order_by(model.Job.id, distance_expr.asc())
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            model.Job,
+            best_skill_per_job.c.distance,
+            best_skill_per_job.c.skill_id,
+            best_skill_per_job.c.skill_title,
+        )
+        .join(best_skill_per_job, best_skill_per_job.c.job_id == model.Job.id)
+        .order_by(best_skill_per_job.c.distance.asc())
     )
 
     search_results = db.execute(stmt).all()
@@ -324,9 +348,8 @@ def create_matches_for_worker(
     matched_jobs_payload: list[MatchedJobDetail] = []
     current_rank = 1
 
-    for job, distance in search_results:
+    for job, distance, skill_id, skill_title in search_results:
         score = calculate_match_score(float(distance))
-
         if score > SCORE_THRESHOLD:
             match_row = model.JobWorkerMatch(
                 job_id=job.id,
@@ -334,19 +357,20 @@ def create_matches_for_worker(
                 match_score=score,
                 match_rank=current_rank,
                 semantic_distance=float(distance),
+                matched_skill_id=skill_id,
                 is_active=True,
                 is_interested=False,
                 is_selected=False,
-                is_rejected=False
+                is_rejected=False,
             )
             new_match_records.append(match_row)
-
             matched_jobs_payload.append({
                 "booking_chat_id": job.booking_chat_id,
                 "title": job.title,
                 "description": job.description,
                 "score": score,
-                "rank": current_rank
+                "rank": current_rank,
+                "matched_skill_title": skill_title,
             })
             current_rank += 1
 
@@ -356,5 +380,5 @@ def create_matches_for_worker(
 
     return {
         "matched_jobs": matched_jobs_payload,
-        "count": len(matched_jobs_payload)
+        "count": len(matched_jobs_payload),
     }
