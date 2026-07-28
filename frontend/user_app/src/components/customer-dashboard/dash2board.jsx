@@ -1,21 +1,122 @@
-// components/customer-dashboard/dash2board.jsx
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerDashboardData } from './useCustomerDashboardData';
 import './dash2board.css';
 
+// 1. IMPORT LEAFLET
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// 2. VITE-COMPATIBLE ICON IMPORTS
+import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
+import iconUrl from 'leaflet/dist/images/marker-icon.png';
+import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl,
+  iconUrl,
+  shadowUrl,
+});
+
+// --- CUSTOM SVG WORKER ICONS ---
+const personSvg = `
+  <svg viewBox="0 0 24 24" fill="currentColor" width="30px" height="30px">
+    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+  </svg>
+`;
+
+const staticWorkerIcon = L.divIcon({
+  className: 'custom-worker-icon',
+  html: `<div style="color: #7300ff; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -15]
+});
+
+const blinkingWorkerIcon = L.divIcon({
+  className: 'custom-worker-icon blinking-red-icon',
+  html: `<div style="display: flex; justify-content: center; align-items: center;">${personSvg}</div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -15]
+});
+
+const goldenWorkerIcon = L.divIcon({
+  className: 'custom-worker-icon golden-worker-icon',
+  html: `<div style="color: #FFD700; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+  popupAnchor: [0, -15]
+});
+
+
+const MapUpdater = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center && center[0] && center[1]) {
+      map.setView(center, map.getZoom());
+    }
+  }, [center, map]);
+  return null;
+};
+
+const Card = ({ slug, title, position, onSelect, children }) => {
+  const isMain = position === "main";
+  return (
+    <div 
+      className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
+      onClick={!isMain ? () => onSelect(slug) : undefined}
+    >
+      <div className="card-header">••• {title}</div>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
 export default function Dash2Board({ viewSlug }) {
   const navigate = useNavigate();
+  const workerCardRefs = React.useRef({});
+  
   const {
     postingsSlots,
     swapPostingsSlots,
     biddingsStream,
-    gpsCoordinates,
-    pipelineStatus,
-    feedbackRating
+    pendingJobs,
+    selectedJob,
+    setSelectedJob,
+    fetchPendingJobs,
+    
+    matchedWorkersMap,
+    workerLocations,          
+    toggleWorkerInterest,     
+
+    selectedWorkerId,
+    setSelectedWorkerId
   } = useCustomerDashboardData();
 
-  // Route state synchronization layer
+  useEffect(() => {
+    fetchPendingJobs();
+  }, [fetchPendingJobs]);
+
+  useEffect(() => {
+    const handleFocus = () => { fetchPendingJobs(); };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchPendingJobs]);
+
+  useEffect(() => {
+    if (selectedWorkerId && workerCardRefs.current[selectedWorkerId]) {
+      workerCardRefs.current[selectedWorkerId].scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }, [selectedWorkerId]);
+
   useEffect(() => {
     if (!viewSlug) return;
     if (postingsSlots.main !== viewSlug) {
@@ -28,31 +129,15 @@ export default function Dash2Board({ viewSlug }) {
     navigate(`/customer/postings/${targetSlug}`);
   };
 
-  // Simplified shared card container component
-  const Card = ({ slug, title, position, children }) => {
-    const isMain = position === "main";
-    return (
-      <div 
-        className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
-        onClick={!isMain ? () => handleModuleSelect(slug) : undefined}
-      >
-        <div className="card-header">••• {title}</div>
-        {children}
-      </div>
-    );
-  };
-
-  // ====================================================
-  // SUB-MODULE RENDERS
-  // ====================================================
-
   const renderBiddingsEngine = (position) => (
-    <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position}>
+    <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position} onSelect={handleModuleSelect}>
       {position === "main" ? (
-        <div className="main-panel">
-          <h2>ACTIVE BIDDINGS ENGINE</h2>
-          <p className="panel-desc">Active incoming competitive service offers and rate valuation streams.</p>
-          <div className="bids-box">
+        <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <h2 style={{ flexShrink: 0 }}>ACTIVE BIDDINGS ENGINE</h2>
+          <h3 style={{ color: "#010509", flexShrink: 0 }}>
+            Bids for job: {selectedJob ? selectedJob.title : "No Job Selected"}
+          </h3>
+          <div className="bids-box" style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginTop: '10px' }}>
             {biddingsStream.map(bid => (
               <div key={bid.id} className="bid-row">
                 <span><strong>{bid.provider}</strong>: {bid.offer}</span>
@@ -64,76 +149,342 @@ export default function Dash2Board({ viewSlug }) {
       ) : (
         <div className="preview-panel">
           {position === "sidebar" ? (
-            <>
-              <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
-              <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
-            </>
+             <>
+             <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
+             <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
+             <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
+           </>
           ) : (
-            <span className="badge">Footer Slot: {biddingsStream.length} Active Valuations</span>
+            <span className="badge">Footer Slot: Bids for {selectedJob?.title || "N/A"}</span>
           )}
         </div>
       )}
     </Card>
   );
 
-  const renderLiveMap = (position) => (
-    <Card slug="GeospatialLiveMap" title="GEOSPATIAL LIVE MAP" position={position}>
-      {position === "main" ? (
-        <div className="main-panel">
-          <h2>GEOSPATIAL ENGINE FULL DISPLAY</h2>
-          <p>Coordinates: {gpsCoordinates.lat}, {gpsCoordinates.lng}</p>
-        </div>
-      ) : (
-        <div className="preview-panel">
-          {position === "sidebar" ? (
-            <>
-              <span className="badge badge-highlight">Sidebar: GPS Map Node Tracker</span>
-              <p className="card-summary">Lat: {gpsCoordinates.lat} | Lng: {gpsCoordinates.lng}</p>
-            </>
-          ) : (
-            <span className="badge">Footer Slot: Map Tracking Active</span>
-          )}
-        </div>
-      )}
-    </Card>
-  );
+  const renderLiveMap = (position) => {
+    // 🛠️ ARCHITECTURAL FIX: Consumes seamlessly flattened store coordinates safely
+    const centerPoint = selectedJob && selectedJob.latitude && selectedJob.longitude 
+      ? [parseFloat(selectedJob.latitude), parseFloat(selectedJob.longitude)]
+      : [27.7172, 85.3240];
+
+    const currentWorkers = selectedJob && matchedWorkersMap[selectedJob.id] 
+      ? matchedWorkersMap[selectedJob.id] 
+      : [];
+
+    return (
+      <Card slug="GeospatialLiveMap" title="GEOSPATIAL LIVE MAP" position={position} onSelect={handleModuleSelect}>
+        <style>
+          {`
+            @keyframes blinkRedIcon {
+              0% { color: #f44336; transform: scale(1); filter: drop-shadow(0 0 2px rgba(244,67,54,0.6)); }
+              50% { color: #ff7961; transform: scale(1.3); filter: drop-shadow(0 0 10px rgba(244,67,54,1)); }
+              100% { color: #f44336; transform: scale(1); filter: drop-shadow(0 0 2px rgba(244,67,54,0.6)); }
+            }
+            .blinking-red-icon div {
+              animation: blinkRedIcon 1.2s infinite ease-in-out;
+            }
+            @keyframes goldGlow {
+              0% { filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.6)); }
+              50% { filter: drop-shadow(0 0 10px rgba(255, 215, 0, 1)); }
+              100% { filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.6)); }
+            }
+            .golden-worker-icon div {
+              animation: goldGlow 1.5s infinite ease-in-out;
+            }
+          `}
+        </style>
+
+        {position === "main" ? (
+          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <h2 style={{ flexShrink: 0 }}>GEOSPATIAL ENGINE FULL DISPLAY</h2>
+            <div style={{ flex: 1, minHeight: 0, borderRadius: '12px', overflow: 'hidden', marginTop: '10px' }}>
+              <MapContainer center={centerPoint} zoom={13} style={{ height: '100%', width: '100%' }}>
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                />
+                <MapUpdater center={centerPoint} />
+                
+                {selectedJob && selectedJob.latitude && (
+                  <Marker position={centerPoint}>
+                    <Popup><strong>{selectedJob.title}</strong><br/>Job Location</Popup>
+                  </Marker>
+                )}
+
+                {/* 2. Worker Location Markers */}
+                {currentWorkers.map((worker, index) => {
+                  const locInfo = workerLocations[worker.worker_chat_id];
+                  if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
+                  
+                  const workerPos = [locInfo.latitude, locInfo.longitude];
+                  const rank = index + 1;
+                  const isTopThree = rank <= 3;
+                  const iconToUse = isTopThree ? goldenWorkerIcon : (locInfo.is_interested ? blinkingWorkerIcon : staticWorkerIcon);
+
+                  return (
+                    <Marker 
+                      key={`map-worker-${worker.worker_chat_id}`} 
+                      position={workerPos} 
+                      icon={iconToUse}
+                      eventHandlers={{ click: () => setSelectedWorkerId(worker.worker_chat_id) }}
+                    >
+                      <Popup>
+                        <div style={{ textAlign: 'center' }}>
+                          <strong>{worker.username}</strong><br/>
+                          {isTopThree ? `🏆 Rank #${rank} Match` : `Rank #${rank}`}<br/>
+                          Match Score: {worker.match_score}%<br/>
+                          <button 
+                            onClick={() => toggleWorkerInterest(worker.worker_chat_id)}
+                            style={{ 
+                              marginTop: '8px', 
+                              padding: '4px 8px', 
+                              backgroundColor: '#007bff', 
+                              color: '#fff', 
+                              border: 'none', 
+                              borderRadius: '4px',
+                              cursor: 'pointer' 
+                            }}
+                          >
+                            Toggle Interest (Test)
+                          </button>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+              </MapContainer>
+            </div>
+          </div>
+        ) : (
+          <div className="preview-panel">
+            {position === "sidebar" ? (
+              <>
+                <span className="badge badge-highlight">Sidebar: GPS Map Node Tracker</span>
+                <p className="card-summary">Lat: {selectedJob?.latitude || "N/A"} | Lng: {selectedJob?.longitude || "N/A"}</p>
+                <p className="card-summary">Workers Rendered: {currentWorkers.length}</p>
+              </>
+            ) : (
+              <span className="badge">Footer Slot: Map Tracking Active</span>
+            )}
+          </div>
+        )}
+      </Card>
+    );
+  };
+
+  const renderReviewLogs = (position) => {
+    const currentWorkers = selectedJob && matchedWorkersMap[selectedJob.id] 
+      ? matchedWorkersMap[selectedJob.id] 
+      : [];
+
+    return (
+      <Card slug="RatingsReviewLogs" title="MATCHED PROFESSIONALS LOGS" position={position} onSelect={handleModuleSelect}>
+        {position === "main" ? (
+          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <h2 style={{ flexShrink: 0 }}>QUALIFIED WORKER NETWORK</h2>
+            
+            <h3 style={{ color: "var(--text-primary)", flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>Matched Profiles For: {selectedJob ? selectedJob.title : "No Job Selected"}</span>
+              
+              {selectedJob?.matchCategory && (
+                <span style={{ 
+                  fontSize: '0.65em', 
+                  backgroundColor: selectedJob.matchedByCategory ? 'rgba(235, 244, 235, 0.15)' : 'rgba(255, 152, 0, 0.15)', 
+                  color: selectedJob.matchedByCategory ? '#4CAF50' : '#ff9800', 
+                  padding: '4px 8px', 
+                  borderRadius: '4px',
+                  border: `1px solid ${selectedJob.matchedByCategory ? '#4CAF50' : '#ff9800'}`
+                }}>
+                  {selectedJob.matchedByCategory 
+                    ? `Category Match: ${selectedJob.matchCategory}` 
+                    : `Semantic Radius Fallback`}
+                </span>
+              )}
+            </h3>
+
+            <div style={{ 
+              flex: 1, 
+              overflowY: 'scroll',
+              maxHeight: '23vw',
+              minHeight: 0, 
+              marginTop: '15px', 
+              paddingRight: '10px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '12px' 
+            }}>
+              {currentWorkers.length === 0 ? (
+                <p style={{ opacity: 0.7 }}>No professionals matched yet or scanning network...</p>
+              ) : (
+                currentWorkers.map((worker, index) => {
+                  const isSelected = selectedWorkerId && worker.worker_chat_id === selectedWorkerId;
+                  const rank = index + 1;
+                  return (
+                    <div 
+                      key={worker.worker_chat_id} 
+                      ref={el => workerCardRefs.current[worker.worker_chat_id] = el}
+                      style={{
+                        border: isSelected ? '3px solid #FFD700' : '1px solid #444',
+                        borderRadius: '8px',
+                        padding: '15px',
+                        backgroundColor: isSelected ? '#FFFDE7' : '#dbddda', 
+                        boxShadow: isSelected ? '0 0 12px rgba(255, 215, 0, 0.6)' : '0 2px 4px rgb(0, 0, 0)',
+                        transform: isSelected ? 'scale(1.02)' : 'none',
+                        transition: 'all 0.2s ease-in-out'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <strong style={{ fontSize: '1.1em', color: '#090f09' }}>{worker.username}</strong>
+                          {isSelected && (
+                            <span style={{ 
+                              backgroundColor: '#FFD700', 
+                              color: '#000', 
+                              padding: '2px 8px', 
+                              borderRadius: '4px', 
+                              fontWeight: 'bold', 
+                              fontSize: '0.75em' 
+                            }}>
+                              🏆 Rank #{rank}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.85em', color: '#0a0707af', border: '1px solid #555', padding: '2px 6px', borderRadius: '4px' }}>
+                          ID: {worker.worker_chat_id}
+                        </span>
+                      </div>
+
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: '#010201', fontStyle: 'italic', lineHeight: '1.4' }}>
+                      "{worker.job_description}"
+                    </p>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', fontSize: '0.85em' }}>
+                      <span style={{ 
+                        backgroundColor: 'rgba(0, 123, 255, 0.2)', 
+                        color: '#4db8ff', 
+                        padding: '4px 8px', 
+                        borderRadius: '4px',
+                        fontWeight: 'bold' 
+                      }}>
+                        Vector Match Score: {worker.match_score}%
+                      </span>
+                    </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="preview-panel">
+            {position === "sidebar" ? (
+              <>
+                <span className="badge badge-highlight">Sidebar: Network Discovery</span>
+                <p className="card-summary">Scanning: {selectedJob?.title || "N/A"}</p>
+                <p className="card-summary">Available Matches: {currentWorkers.length}</p>
+              </>
+            ) : (
+              <span className="badge">Footer Slot: Matches for {selectedJob?.title || "N/A"}</span>
+            )}
+          </div>
+        )}
+      </Card>
+    );
+  };
 
   const renderPostsDashboard = (position) => (
-    <Card slug="ActivePostsDashboard" title="ACTIVE POSTS DASHBOARD" position={position}>
+    <Card slug="ActivePostsDashboard" title="ACTIVE POSTS DASHBOARD" position={position} onSelect={handleModuleSelect}>
+      <style>
+        {`
+          @keyframes blinkDot {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+          .status-indicator-dot {
+            animation: blinkDot 1.5s infinite ease-in-out;
+            width: 8px;
+            height: 8px;
+            background-color: #f44336;
+            border-radius: 50%;
+            display: inline-block;
+          }
+          ::-webkit-scrollbar { width: 8px; }
+          ::-webkit-scrollbar-track { background: transparent; }
+          ::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
+          ::-webkit-scrollbar-thumb:hover { background-color: #777; }
+        `}
+      </style>
+
       {position === "main" ? (
-        <div className="main-panel">
-          <h2>ACTIVE POSTS PIPELINE NETWORK</h2>
+        <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <h2 style={{ flexShrink: 0 }}>ACTIVE POSTS PIPELINE NETWORK</h2>
+          
+          <div className="jobs-selector-list" style={{ 
+            flex: 1, 
+            overflowY: 'scroll',
+            maxHeight: '23vw',
+            minHeight: 0,
+            marginTop: '20px', 
+            paddingRight: '10px', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '12px' 
+          }}>
+            {pendingJobs.length === 0 ? (
+              <p>No pending jobs found.</p>
+            ) : (
+              pendingJobs.map(job => {
+                const isActive = selectedJob && selectedJob.id === job.id;
+                return (
+                  <div 
+                    key={job.id} 
+                    onClick={(e) => {
+                      e.stopPropagation(); 
+                      setSelectedJob(job);
+                    }}
+                    style={{
+                      border: isActive ? '2px solid #4CAF50' : '1px solid #555',
+                      padding: '15px',
+                      cursor: 'pointer',
+                      backgroundColor: isActive ? '#e8f5e9' : 'transparent',
+                      color: isActive ? '#000' : 'inherit',
+                      borderRadius: '5px',
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '20px', marginBottom: '8px', fontSize: '0.85em', fontWeight: 'bold' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#555' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                        <span>{job.matchedCount || 0} matched professionals</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#d32f2f' }}>
+                        <span className="status-indicator-dot"></span>
+                        <span>{job.interestedCount || 0} interested</span>
+                      </div>
+                    </div>
+
+                    <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
+                    <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       ) : (
         <div className="preview-panel">
           {position === "sidebar" ? (
             <>
               <span className="badge badge-highlight">Sidebar: Pipeline Stream</span>
-              <p className="card-summary">Status: {pipelineStatus}</p>
+              <p className="card-summary">Selected: {selectedJob?.title || "None"}</p>
+              <p className="card-summary">Total Pending: {pendingJobs.length}</p>
             </>
           ) : (
-            <span className="badge">Footer Slot: Pipeline Backgrounded ({pipelineStatus})</span>
-          )}
-        </div>
-      )}
-    </Card>
-  );
-
-  const renderReviewLogs = (position) => (
-    <Card slug="RatingsReviewLogs" title="RATINGS & REVIEW LOGS" position={position}>
-      {position === "main" ? (
-        <div className="main-panel">
-          <h2>VERIFIED FEEDBACK HISTORY LOGS</h2>
-        </div>
-      ) : (
-        <div className="preview-panel">
-          {position === "sidebar" ? (
-            <>
-              <span className="badge badge-highlight">Sidebar: Feedback Monitoring</span>
-              <p className="card-summary">Live Score Rating: {feedbackRating}</p>
-            </>
-          ) : (
-            <span className="badge">Footer Slot: Logs Idle — Score ({feedbackRating})</span>
+            <span className="badge">Footer Slot: Active Job ({selectedJob?.title || "None"})</span>
           )}
         </div>
       )}

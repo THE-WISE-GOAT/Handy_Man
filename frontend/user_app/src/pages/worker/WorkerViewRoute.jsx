@@ -1,9 +1,8 @@
-// routes/worker/WorkerViewRoute.jsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { getDefaultWorkerPath, getWorkerViewBySlug } from "@shared/config/viewRoutes";
+import { apiClient } from "@shared/api/client";
 
-// Direct component layout imports
 import Dash1Worker from "../../components/worker-dashboard/dash1worker";
 import Dash2Worker from "../../components/worker-dashboard/dash2worker";
 import Dash3Worker from "../../components/worker-dashboard/dash3worker";
@@ -12,13 +11,43 @@ import Dash4Worker from "../../components/worker-dashboard/dash4worker";
 export default function WorkerViewRoute() {
   const { section, viewSlug } = useParams();
   const activeView = getWorkerViewBySlug(viewSlug || "");
+  const [isApplicant, setIsApplicant] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-  // Validate that the view exists and matches the current path category section
+  useEffect(() => {
+    let active = true;
+    const checkApplicantStatus = async () => {
+      try {
+        const data = await apiClient.get("/worker-onboarding/my-status");
+        if (active) {
+          setIsApplicant(!data.is_complete);
+        }
+      } catch (error) {
+        if (active) {
+          console.error("[WorkerViewRoute] Applicant status check failed:", error);
+          // Keep isApplicant = true on error (fail closed)
+          setIsApplicant(true);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    checkApplicantStatus();
+    return () => { active = false; };
+  }, []);
+
+  if (loading) {
+    return <div className="admin-status">Loading…</div>;
+  }
+
+  if (isApplicant && section?.toLowerCase() !== "me") {
+    return <Navigate to={`/worker/me/MeInterview`} replace />;
+  }
+
   if (!activeView || activeView.section !== section?.toLowerCase()) {
     return <Navigate to={getDefaultWorkerPath()} replace />;
   }
 
-  // Render appropriate layout panel canvas directly by section, forwarding viewSlug
   switch (section?.toLowerCase()) {
     case "workspace": return <Dash1Worker viewSlug={viewSlug} />;
     case "scheduled": return <Dash2Worker viewSlug={viewSlug} />;

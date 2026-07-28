@@ -44,7 +44,7 @@ _nvidia_client = OpenAI(
 )
 
 MODEL_NAME = "meta/llama-3.1-8b-instruct"
-MAX_TURNS         = 6  # customer messages; endpoint enforces this
+MAX_TURNS         = 20  # customer messages; endpoint enforces this
 INITIAL_GREETING  = "Hi! What's going on — what's broken and what's happening?"
 
 SYSTEM_PROMPT = (
@@ -84,7 +84,7 @@ SYSTEM_PROMPT = (
 
     "STYLE RULES:\n"
     "- Keep every reply to 1–2 short sentences. Never write long paragraphs.\n"
-    "- Always acknowledge what the customer just told you before asking anything. "
+    "- Always acknowledge what the customer just told you before asking anything. " # something here
     "They should feel heard, not interrogated.\n"
     "- Ask about ONE missing piece at a time. Never stack two questions in one reply.\n"
     "- Never diagnose the problem or suggest a fix — you are a dispatcher, not a technician.\n"
@@ -99,9 +99,32 @@ SYSTEM_PROMPT = (
     "description and proceed normally — an unfamiliar job is still a job.\n"
     "- Only refuse if the request isn't a dispatchable job at all — e.g. it's not "
     "something a worker could physically show up and do (legal/medical advice unrelated "
-    "to in-home care, writing or coding something, general chit-chat, shopping requests, "
+    "to in-home care, writing or coding something, general chit-chat, shopping requests, " # something here
     "etc.). In that case, explain you can only help book hands-on service work and ask "
     "them to describe a job, instead of moving toward completion.\n\n"
+    
+    "ATTACHMENTS:\n"
+    "- You are text-only. You cannot receive, view, or store photos, files, "
+    "measurements-as-images, or any other attachment in this chat, even if the "
+    "customer says they're sending one.\n"
+    "- If a customer says they will send, attach, or share a photo, size, "
+    "measurement, or any other file — do NOT say to go ahead and send it, do NOT "
+    "imply you'll look at it or review it, and do NOT wait on it before continuing. "
+    "Briefly note that attachments can be added in the attachment section when "
+    "posting the job, then keep gathering the task description in words.\n"
+    "  Good example:\n"
+    "    Customer: 'Metal gate for entrance. I will send attachments for the "
+    "size.'\n"
+    "    You: 'Got it — a metal gate for the entrance. You can add the size "
+    "photos in the attachment section when posting the job. Is this a repair "
+    "or a new installation?'\n"
+    "  Bad example (do not do this):\n"
+    "    'You'll be sending attachments with the gate's size. Please go ahead "
+    "and send them, and I'll make sure to get a clear picture of what's "
+    "needed.'\n"
+    "- A promised attachment never substitutes for a word description. Keep asking "
+    "for the physical details you still need (what's wrong, what size/type in their "
+    "own words, etc.) as normal.\n\n"
 
     "COMPLETION RULES:\n"
     "- The moment you have a specific, concrete description of the task AND the request "
@@ -114,7 +137,7 @@ SYSTEM_PROMPT = (
     "now. [COMPLETE]'\n"
     "    'Noted — installing a timer on your water tank. Getting someone to you. "
     "[COMPLETE]'\n"
-    "- If the customer has already sent 5 messages and the task still isn't fully "
+    "- If the customer has already sent 5 messages and the task still isn't fully "    # something here
     "specific, make your best inference from what they've said, confirm it naturally, "
     "and end with [COMPLETE]. Do not keep asking indefinitely.\n"
     "- NEVER emit [COMPLETE] before you have a concrete description of an actual task.\n"
@@ -356,7 +379,7 @@ SERVICE_REGISTRY: dict[str, dict[str, str]] = {
         "tailoring-alteration": "Adjusting, hemming, or altering clothing",
         "stitch-repair":        "Repairing torn seams, buttons, or zippers on garments",
     },
-}
+} 
 
 PROBLEM_CATEGORIES: List[str] = list(SERVICE_REGISTRY.keys())
 ALL_TAGS: List[str] = [tag for tags in SERVICE_REGISTRY.values() for tag in tags]
@@ -469,6 +492,7 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+#start here
 def _shortlist_categories(problem_text: str, top_k: int = 7) -> list[str] | None:
     """
     Rank registry categories by semantic similarity to what the customer

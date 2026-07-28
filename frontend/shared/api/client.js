@@ -2,6 +2,7 @@ import { API_BASE_URL } from '@shared/config/api';
 
 const TOKEN_KEY = 'handy_man_access_token';
 const TOKEN_TYPE_KEY = 'handy_man_token_type';
+const USER_KEY = 'handy_man_user';
 
 export class ApiClientError extends Error {
   constructor(message, { status = 0, errors = [], data = null, url = '' } = {}) {
@@ -103,6 +104,7 @@ const request = async (path, options = {}) => {
   }
 
   try {
+    console.log(`[apiClient] ${method} ${API_BASE_URL}${path}`);
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers: nextHeaders,
@@ -110,6 +112,16 @@ const request = async (path, options = {}) => {
       signal,
       ...rest
     });
+
+    console.log(`[apiClient] Response: ${response.status} ${response.statusText}`);
+
+    if (response.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(TOKEN_TYPE_KEY);
+      localStorage.removeItem(USER_KEY);
+      window.location.href = '/login';
+      return;
+    }
 
     const data = await safeParse(response);
 
@@ -142,6 +154,8 @@ const request = async (path, options = {}) => {
     if (error instanceof ApiClientError) {
       throw error;
     }
+
+    console.error(`[apiClient] Network error for ${method} ${API_BASE_URL}${path}:`, error);
 
     throw new ApiClientError(
       error?.message === 'Failed to fetch'

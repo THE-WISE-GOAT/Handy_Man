@@ -9,6 +9,7 @@ import { apiClient } from "@shared/api/client";
 import {
   getDefaultCustomerPath,
   getDefaultWorkerPath,
+  getDefaultAdminPath,
 } from "@shared/config/viewRoutes";
 
 const AuthContext = createContext(null);
@@ -152,6 +153,25 @@ export function AuthProvider({ children }) {
     return bootstrapUserSession({ token, type, usernameValue });
   };
 
+  const refreshUser = async () => {
+    if (!accessToken) return null;
+
+    const responseBody = await apiClient.get(`/users/me`, {
+      token: accessToken,
+      tokenType,
+    });
+
+    const profile = normalizeUserProfile(responseBody, username);
+
+    if (profile) {
+      localStorage.setItem(USER_KEY, JSON.stringify(profile));
+    }
+
+    setUser(profile);
+
+    return profile;
+  };
+
   const logoutLocal = () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(TOKEN_TYPE_KEY);
@@ -180,9 +200,12 @@ export function AuthProvider({ children }) {
   const canAccessWorker = ["worker", "technician", "provider"].some(
     (roleName) => hasRole(roleName),
   );
-  const defaultHomePath = canAccessWorker
-    ? getDefaultWorkerPath()
-    : getDefaultCustomerPath("dashboard");
+  const canAccessAdmin = hasRole("admin");
+  const defaultHomePath = canAccessAdmin
+    ? getDefaultAdminPath()
+    : canAccessWorker
+      ? getDefaultWorkerPath()
+      : getDefaultCustomerPath("dashboard");
 
   const value = useMemo(
     () => ({
@@ -194,10 +217,12 @@ export function AuthProvider({ children }) {
       isLoading,
       isAuthenticated,
       canAccessWorker,
+      canAccessAdmin,
       defaultHomePath,
       hasRole,
       login,
       logout,
+      refreshUser,
     }),
     [
       accessToken,
@@ -208,6 +233,7 @@ export function AuthProvider({ children }) {
       isLoading,
       isAuthenticated,
       canAccessWorker,
+      canAccessAdmin,
       defaultHomePath,
     ],
   );

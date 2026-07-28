@@ -1,13 +1,157 @@
 # this page is for the validation of data that is sent to database
-from pydantic import BaseModel, EmailStr, field_validator
+from __future__ import annotations
 from datetime import datetime
-from typing import Any, List, Literal, Optional, Dict
-from pydantic import Field
-from pydantic import BaseModel, Field, EmailStr
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional, TypedDict
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from src.core import model
 
+class LocationCoordinates(BaseModel):
+    longitude: float = Field(..., description="Longitude coordinate (X)", ge=-180, le=180)
+    latitude: float = Field(..., description="Latitude coordinate (Y)", ge=-90, le=90)
 
+class CompleteChatIn(BaseModel):
+    edited_description: str
+    location: LocationCoordinates
+    title: str
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: str = "pending"
+    mode: str = "regular"
+    attachments: List[Dict[str, Any]] = Field(default_factory=list)
+    phone_number: Optional[str] = None
 
-# we put value through this schema before it goes to the database, so we can validate that the data is in the correct format and that all required fields are present, this is also used for the API endpoints to validate the data that is sent to the API
+class CreateJobIn(BaseModel):
+    title: str
+    description: str
+    location: LocationCoordinates
+    category: Optional[str] = None
+    budget: Optional[float] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: str = "pending"
+    mode: str = "regular"
+    attachments: List[Dict[str, Any]] = Field(default_factory=list)
+    phone_number: Optional[str] = None
+
+class InitializeWorkerAppIn(BaseModel):
+    pass
+
+class InitializeWorkerAppOut(BaseModel):
+    worker_id: int
+    user_id: int
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    worker_chat_id: int | None = None
+
+    class Config:
+        from_attributes = True
+
+class SubmitWorkerAppIn(BaseModel):
+    worker_chat_id: int
+    phone_number: str | None = None
+    address_text: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+class SubmitWorkerAppOut(BaseModel):
+    worker_id: int
+    stage: str
+    message: str
+
+class WorkerAppStatusOut(BaseModel):
+    worker_id: int
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    rejection_reason: str | None = None
+    job_category: str
+    category_tag: str
+    specialities: List[str]
+    years_experience: int
+    worker_chat_id: int | None = None
+    phone_number: str | None = None
+    address_text: str | None = None
+
+    class Config:
+        from_attributes = True
+
+class AdminPendingAppOut(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    email: str
+    firstName: str | None = None
+    lastName: str | None = None
+    stage: str
+    is_complete: bool
+    is_rejected: bool
+    rejection_reason: str | None = None
+    job_category: str
+    category_tag: str
+    specialities: List[str]
+    years_experience: int
+    worker_chat_id: int | None = None
+    phone_number: str | None = None
+    address_text: str | None = None
+    history: List[dict] | None = None
+    profile: dict | None = None
+
+class RejectWorkerIn(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=1000)
+
+class UpdateWorkerProfileIn(BaseModel):
+    job_category: Optional[str] = None
+    category_tag: Optional[str] = None
+    specialities: Optional[List[str]] = None
+    specialized_tools_or_equipment: Optional[List[str]] = None
+    years_experience: Optional[int] = None
+    license_or_certification: Optional[str] = None
+    job_description: Optional[str] = None
+    emergency_available: Optional[bool] = None
+    phone_number: Optional[str] = None
+    address_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class UpdateWorkerProfileOut(BaseModel):
+    worker_id: int
+    job_category: str
+    category_tag: str
+    specialities: List[str]
+    years_experience: int
+    license_or_certification: str | None = None
+    job_description: str
+    emergency_available: bool
+    phone_number: str | None = None
+    address_text: str | None = None
+    message: str
+
+    class Config:
+        from_attributes = True
+
+class UpdateUserIn(BaseModel):
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    email: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+class ChatMessageOut(BaseModel):
+    """Returned after each chat turn (POST /dispatch/chat)."""
+    booking_chat_id: int
+    ai_response: str
+    is_complete: bool
+    current_tags: List[str]  
+    is_job_request: bool  
+    is_custom_category: bool 
+    turns_used: int 
+    turns_remaining: int 
+    
+    problem_description: Optional[str] = None  # Allows AI summary to pass to UI
+    categories: List[CategoryMatch] = Field(default_factory=list)  # Allows title extraction to pass to UI
+
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -22,7 +166,6 @@ class RoleOut(BaseModel):
     class Config:
         from_attributes = True
             
-# this is the schema for the data that is sent back to the frontend, we don't want to send the password back to the frontend, so we create a separate schema for that   
 class UserOut(BaseModel):
     id: int
     email: EmailStr 
@@ -35,18 +178,15 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
-        
 
 class Token(BaseModel):
-    access_token:str # this is token that will be used to authenticate the user, it will be generated when the user logs in, and it will be sent back to the frontend, and the frontend will use this token to authenticate the user for subsequent requests to the API
-    token_type:str # it will be set as "bearer", which is a common type of token used for authentication, it indicates that the token is a bearer token, which means that the token itself is sufficient to authenticate the user, and no additional credentials are required.
-    
+    access_token: str 
+    token_type: str 
     
 class TokenData(BaseModel):
-    user_id: str | None = None # this is the data that will be contained in the token, it will be used to identify the user when the token is decoded, it will be set to None by default, and it will be populated with the user_id when the token is created.
-    
+    user_id: str | None = None 
 
-# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API, and it will be used to validate the data
+# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API
 class ChatMessageIn(BaseModel):
     """Payload the client sends on each chat turn."""
     booking_chat_id: int = Field(
@@ -68,48 +208,35 @@ class ChatMessageIn(BaseModel):
             raise ValueError("message cannot be empty or whitespace-only")
         return stripped  # normalised once, here — not re-stripped downstream
  
- # use to display session start response
+# use to display session start response
 class SessionStartOut(BaseModel):
     """Returned when a new session is created (POST /dispatch/session)."""
     booking_chat_id: int
     ai_response:     str
     turns_remaining: int
  
- # display the chat message response after each chat turn
-class ChatMessageOut(BaseModel):
-    """Returned after each chat turn (POST /dispatch/chat)."""
-    booking_chat_id: int
-    ai_response: str
-    is_complete: bool
-    current_tags: List[str]  # problem related tags
-    is_job_request: bool  # True only on the completion turn, if a real job was found
-    is_custom_category: bool # True if the category/tags came from the AI fallback, not the static registry
-    turns_used: int # number of turns used in the chat session
-    turns_remaining:  int # number of turns remaining in the chat session
- 
- # dsupport to display the chat history response after each chat turn
+# dsupport to display the chat history response after each chat turn
 class HistoryMessage(BaseModel):
     """A single turn in the client-visible conversation."""
-    role:    Literal["user", "assistant"]
+    role:  Literal["user", "assistant"]
     content: str
  
- # display the all chat history response 
+# display the all chat history response 
 class ChatHistoryOut(BaseModel):
     """Returned by GET /dispatch/{id}/history."""
     booking_chat_id: int
     history:         List[HistoryMessage]
     is_complete:     bool
-    turns_used:       int
+    turns_used:      int
     turns_remaining: int
  
-  # this is use to disply category for the specific job request
+ # this is use to disply category for the specific job request
 class CategoryMatch(BaseModel):
     category: str
     tags: List[str] = Field(default_factory=list)
     is_custom_category: bool
  
- 
- # to display the structured summary mainly needed for the frontend to use dict keys
+# to display the structured summary mainly needed for the frontend to use dict keys
 class BookingSummaryOut(BaseModel):
     """Returned by GET /dispatch/{id}/summary once is_complete is True."""
     categories: List[CategoryMatch] = Field(default_factory=list)
@@ -117,21 +244,18 @@ class BookingSummaryOut(BaseModel):
     is_complete: bool
     is_job_request: bool
  
-
-
 # use in the customer_chat_analyser_nvidia.py to validate the data that is sent to the API
 class CustomerProblemSchema(BaseModel):
     is_job_request: bool
     categories: List[CategoryMatch] = Field(default_factory=list)
     problem_description: str
 
-
  # for now this is just use to get the what is the roles of the user 
 # 1. Schema for a single Role
 class UserRolesOut(BaseModel):
     roles: list[str]
     
- # for now this support in worker.py   
+  # for now this support in worker_onboarding.py
 class WorkerOnboardIn(BaseModel):
     latitude: float
     longitude: float
@@ -142,12 +266,9 @@ class WorkerOnboardIn(BaseModel):
     additional_metadata: Dict[str, Any]
     ai_assessed_skills_json: Optional[List[str]] = []
 
-
-
-
-
 ### schemas for the worker chat functionality
 
+# use in the worker_chat_analyser_nvidia.py to validate the data that is sent to the API
 # use in the worker_chat_analyser_nvidia.py to validate the data that is sent to the API
 class WorkerProfileSchema(BaseModel):
     job_category: str
@@ -163,13 +284,22 @@ class WorkerProfileSchema(BaseModel):
     scenario_passed: bool
     scenario_score: int
 
+    @field_validator("job_description", "license_or_certification", "job_category", mode="before")
+    @classmethod
+    def sanitize_string_fields(cls, value: Any) -> str:
+        # If AI sends a list, join it into a single string
+        if isinstance(value, list):
+            return " ".join(str(v) for v in value)
+        # Ensure it's a string even if the AI sends an int or other type
+        return str(value)
+
 # use to display session start response
 class WorkerSessionStartOut(BaseModel):
     worker_chat_id: int
     ai_response: str
     stage: str
 
-# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API, and it will be used to validate the data
+# this is the schema for the chat functionality, it will be used to validate the data that is sent to the API
 class WorkerChatMessageIn(BaseModel):
     worker_chat_id: int
     message: str
@@ -202,8 +332,6 @@ class WorkerSummaryOut(BaseModel):
     rejection_reason: Optional[str] = None
     profile: Optional[WorkerProfileSchema] = None   
     
-    
-    
 # ── Find Help (worker matching) ──────────────────────────────────────────────
 
 class WorkerMatchOut(BaseModel):
@@ -214,8 +342,53 @@ class WorkerMatchOut(BaseModel):
     job_description: str
     match_score: float  # 1.0 = near-identical meaning, 0 = unrelated, negative = opposite
 
-
 class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used
     category: Optional[str] = None     # the category that was searched (if any)
     workers: List[WorkerMatchOut]
+    
+    
+class WorkerCompleteChatIn(BaseModel):
+    location: LocationCoordinates
+    phone_number: Optional[str] = None
+    
+
+class WorkerExpertiseIn(BaseModel):
+    title: str = Field(..., max_length=255, description="E.g., CCTV Installation, Electrical Repair")
+    description: str = Field(..., max_length=3000, description="Detailed breakdown of experience or tools owned")
+
+class WorkerExpertiseOut(BaseModel):
+    id: int
+    worker_id: int
+    title: str
+    description: str
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        
+        
+# ___________________ for mathcing worker with job request ___________________________
+class MatchDetail(TypedDict):
+    worker_profile: model.WorkerProfile
+    user: model.User
+    score: float
+    rank: int
+    worker_chat_id: int
+
+class MatchingResult(TypedDict):
+    matches: list[MatchDetail]
+    worker_chat_ids: list[int]
+    count: int
+
+class MatchedJobDetail(TypedDict):
+    booking_chat_id: int
+    title: str
+    description: str
+    score: float
+    rank: int
+
+class WorkerMatchingResult(TypedDict):
+    matched_jobs: list[MatchedJobDetail]
+    count: int

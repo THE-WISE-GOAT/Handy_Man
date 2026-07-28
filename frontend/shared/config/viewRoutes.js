@@ -195,14 +195,14 @@ export const WORKER_VIEWS = {
 
 export const CUSTOMER_SECTIONS = {
   Bookings: { id: "bookings", label: "Bookings", defaultViewId: "AI_CHAT" },
-  Postings: { id: "postings", label: "Postings", defaultViewId: "ACTIVE_BIDDINGS" },
+  Postings: { id: "postings", label: "Postings", defaultViewId: "ACTIVE_POSTS" },
   More: { id: "more", label: "More", defaultViewId: "CALENDAR" },
 };
 
 export const WORKER_SECTIONS = {
+  Me: { id: "me", label: "Me", defaultViewId: "INTERVIEW" },
   WorkSpace: { id: "workspace", label: "WorkSpace", defaultViewId: "MAP" },
   Scheduled: { id: "scheduled", label: "Scheduled", defaultViewId: "CALENDAR" },
-  Me: { id: "me", label: "Me", defaultViewId: "INTERVIEW" },
   Mics: { id: "mics", label: "Mics", defaultViewId: "EMPTY_VIEW" }
 };
 
@@ -211,6 +211,65 @@ export const WORKER_VIEW_LIST = Object.values(WORKER_VIEWS);
 
 export const CUSTOMER_VIEW_BY_SLUG = Object.fromEntries(CUSTOMER_VIEW_LIST.map((v) => [v.slug, v]));
 export const WORKER_VIEW_BY_SLUG = Object.fromEntries(WORKER_VIEW_LIST.map((v) => [v.slug, v]));
+
+// ==========================================
+// ADMIN WORKSPACE
+// ==========================================
+export const ADMIN_VIEWS = {
+  USERS: {
+    id: "USERS",
+    slug: "UserManagement",
+    label: "User Management",
+    section: "users",
+    categoryKey: "users",
+  },
+  JOBS: {
+    id: "JOBS",
+    slug: "JobManagement",
+    label: "Job Management",
+    section: "jobs",
+    categoryKey: "jobs",
+  },
+  WORKER_APPLICATIONS: {
+    id: "WORKER_APPLICATIONS",
+    slug: "WorkerApplications",
+    label: "Worker Applications",
+    section: "applications",
+    categoryKey: "applications",
+  },
+};
+
+export const ADMIN_SECTIONS = {
+  Users: { id: "users", label: "Users", defaultViewId: "USERS" },
+  Jobs: { id: "jobs", label: "Jobs", defaultViewId: "JOBS" },
+  Applications: {
+    id: "applications",
+    label: "Worker Applications",
+    defaultViewId: "WORKER_APPLICATIONS",
+  },
+};
+
+export const ADMIN_VIEW_LIST = Object.values(ADMIN_VIEWS);
+export const ADMIN_VIEW_BY_SLUG = Object.fromEntries(ADMIN_VIEW_LIST.map((v) => [v.slug, v]));
+
+export const ADMIN_NAV_ITEMS = Object.values(ADMIN_SECTIONS).map((section) => ({
+  id: section.id,
+  label: section.label,
+  path: `/admin/${section.id}/${ADMIN_VIEWS[section.defaultViewId].slug}`,
+  matchPrefix: `/admin/${section.id}/`,
+}));
+
+export function buildAdminViewPath(view) {
+  return `/admin/${view.section}/${view.slug}`;
+}
+
+export function getDefaultAdminPath(sectionKey = "users") {
+  const normalizedKey = String(sectionKey).toLowerCase();
+  const matchedSection =
+    Object.values(ADMIN_SECTIONS).find((s) => s.id === normalizedKey) ||
+    ADMIN_SECTIONS.Users;
+  return buildAdminViewPath(ADMIN_VIEWS[matchedSection.defaultViewId]);
+}
 
 export const CUSTOMER_NAV_ITEMS = Object.values(CUSTOMER_SECTIONS).map((section) => ({
   id: section.id,
@@ -246,6 +305,7 @@ export function getDefaultWorkerPath(sectionKey = "workspace") {
 
 export function getCustomerViewBySlug(slug) { return CUSTOMER_VIEW_BY_SLUG[slug] || null; }
 export function getWorkerViewBySlug(slug) { return WORKER_VIEW_BY_SLUG[slug] || null; }
+export function getAdminViewBySlug(slug) { return ADMIN_VIEW_BY_SLUG[slug] || null; }
 
 // Fixed to map via slug now that internal structural moduleIds are pruned
 export const WORKER_VIEW_BY_SLUG_MAP = Object.fromEntries(

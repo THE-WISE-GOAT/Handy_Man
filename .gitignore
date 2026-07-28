@@ -48,3 +48,10 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# === Kilo ===
+.kilo/
+.kilo
+
+# === Docker Compose ===
+docker-compose.override.yml

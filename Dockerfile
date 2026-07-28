@@ -12,10 +12,8 @@ RUN apt-get update \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend ./backend
+COPY backend ./
 
 EXPOSE 8000
-
-WORKDIR /app/backend
 
 CMD ["uvicorn", "src.core.main:app", "--host", "0.0.0.0", "--port", "8000"]

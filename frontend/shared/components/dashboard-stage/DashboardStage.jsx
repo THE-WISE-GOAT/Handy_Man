@@ -39,12 +39,39 @@ export function FixFastNavbar({
 
 export function FixFastProfile({ label, sublabel, actions = [] }) {
   const [open, setOpen] = React.useState(false);
+  const containerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!open) return undefined;
+
+    function handlePointerDown(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   return (
-    <div className="fixfast-profile">
+    <div className="fixfast-profile" ref={containerRef}>
       <button
         type="button"
         className="fixfast-profile__trigger"
+        aria-haspopup="menu"
+        aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
       >
         <span className="fixfast-profile__avatar">
@@ -52,13 +79,18 @@ export function FixFastProfile({ label, sublabel, actions = [] }) {
         </span>
       </button>
       {open && (
-        <div className="fixfast-profile__menu">
+        <div className="fixfast-profile__menu" role="menu">
           <div className="fixfast-profile__meta">
             <strong>{label}</strong>
-            <span>{sublabel}</span>
+            <span className="fixfast-profile__email">{sublabel}</span>
           </div>
           {actions.map((action) => (
-            <button key={action.label} type="button" onClick={action.onClick}>
+            <button
+              key={action.label}
+              type="button"
+              role="menuitem"
+              onClick={action.onClick}
+            >
               {action.label}
             </button>
           ))}

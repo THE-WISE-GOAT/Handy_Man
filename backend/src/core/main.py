@@ -14,11 +14,14 @@ from src.core.router import (
     auth, 
     login, 
     user, 
-    worker, 
-    service_task, 
     chat_customer, 
-    chat_worker
+    chat_worker,
+    job_router,
+    worker_onboarding,
+    socket,
+    worker_router
 )
+from src.core.oauth2 import get_current_user
 
 # 1. Define the startup logic using a SINGLE lifespan block
 @asynccontextmanager
@@ -37,31 +40,49 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # 3. CORS Configuration
-origins = ["*"]
+origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:3000",
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # 4. Include Routers sequentially (Exactly ONCE)
 app.include_router(user.router)
 app.include_router(auth.router)
 app.include_router(login.router)
-app.include_router(worker.router)
 app.include_router(chat_customer.router)
-app.include_router(chat_customer.match_router)
 app.include_router(chat_worker.router)
+app.include_router(job_router.router)
+app.include_router(worker_onboarding.router)
+app.include_router(socket.router)
+app.include_router(worker_router.router)
 
 
-# 5. Core Alias Root Routes
+# 5. Worker locations stub (preserves legacy frontend contract)
+@app.post("/workers/locations", summary="Get worker locations (stub)")
+async def worker_locations_stub(
+    payload: dict,
+    current_user = Depends(get_current_user),
+):
+    return {"status": "success", "locations": []}
+
+
+# 6. Core Alias Root Routes
 @app.post("/register", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut)
 @app.post("/signup", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut)
 def register_alias(new_user: schema.UserCreate, db: Session = Depends(get_db)):
     return auth._create_user(new_user, db)
-
 
 @app.post("/login", response_model=schema.Token)
 @app.post("/login/", response_model=schema.Token, include_in_schema=False)
