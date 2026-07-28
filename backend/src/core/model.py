@@ -113,14 +113,14 @@ class Bids(Base):
 )
     
 # in my point of view not needed
-class WorkerSkillsSchema(BaseModel):
-    primary_trades: List[str] = Field(default_factory=list, description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
-    specific_skills: List[str] = Field(default_factory=list, description="Specific tasks they can do, e.g., fixing leaks, installing ceiling fans, drywall patching")
-    years_of_experience: int = Field(default=0, description="Total years of experience as an integer")
-    special_tools: List[str] = Field(default_factory=list, description="Key tools they own, e.g., ladders, power drills, welding gear, snakes")
-    certifications: List[str] = Field(default_factory=list, description="Any professional licenses or certifications mentioned")
-    estimated_hourly_rate: Optional[float] = Field(None, description="Their preferred hourly rate if mentioned, otherwise null")
-    ai_confidence_summary: str = Field(default="", description="A brief paragraph summarizing their professional background and reliability based on the chat")
+# class WorkerSkillsSchema(BaseModel):
+#     primary_trades: List[str] = Field(default_factory=list, description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
+#     specific_skills: List[str] = Field(default_factory=list, description="Specific tasks they can do, e.g., fixing leaks, installing ceiling fans, drywall patching")
+#     years_of_experience: int = Field(default=0, description="Total years of experience as an integer")
+#     special_tools: List[str] = Field(default_factory=list, description="Key tools they own, e.g., ladders, power drills, welding gear, snakes")
+#     certifications: List[str] = Field(default_factory=list, description="Any professional licenses or certifications mentioned")
+#     estimated_hourly_rate: Optional[float] = Field(None, description="Their preferred hourly rate if mentioned, otherwise null")
+#     ai_confidence_summary: str = Field(default="", description="A brief paragraph summarizing their professional background and reliability based on the chat")
 
 #### models for the Worker Interview Session, this will be used to store the worker interview session data, including the chat history, the current stage of the interview, and the final outcome. 
 class WorkerInterviewSession(Base):
