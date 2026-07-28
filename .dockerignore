@@ -3,7 +3,7 @@
 frontend/
 frontend.zip
 docs/
-TODO/
+TODO
 **/__pycache__/
 **/.pytest_cache/
 **/.mypy_cache/
