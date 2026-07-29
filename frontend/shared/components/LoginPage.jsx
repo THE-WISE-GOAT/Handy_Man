@@ -142,7 +142,7 @@ const profile = await login({
           <div className="auth-shell__brand">
             <span className="auth-shell__mark">HM</span>
             <div>
-              <p className="auth-shell__eyebrow">Handy Man Dispatch</p>
+              <p className="auth-shell__eyebrow">Kamigo</p>
               <h1>Instant access to verified local experts.</h1>
             </div>
           </div>

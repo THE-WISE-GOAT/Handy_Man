@@ -178,7 +178,7 @@ export default function AppLayout({ role = "customer" }) {
   return (
     <div className="fixfast-page">
       <FixFastNavbar
-        brandTitle="Handy Man"
+        brandTitle="Kamigo"
         brandEyebrow={
           role === "worker"
             ? "Unified Worker Workspace"

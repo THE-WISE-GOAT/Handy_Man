@@ -8,7 +8,7 @@
   padding-left: 1rem;
   padding-right: 1rem;
   font-family: "Inter", "Segoe UI", "Roboto", system-ui, -apple-system, sans-serif;
-  color: var(--fixfast-white, #F5F5F7);
+  color: var(--fixfast-white, #E2E8F0);
 }
 
 .admin-board__head h1 {
@@ -16,26 +16,26 @@
   font-size: 1.6rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .admin-board__sub {
   margin: 0;
-  color: var(--fixfast-muted, #7A7A7A);
+  color: var(--fixfast-muted, #94A3B8);
   font-size: 0.85rem;
 }
 
 .admin-status {
   padding: 1rem;
-  border: 1px dashed rgba(245, 245, 247, 0.2);
+  border: 1px dashed var(--ind-border-strong);
   border-radius: 12px;
-  background: rgba(31, 31, 31, 0.4);
-  color: #F5F5F7;
+  background: var(--ind-surface-alt);
+  color: var(--text-secondary);
 }
 
 .admin-status--error {
   border-color: rgba(220, 53, 69, 0.5);
-  color: #ff6b6b;
+  color: var(--status-danger);
 }
 
 .admin-board__grid {
@@ -44,7 +44,7 @@
 }
 
 .admin-section {
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 12px;
   background: var(--ind-surface);
   border: 1px solid var(--ind-border);
@@ -72,15 +72,15 @@
   min-width: 2rem;
   height: 2rem;
   padding: 0 0.5rem;
-  background: rgba(255, 107, 26, 0.15);
-  border: 1px solid rgba(255, 107, 26, 0.3);
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(37, 99, 235, 0.3);
   border-radius: 12px;
   font-weight: 900;
-  color: #FF6B1A;
+  color: var(--accent-soft);
 }
 
 .admin-section__empty {
-  color: var(--fixfast-muted, #7A7A7A);
+  color: var(--fixfast-muted, #94A3B8);
   font-size: 0.85rem;
 }
 
@@ -98,7 +98,7 @@
 .admin-table td {
   text-align: left;
   padding: 0.55rem 0.6rem;
-  border-bottom: 1px solid rgba(245, 245, 247, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
 
@@ -106,7 +106,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 0.72rem;
-  color: var(--fixfast-muted, #7A7A7A);
+  color: var(--fixfast-muted, #94A3B8);
 }
 
 .admin-cell-email {
@@ -117,37 +117,37 @@
 }
 
 .admin-row:hover {
-  background: rgba(31, 31, 31, 0.4);
+  background: var(--ind-surface-alt);
 }
 
 .admin-pill {
   display: inline-block;
   margin: 0 0.2rem 0.2rem 0;
   padding: 0.1rem 0.5rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 999px;
   font-size: 0.7rem;
   text-transform: capitalize;
-  background: rgba(31, 31, 31, 0.4);
-  color: #F5F5F7;
+  background: var(--ind-surface-alt);
+  color: var(--text-secondary);
 }
 
 .admin-row--worker .admin-pill {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--accent-soft);
+  border-color: rgba(37, 99, 235, 0.3);
 }
 
 .admin-row--customer .admin-pill {
-  background: rgba(255, 107, 26, 0.15);
-  color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.3);
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--accent-soft);
+  border-color: rgba(37, 99, 235, 0.3);
 }
 
 .admin-row--admin .admin-pill {
-  background: rgba(255, 107, 26, 0.25);
-  color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.4);
+  background: rgba(37, 99, 235, 0.25);
+  color: var(--accent-soft);
+  border-color: rgba(37, 99, 235, 0.4);
 }
 
 .admin-applications-list {
@@ -157,9 +157,9 @@
 }
 
 .admin-application-card {
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 12px;
-  background: rgba(31, 31, 31, 0.4);
+  background: var(--ind-surface-alt);
   padding: 1rem;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
@@ -183,7 +183,7 @@
 .admin-application-meta {
   margin: 0 0 0.5rem;
   font-size: 0.78rem;
-  color: var(--fixfast-muted, #7A7A7A);
+  color: var(--fixfast-muted, #94A3B8);
 }
 
 .admin-application-details {
@@ -195,11 +195,11 @@
 .admin-detail-tag {
   display: inline-block;
   padding: 0.15rem 0.5rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 8px;
   font-size: 0.72rem;
-  background: rgba(31, 31, 31, 0.4);
-  color: #F5F5F7;
+  background: var(--ind-surface-alt);
+  color: var(--text-secondary);
 }
 
 .admin-application-actions {
@@ -210,7 +210,7 @@
 
 .admin-btn {
   padding: 0.45rem 0.9rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 8px;
   font: inherit;
   font-size: 0.78rem;
@@ -230,20 +230,20 @@
 
 .admin-btn--approve {
   background: rgba(74, 222, 128, 0.15);
-  color: #4ade80;
+  color: var(--status-success);
   border-color: rgba(74, 222, 128, 0.3);
 }
 
 .admin-btn--reject {
   background: rgba(220, 53, 69, 0.15);
-  color: #ff6b6b;
+  color: var(--status-danger);
   border-color: rgba(220, 53, 69, 0.3);
 }
 
 .admin-btn--expand {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--accent-soft);
+  border-color: rgba(37, 99, 235, 0.3);
 }
 
 .admin-application-details-grid {
@@ -257,7 +257,7 @@
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .admin-chat-preview {
@@ -266,7 +266,7 @@
   border: 1px solid var(--ind-border);
   border-radius: 8px;
   padding: 0.5rem;
-  background: rgba(31, 31, 31, 0.4);
+  background: var(--ind-surface-alt);
   font-size: 0.78rem;
   display: flex;
   flex-direction: column;
@@ -283,36 +283,36 @@
 }
 
 .admin-chat-bubble--user {
-  background: rgba(59, 130, 246, 0.15);
-  border-left: 3px solid #3b82f6;
-  color: #F5F5F7;
+  background: rgba(37, 99, 235, 0.15);
+  border-left: 3px solid var(--accent-soft);
+  color: var(--text-secondary);
   align-self: flex-end;
   border-radius: 12px 4px 12px 12px;
 }
 
 .admin-chat-bubble--assistant {
-  background: rgba(31, 31, 31, 0.4);
-  border-left: 3px solid #7A7A7A;
-  color: #F5F5F7;
+  background: var(--ind-surface-alt);
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-secondary);
   align-self: flex-start;
   border-radius: 4px 12px 12px 12px;
 }
 
 .light .admin-chat-preview {
   background: #FFFFFF;
-  border-color: #E2E8F0;
+  border-color: var(--ind-border);
 }
 
 .light .admin-chat-bubble--user {
-  background: #FFF3E0;
-  border-left: 3px solid #FF6B1A;
-  color: #0D0D0D;
+  background: #E8F0FE;
+  border-left: 3px solid var(--accent);
+  color: var(--text-primary);
 }
 
 .light .admin-chat-bubble--assistant {
-  background: #E3F2FD;
-  border-left: 3px solid #3b82f6;
-  color: #0D0D0D;
+  background: #F1F5F9;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-primary);
 }
 
 .admin-profile-preview {
@@ -323,7 +323,7 @@
   display: flex;
   gap: 0.5rem;
   padding: 0.2rem 0;
-  border-bottom: 1px solid rgba(245, 245, 247, 0.06);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .admin-profile-key {
@@ -331,18 +331,18 @@
   text-transform: capitalize;
   min-width: 8rem;
   flex-shrink: 0;
-  color: #F5F5F7;
+  color: var(--text-secondary);
 }
 
 .admin-profile-val {
-  color: var(--fixfast-muted, #7A7A7A);
+  color: var(--fixfast-muted, #94A3B8);
   word-break: break-word;
 }
 
 .status-badge {
   display: inline-block;
   padding: 0.4rem 0.8rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 8px;
   font-size: 0.85rem;
   font-weight: 700;
@@ -350,9 +350,9 @@
 }
 
 .status-badge--review {
-  background: rgba(255, 177, 0, 0.15);
-  color: #FF6B1A;
-  border-color: rgba(255, 177, 0, 0.3);
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+  border-color: var(--status-warning-border);
 }
 
 .rejection-reason-box {
@@ -361,19 +361,19 @@
   border: 1px solid rgba(220, 53, 69, 0.3);
   border-radius: 8px;
   background: rgba(220, 53, 69, 0.1);
-  color: #ff6b6b;
+  color: var(--status-danger);
   font-size: 0.85rem;
 }
 
 .turns-badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 6px;
   font-size: 0.72rem;
   font-weight: 700;
-  background: rgba(255, 107, 26, 0.12);
-  color: #FF6B1A;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--accent-soft);
   margin-left: 0.5rem;
 }
 
@@ -407,14 +407,14 @@
   font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .chat-box {
   border: 1px solid var(--ind-border);
   border-radius: 8px;
   padding: 0.8rem;
-  background: rgba(31, 31, 31, 0.4);
+  background: var(--ind-surface-alt);
   min-height: 200px;
   max-height: 300px;
   overflow-y: auto;
@@ -441,51 +441,51 @@
 }
 
 .chat-msg--user {
-  background: rgba(59, 130, 246, 0.15);
-  border-left: 3px solid #3b82f6;
-  color: #F5F5F7;
+  background: rgba(37, 99, 235, 0.15);
+  border-left: 3px solid var(--accent-soft);
+  color: var(--text-secondary);
   align-self: flex-end;
   border-radius: 14px 4px 14px 14px;
 }
 
 .chat-msg--assistant {
-  background: rgba(31, 31, 31, 0.4);
-  border-left: 3px solid #7A7A7A;
-  color: #F5F5F7;
+  background: var(--ind-surface-alt);
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-secondary);
   align-self: flex-start;
   border-radius: 4px 14px 14px 14px;
 }
 
 .chat-msg--system {
-  background: rgba(255, 107, 26, 0.1);
-  border-left: 3px solid #FF6B1A;
+  background: rgba(37, 99, 235, 0.1);
+  border-left: 3px solid var(--accent);
   font-style: italic;
-  color: #F5F5F7;
+  color: var(--text-secondary);
   align-self: flex-start;
   border-radius: 4px 14px 14px 14px;
 }
 
 .light .onboarding-chat-section .chat-box {
   background: #FFFFFF;
-  border-color: #E2E8F0;
+  border-color: var(--ind-border);
 }
 
 .light .onboarding-chat-section .chat-msg--user {
-  background: #FFF3E0;
-  border-left: 3px solid #FF6B1A;
-  color: #0D0D0D;
+  background: #E8F0FE;
+  border-left: 3px solid var(--accent);
+  color: var(--text-primary);
 }
 
 .light .onboarding-chat-section .chat-msg--assistant {
-  background: #E3F2FD;
-  border-left: 3px solid #3b82f6;
-  color: #0D0D0D;
+  background: #F1F5F9;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-primary);
 }
 
 .light .onboarding-chat-section .chat-msg--system {
-  background: #E3F2FD;
-  border-left: 3px solid #3b82f6;
-  color: #0D0D0D;
+  background: var(--ind-cta-alpha-10);
+  border-left: 3px solid var(--ind-cta);
+  color: var(--text-primary);
 }
 
 .chat-form {
@@ -495,30 +495,30 @@
 
 .chat-form input {
   flex: 1;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 6px;
   padding: 0.5rem;
   font: inherit;
   font-size: 0.85rem;
-  background: rgba(31, 31, 31, 0.4);
-  color: #FFFFFF;
+  background: var(--ind-surface-alt);
+  color: var(--text-primary);
 }
 
 .light .onboarding-chat-section .chat-form input {
   background: #FFFFFF;
-  border-color: #E2E8F0;
-  color: #0D0D0D;
+  border-color: var(--ind-border);
+  color: var(--text-primary);
 }
 
 .light .onboarding-chat-section .chat-form input::placeholder {
-  color: #555555;
+  color: var(--text-muted);
 }
 
 .chat-btn {
   padding: 0.5rem 1rem;
-  border: 1px solid #FF6B1A;
+  border: 1px solid var(--accent);
   border-radius: 6px;
-  background: #FF6B1A;
+  background: var(--accent);
   color: #FFFFFF;
   font: inherit;
   font-weight: 700;
@@ -527,8 +527,8 @@
 }
 
 .chat-btn:hover {
-  background: #e85d14;
-  border-color: #e85d14;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .chat-btn:active {
@@ -548,10 +548,10 @@
 
 .extraction-panel,
 .location-panel {
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 8px;
   padding: 0.8rem;
-  background: rgba(31, 31, 31, 0.4);
+  background: var(--ind-surface-alt);
 }
 
 .extraction-panel h3,
@@ -560,7 +560,7 @@
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .extracted-data {
@@ -575,17 +575,17 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.2rem 0;
-  border-bottom: 1px solid rgba(245, 245, 247, 0.06);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .extracted-label {
   font-weight: 700;
   text-transform: capitalize;
-  color: #F5F5F7;
+  color: var(--text-secondary);
 }
 
 .extracted-value {
-  color: #7A7A7A;
+  color: var(--text-muted);
   text-align: right;
   word-break: break-word;
 }
@@ -603,30 +603,30 @@
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #F5F5F7;
+  color: var(--text-secondary);
 }
 
 .location-form input {
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 6px;
   padding: 0.4rem;
   font: inherit;
   font-size: 0.85rem;
-  background: rgba(31, 31, 31, 0.4);
-  color: #FFFFFF;
+  background: var(--ind-surface-alt);
+  color: var(--text-primary);
 }
 
 .location-form input[readonly] {
-  background: rgba(31, 31, 31, 0.6);
+  background: var(--ind-surface-raised);
   cursor: pointer;
 }
 
 .map-open-btn {
   padding: 0.5rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 6px;
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--accent-soft);
   font: inherit;
   font-size: 0.85rem;
   font-weight: 700;
@@ -635,8 +635,8 @@
 }
 
 .map-open-btn:hover {
-  background: rgba(59, 130, 246, 0.25);
-  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(37, 99, 235, 0.25);
+  border-color: rgba(37, 99, 235, 0.4);
 }
 
 .map-open-btn:active {
@@ -648,7 +648,7 @@
   border: 1px solid rgba(74, 222, 128, 0.3);
   border-radius: 8px;
   background: rgba(74, 222, 128, 0.15);
-  color: #4ade80;
+  color: var(--status-success);
   font: inherit;
   font-size: 0.9rem;
   font-weight: 700;
@@ -668,9 +668,9 @@
 }
 
 .submit-app-btn:disabled {
-  background: rgba(122, 122, 122, 0.15);
-  color: #7A7A7A;
-  border-color: rgba(122, 122, 122, 0.3);
+  background: var(--ind-surface-raised);
+  color: var(--text-muted);
+  border-color: var(--ind-border);
   cursor: not-allowed;
 }
 
@@ -713,12 +713,12 @@
 
 .light .admin-status--error {
   border-color: rgba(220, 53, 69, 0.5);
-  color: #c0392b;
+  color: var(--status-danger);
 }
 
 .light .admin-section__count {
-  background: rgba(255, 107, 26, 0.1);
-  border-color: rgba(255, 107, 26, 0.3);
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.3);
   color: var(--ind-amber);
 }
 
@@ -799,7 +799,7 @@
 }
 
 .light .admin-cell-actions button:hover {
-  background: rgba(255, 107, 26, 0.1);
+  background: rgba(37, 99, 235, 0.1);
   border-color: var(--ind-amber);
   color: var(--ind-amber);
 }
@@ -807,13 +807,13 @@
 .light .admin-cell-actions button--danger {
   background: var(--ind-surface);
   border-color: var(--ind-border);
-  color: #c0392b;
+  color: var(--status-danger);
 }
 
 .light .admin-cell-actions button--danger:hover {
   background: rgba(220, 53, 69, 0.1);
   border-color: rgba(220, 53, 69, 0.5);
-  color: #c0392b;
+  color: var(--status-danger);
 }
 
 .light .admin-pagination {
@@ -828,13 +828,13 @@
 }
 
 .light .admin-pagination__button.is-active {
-  background: var(--ind-amber);
-  border-color: var(--ind-amber);
-  color: var(--ind-white);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
 }
 
 .light .admin-pagination__button:hover {
-  background: rgba(255, 107, 26, 0.1);
+  background: rgba(37, 99, 235, 0.1);
   border-color: var(--ind-amber);
   color: var(--ind-amber);
 }
@@ -860,7 +860,7 @@
 
 .light .admin-filter__input:focus {
   border-color: var(--ind-amber);
-  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
 .light .admin-filter__select {
@@ -871,7 +871,7 @@
 
 .light .admin-filter__select:focus {
   border-color: var(--ind-amber);
-  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
 .light .admin-badge {
@@ -889,7 +889,7 @@
 .light .admin-badge--inactive {
   background: rgba(220, 53, 69, 0.1);
   border-color: rgba(220, 53, 69, 0.3);
-  color: #c0392b;
+  color: var(--status-danger);
 }
 
 .light .admin-badge--pending {
@@ -911,7 +911,7 @@
 
 .light .admin-search__input:focus {
   border-color: var(--ind-amber);
-  box-shadow: 0 0 0 4px rgba(255, 107, 26, 0.12);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
 .light .admin-search__input::placeholder {
@@ -930,27 +930,27 @@
 }
 
 .light .admin-actions__button:hover {
-  background: rgba(255, 107, 26, 0.1);
+  background: rgba(37, 99, 235, 0.1);
   border-color: var(--ind-amber);
   color: var(--ind-amber);
 }
 
 .light .admin-actions__button--primary {
-  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
-  border-color: var(--ind-amber);
-  color: var(--ind-white);
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+  border-color: var(--accent);
+  color: #FFFFFF;
 }
 
 .light .admin-actions__button--danger {
   background: var(--ind-surface);
   border-color: var(--ind-border);
-  color: #c0392b;
+  color: var(--status-danger);
 }
 
 .light .admin-actions__button--danger:hover {
   background: rgba(220, 53, 69, 0.1);
   border-color: rgba(220, 53, 69, 0.5);
-  color: #c0392b;
+  color: var(--status-danger);
 }
 
 .light .admin-modal {
@@ -983,13 +983,13 @@
 }
 
 .light .admin-modal__button:hover {
-  background: rgba(255, 107, 26, 0.1);
+  background: rgba(37, 99, 235, 0.1);
   border-color: var(--ind-amber);
   color: var(--ind-amber);
 }
 
 .light .admin-modal__button--primary {
-  background: linear-gradient(180deg, var(--ind-amber), #e85d14);
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
   border-color: var(--ind-amber);
   color: var(--ind-white);
 }
@@ -997,13 +997,13 @@
 .light .admin-modal__button--danger {
   background: var(--ind-surface);
   border-color: var(--ind-border);
-  color: #c0392b;
+  color: var(--status-danger);
 }
 
 .light .admin-modal__button--danger:hover {
   background: rgba(220, 53, 69, 0.1);
   border-color: rgba(220, 53, 69, 0.5);
-  color: #c0392b;
+  color: var(--status-danger);
 }
 
 .light .admin-modal__close {

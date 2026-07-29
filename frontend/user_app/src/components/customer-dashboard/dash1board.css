@@ -1,16 +1,22 @@
 /* ==========================================================================
+   KAMIGO — CUSTOMER DASHBOARD (WORKSPACE VIEW)
+   All colours come from the shared design tokens in shared/styles/global.css,
+   so light mode is handled automatically and no override blocks are needed.
+   ========================================================================== */
+
+/* ==========================================================================
    1. CORE DASHBOARD LAYOUT GRID
    ========================================================================== */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 380px;
-  grid-template-rows: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 16px;
   width: 100%;
   height: calc(100vh - 120px);
   padding: 16px;
   box-sizing: border-box;
-  background-color: var(--ind-concrete);
+  background-color: transparent;
 }
 
 .grid-main {
@@ -18,6 +24,7 @@
   grid-row: 1;
   display: flex;
   min-width: 0;
+  min-height: 0;
 }
 
 .grid-bottom {
@@ -32,6 +39,7 @@
   grid-row: 1 / span 2;
   display: flex;
   min-width: 0;
+  min-height: 0;
 }
 
 /* ==========================================================================
@@ -40,15 +48,14 @@
 .dashboard-card {
   background-color: var(--ind-surface);
   border: 1px solid var(--ind-border);
-  border-radius: 12px;
+  border-radius: var(--ind-radius-lg);
   width: 100%;
   display: flex;
   flex-direction: column;
-  padding: 25px;
+  padding: 20px 22px;
   box-sizing: border-box;
+  box-shadow: var(--ind-shadow-tight);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  padding-top: 18px;
-  padding-left: 18px;
   min-width: 0;
 }
 
@@ -58,99 +65,94 @@
 
 .clickable:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-  border-color: rgba(255, 107, 26, 0.3);
+  box-shadow: var(--ind-shadow-hover);
+  border-color: var(--accent-alpha-35);
+}
+
+.clickable:focus-visible {
+  outline: none;
+  box-shadow: var(--ind-focus-ring);
+  border-color: var(--accent);
+}
+
+/* --------------------------------------------------------------------------
+   2b. SIDEBAR ACTION BUTTONS
+   "Post a job" is the primary action, so it carries the amber CTA colour.
+   "Emergency" stays red because it communicates urgency.
+   -------------------------------------------------------------------------- */
+button[name="emergency"],
+button[name="post"] {
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 0.9rem 1.2rem;
+  align-self: stretch;
+  font: inherit;
+  font-size: var(--ind-text-md);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+  border-radius: var(--ind-radius-md);
+  cursor: pointer;
+  transition: var(--fixfast-ease);
 }
 
 button[name="emergency"] {
   margin-top: auto;
-  align-self: center;
-  background: rgba(220, 53, 69, 0.15);
-  border-radius: 19px;
-  color: #ff6b6b;
-  width: 100%;
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  font-variant: inherit;
-  font-weight: inherit;
-  font-stretch: inherit;
-  font-size: 29px;
-  line-height: inherit;
-  font-family: inherit;
-  font-optical-sizing: inherit;
-  font-variation-settings: inherit;
-  font-size-adjust: inherit;
-  font-kerning: inherit;
-  font-language-override: inherit;
-  font-feature-settings: inherit;
-  cursor: pointer;
-  text-align: center;
-  height: 10%;
-  transition: var(--fixfast-ease);
+  background: var(--status-danger-bg);
+  border: 1px solid var(--status-danger-border);
+  color: var(--status-danger);
 }
 
 button[name="emergency"]:hover {
-  background: rgba(220, 53, 69, 0.25);
-  border-color: rgba(220, 53, 69, 0.5);
+  background: var(--status-danger);
+  border-color: var(--status-danger);
+  color: #FFFFFF;
+  transform: translateY(-1px);
 }
 
 button[name="post"] {
-  margin: 5px 0px 0px;
-  align-self: center;
-  color: #4ade80;
-  border-radius: 19px;
-  border: 1px solid rgba(74, 222, 128, 0.3);
-  width: 100%;
-  font-style: inherit;
-  font-variant: inherit;
-  font-weight: inherit;
-  font-stretch: inherit;
-  font-size: 29px;
-  line-height: inherit;
-  font-family: inherit;
-  font-optical-sizing: inherit;
-  font-variation-settings: inherit;
-  font-size-adjust: inherit;
-  font-kerning: inherit;
-  font-language-override: inherit;
-  font-feature-settings: inherit;
-  cursor: pointer;
-  text-align: center;
-  height: 10%;
-  transition: var(--fixfast-ease);
+  margin-top: 10px;
+  background: linear-gradient(180deg, var(--ind-cta), var(--ind-cta-hover));
+  border: 1px solid var(--ind-cta);
+  color: var(--ind-cta-contrast);
+  box-shadow: 0 10px 22px var(--ind-cta-glow);
 }
 
 button[name="post"]:hover {
-  background: rgba(74, 222, 128, 0.15);
-  border-color: rgba(74, 222, 128, 0.5);
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+button[name="emergency"]:focus-visible,
+button[name="post"]:focus-visible {
+  outline: none;
+  box-shadow: var(--ind-focus-ring);
 }
 
 .main-view {
   height: 100%;
   max-height: 100%;
+  min-height: 0;
 }
 
 .main-view h2 {
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-weight: 800;
-  font-size: 2rem;
-  margin-top: -12px;
-  letter-spacing: -0.05em;
-  color: #FFFFFF;
-  margin-left: -9px;
-  margin-bottom: 0px;
-}
-
-.light .main-view h2 {
-  color: #0D0D0D;
+  font-size: 1.75rem;
+  letter-spacing: -0.03em;
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
 }
 
 .sidebar-slot {
   height: 100%;
+  min-height: 0;
 }
 
 .bottom-slot {
   min-height: 100px;
-  padding: 16px 24px;
+  padding: 16px 22px;
   justify-content: center;
 }
 
@@ -159,56 +161,45 @@ button[name="post"]:hover {
    ========================================================================== */
 .card-header {
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-size: 0.8rem;
+  font-size: var(--ind-text-xs);
   font-weight: 700;
-  color: #7A7A7A;
-  margin-bottom: 16px;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+  margin-bottom: 14px;
   text-transform: uppercase;
 }
 
 .card-flag {
-  font-size: 0.75rem;
+  font-size: var(--ind-text-xs);
   font-weight: 700;
-  color: #7A7A7A;
-  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
   margin-bottom: 4px;
 }
 
 .badge {
   display: inline-block;
-  padding: 10px 16px;
+  padding: 9px 16px;
   border: 1px solid var(--ind-border);
-  border-radius: 12px;
-  font-size: 0.85rem;
+  border-radius: var(--ind-radius-pill);
+  font-size: var(--ind-text-sm);
   font-weight: 700;
   width: fit-content;
-  background-color: rgba(31, 31, 31, 0.6);
-  color: #F5F5F7;
+  background-color: var(--ind-surface-raised);
+  color: var(--text-secondary);
   transition: var(--fixfast-ease);
 }
 
 .badge-highlight {
-  background-color: rgba(255, 107, 26, 0.12);
-  color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.3);
-}
-
-.light .badge {
-  background-color: #FFFFFF;
-  border-color: #E2E8F0;
-  color: #0D0D0D;
-}
-
-.light .badge-highlight {
-  background-color: rgba(255, 107, 26, 0.08);
-  color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.25);
+  background-color: var(--accent-alpha-12);
+  color: var(--accent-soft);
+  border-color: var(--accent-alpha-35);
 }
 
 .card-summary {
-  font-size: 0.85rem;
-  color: #7A7A7A;
-  margin: 12px 0 0 4px;
+  font-size: var(--ind-text-sm);
+  color: var(--text-muted);
+  margin: 12px 0 0 2px;
 }
 
 /* ==========================================================================
@@ -219,27 +210,27 @@ button[name="post"]:hover {
   width: 100%;
   min-height: 0;
   border: none;
+  background: transparent;
   resize: none;
   font-family: inherit;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  color: #FFFFFF;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: var(--text-primary);
   outline: none;
-  margin-top: -4px;
 }
 
-.light .workspace-textarea {
-  color: #0D0D0D;
+.workspace-textarea::placeholder {
+  color: var(--text-muted);
 }
 
 .chat-box {
   flex: 1;
   overflow-y: auto;
   border: 1px solid var(--ind-border);
-  border-radius: 16px;
+  border-radius: var(--ind-radius-md);
   padding: 16px;
-  background-color: rgba(31, 31, 31, 0.4);
-  margin-bottom: 16px;
+  background-color: var(--ind-surface-alt);
+  margin-bottom: 14px;
   max-height: 350px;
   display: flex;
   flex-direction: column;
@@ -254,36 +245,37 @@ button[name="post"]:hover {
   word-wrap: break-word;
   line-height: 1.45;
   font-size: 0.95rem;
+  color: var(--text-secondary);
 }
 
 .chat-msg strong {
   display: block;
   margin-bottom: 2px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: var(--ind-text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .chat-msg--user {
-  background: rgba(59, 130, 246, 0.15);
-  border-left: 3px solid #3b82f6;
-  color: #F5F5F7;
+  background: var(--accent-alpha-12);
+  border-left: 3px solid var(--accent);
   align-self: flex-end;
   border-radius: 14px 4px 14px 14px;
 }
 
 .chat-msg--assistant {
-  background: rgba(31, 31, 31, 0.4);
-  border-left: 3px solid #7A7A7A;
-  color: #F5F5F7;
+  background: var(--ind-surface-raised);
+  border-left: 3px solid var(--border-strong);
   align-self: flex-start;
   border-radius: 4px 14px 14px 14px;
 }
 
 .chat-msg--system {
-  background: rgba(255, 107, 26, 0.1);
-  border-left: 3px solid #FF6B1A;
+  background: var(--ind-cta-alpha-10);
+  border-left: 3px solid var(--ind-cta);
   font-style: italic;
-  color: #F5F5F7;
   align-self: flex-start;
   border-radius: 4px 14px 14px 14px;
 }
@@ -296,82 +288,71 @@ button[name="post"]:hover {
 .chat-form input {
   flex: 1;
   width: 100%;
-  padding: 14px 20px;
+  padding: 13px 18px;
   border: 1px solid var(--ind-border);
-  border-radius: 16px;
-  font-size: 1rem;
+  border-radius: var(--ind-radius-md);
+  font-size: 0.98rem;
   outline: none;
   box-sizing: border-box;
-  background: rgba(31, 31, 31, 0.4);
-  color: #FFFFFF;
+  background: var(--ind-surface-raised);
+  color: var(--text-primary);
+  transition: var(--fixfast-ease);
 }
 
-.light .chat-form input {
-  background: #FFFFFF;
-  border-color: #E2E8F0;
-  color: #0D0D0D;
+.chat-form input::placeholder {
+  color: var(--text-muted);
 }
 
-.light .chat-form input::placeholder {
-  color: #555555;
+.chat-form input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--ind-focus-ring);
 }
 
 .chat-btn {
   padding: 0 24px;
-  background-color: #FF6B1A;
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
   color: #FFFFFF;
-  border: 1px solid #FF6B1A;
-  border-radius: 16px;
-  font-weight: bold;
+  border: 1px solid var(--accent);
+  border-radius: var(--ind-radius-md);
+  font-weight: 800;
   cursor: pointer;
   transition: var(--fixfast-ease);
 }
 
 .chat-btn:hover {
-  background-color: #e85d14;
-  border-color: #e85d14;
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
-.light .chat-box {
-  background: #FFFFFF;
-  border-color: #E2E8F0;
-}
-
-.light .chat-msg--user {
-  background: #FFF3E0;
-  border-left: 3px solid #FF6B1A;
-  color: #0D0D0D;
-}
-
-.light .chat-msg--assistant {
-  background: #E3F2FD;
-  border-left: 3px solid #3b82f6;
-  color: #0D0D0D;
-}
-
-.light .chat-msg--system {
-  background: #E3F2FD;
-  border-left: 3px solid #3b82f6;
-  color: #0D0D0D;
-}
-
-.light .chat-form input {
-  background: #FFFFFF;
-  border-color: #E2E8F0;
-  color: #0D0D0D;
-}
-
-.light .chat-form input::placeholder {
-  color: #555555;
+.chat-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ind-focus-ring);
 }
 
 .title {
-  padding: 0px;
+  padding: 0;
+  margin: 0;
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-size: 30px;
-  margin-top: -8px;
-  text-shadow: 0.5px 0px 0px rgba(255, 255, 255, 0.1);
+  font-size: 1.6rem;
   font-weight: 800;
-  margin-bottom: 0px;
-  color: #FFFFFF;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   5. RESPONSIVE
+   ========================================================================== */
+@media (max-width: 1080px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    height: auto;
+  }
+
+  .grid-main,
+  .grid-bottom,
+  .grid-sidebar {
+    grid-column: 1;
+    grid-row: auto;
+  }
 }

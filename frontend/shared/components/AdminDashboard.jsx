@@ -43,7 +43,7 @@ export default function AdminDashboard() {
         <div className="dash-brand">
           <div className="dash-brand__mark">D</div>
           <div className="dash-brand__copy">
-            <div className="dash-brand__name">Handy Man Admin</div>
+            <div className="dash-brand__name">Kamigo Admin</div>
             <div className="dash-brand__sub">Analytics Control Panel</div>
           </div>
         </div>

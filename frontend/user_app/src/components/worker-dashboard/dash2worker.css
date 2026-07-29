@@ -1,42 +1,52 @@
 /* ==========================================================================
+   KAMIGO — WORKER DASHBOARD (4-PANE VIEW)
+   Colours are token-driven; light mode is inherited from global.css.
+   ========================================================================== */
+
+/* ==========================================================================
    1. 4-PANE LAYOUT ARCHITECTURE CANVAS GRID
    ========================================================================== */
 .dashboard-grid-4pane {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  grid-template-rows: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 380px;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 16px;
   width: 100%;
   height: calc(100vh - 120px);
   padding: 16px;
   box-sizing: border-box;
-  background-color: var(--ind-concrete);
+  background-color: transparent;
 }
 
 .grid-main {
-  grid-column: 1;
+  grid-column: 1 / span 2;
   grid-row: 1;
   display: flex;
+  min-width: 0;
+  min-height: 0;
 }
 
 .grid-sidebar {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1 / span 2;
   display: flex;
+  min-width: 0;
+  min-height: 0;
 }
 
+/* Real grid columns instead of the old margin: 50% hack */
 .grid-bottom-left {
   grid-column: 1;
   grid-row: 2;
   display: flex;
-  margin-right: 50%;
+  min-width: 0;
 }
 
 .grid-bottom-right {
-  grid-column: 1;
+  grid-column: 2;
   grid-row: 2;
   display: flex;
-  margin-left: 50%;
+  min-width: 0;
 }
 
 /* ==========================================================================
@@ -45,13 +55,15 @@
 .dashboard-card {
   background-color: var(--ind-surface);
   border: 1px solid var(--ind-border);
-  border-radius: 12px;
+  border-radius: var(--ind-radius-lg);
   width: 100%;
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 22px;
   box-sizing: border-box;
+  box-shadow: var(--ind-shadow-tight);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  min-width: 0;
 }
 
 .clickable {
@@ -60,15 +72,22 @@
 
 .clickable:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-  border-color: rgba(255, 107, 26, 0.3);
+  box-shadow: var(--ind-shadow-hover);
+  border-color: var(--accent-alpha-35);
+}
+
+.clickable:focus-visible {
+  outline: none;
+  box-shadow: var(--ind-focus-ring);
+  border-color: var(--accent);
 }
 
 .card-header {
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-size: 0.75rem;
+  font-size: var(--ind-text-xs);
   font-weight: 700;
-  color: #7A7A7A;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
   margin-bottom: 12px;
   text-transform: uppercase;
 }
@@ -79,14 +98,16 @@
 .main-panel h2 {
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-weight: 800;
-  font-size: 1.8rem;
+  font-size: 1.75rem;
+  letter-spacing: -0.03em;
   margin: 0 0 8px 0;
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .panel-desc {
   font-size: 0.95rem;
-  color: #7A7A7A;
+  line-height: 1.55;
+  color: var(--text-muted);
   margin-bottom: 16px;
 }
 
@@ -99,24 +120,43 @@
 
 .badge {
   display: inline-block;
-  padding: 10px 18px;
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 14px;
-  font-size: 0.85rem;
+  padding: 9px 16px;
+  border: 1px solid var(--ind-border);
+  border-radius: var(--ind-radius-pill);
+  font-size: var(--ind-text-sm);
   font-weight: 700;
-  background-color: rgba(31, 31, 31, 0.6);
+  background-color: var(--ind-surface-raised);
   width: fit-content;
-  color: #F5F5F7;
+  color: var(--text-secondary);
 }
 
 .badge-highlight {
-  background-color: rgba(255, 107, 26, 0.12);
-  color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.3);
+  background-color: var(--accent-alpha-12);
+  color: var(--accent-soft);
+  border-color: var(--accent-alpha-35);
 }
 
 .card-summary {
-  font-size: 0.85rem;
-  color: #7A7A7A;
-  margin: 8px 0 0 4px;
+  font-size: var(--ind-text-sm);
+  color: var(--text-muted);
+  margin: 8px 0 0 2px;
+}
+
+/* ==========================================================================
+   4. RESPONSIVE
+   ========================================================================== */
+@media (max-width: 1180px) {
+  .dashboard-grid-4pane {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
+    height: auto;
+  }
+
+  .grid-main,
+  .grid-sidebar,
+  .grid-bottom-left,
+  .grid-bottom-right {
+    grid-column: 1;
+    grid-row: auto;
+  }
 }
