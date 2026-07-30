@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func, case
 from src.core import model
 import logging
-from sqlalchemy import text
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -59,8 +59,21 @@ def get_all_jobs_for_customer(db: Session, customer_id: int, skip: int = 0, limi
 
 def get_jobs_by_status(db: Session, customer_id: int, status: str, skip: int = 0, limit: int = 50):
     """Fetch only specific job fields for a customer filtered by status."""
+    match_counts_subq = (
+        select(
+            model.JobWorkerMatch.job_id,
+            func.count(model.JobWorkerMatch.id).label("matched_count"),
+            func.sum(
+                case((model.JobWorkerMatch.is_interested == True, 1), else_=0)
+            ).label("interested_count"),
+        )
+        .where(model.JobWorkerMatch.is_active == True)
+        .group_by(model.JobWorkerMatch.job_id)
+        .subquery()
+    )
+
     return db.query(
-        model.Job.id,                # Ensure the primary key is passed to the frontend
+        model.Job.id,
         model.Job.booking_chat_id,
         model.Job.title,
         model.Job.description,
@@ -69,14 +82,18 @@ def get_jobs_by_status(db: Session, customer_id: int, status: str, skip: int = 0
         model.Job.contact_phone,
         model.Job.attachments,
         model.Job.address_text,
-        model.Job.latitude,  
+        model.Job.latitude,
         model.Job.longitude,
-        model.Job.updated_at
+        model.Job.updated_at,
+        func.coalesce(match_counts_subq.c.matched_count, 0).label("matched_count"),
+        func.coalesce(match_counts_subq.c.interested_count, 0).label("interested_count"),
+    ).outerjoin(
+        match_counts_subq, model.Job.id == match_counts_subq.c.job_id
     ).filter(
         model.Job.customer_id == customer_id,
-        model.Job.status == status
+        model.Job.status == status,
     ).offset(skip).limit(limit).all()
-# In job_manager.py
+
 
 def delete_job(db: Session, job_id: int, customer_id: int):
     """
