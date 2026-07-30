@@ -6,16 +6,6 @@ import "./dash1board.css";
 export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
-  const [isManualMode, setIsManualMode] = useState(false);
-
-  const [manualTitle, setManualTitle] = useState("");
-  const [manualCategory, setManualCategory] = useState("");
-  const [manualBudget, setManualBudget] = useState("");
-  const [manualDescription, setManualDescription] = useState("");
-  const [manualContactName, setManualContactName] = useState("");
-  const [manualContactPhone, setManualContactPhone] = useState("");
-
-  // 🗺️ MAP STATES
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState("");
@@ -58,11 +48,8 @@ export default function Dash1Board({ viewSlug }) {
     sendCustomerMessage,
     turns_remaining,
     is_complete,
-    ai_response,
     current_tags,
     categories,
-    createJobDirect,
-    isSubmitting,
   } = useCustomerDashboardData();
 
   const scrollRef = useRef(null);
@@ -338,10 +325,10 @@ export default function Dash1Board({ viewSlug }) {
           </span>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <h2 style={{ margin: 0 }}>AI CHAT TERMINAL</h2>
-            <button
-              type="button"
-              onClick={() => setIsManualMode(true)}
-              style={{
+             <button
+               type="button"
+               onClick={() => navigate('/customer/bookings/JobDescriptionWorkspace')}
+               style={{
                 background: "#FF6B1A",
                 color: "#0D0D0D",
                 border: "none",
@@ -408,241 +395,6 @@ export default function Dash1Board({ viewSlug }) {
         ) : (
           <span className="badge">AI Dispatch running asleep below...</span>
         )}
-      </div>
-    );
-  };
-
-  const renderManualJobForm = () => {
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      if (!manualTitle.trim() || !manualDescription.trim()) {
-        alert("Title and description are required.");
-        return;
-      }
-
-      await createJobDirect({
-        title: manualTitle.trim(),
-        category: manualCategory.trim(),
-        budget: manualBudget ? parseFloat(manualBudget) : null,
-        description: manualDescription.trim(),
-        contactName: manualContactName.trim(),
-        contactPhone: manualContactPhone.trim(),
-      });
-
-      setManualTitle("");
-      setManualCategory("");
-      setManualBudget("");
-      setManualDescription("");
-      setManualContactName(userName || "");
-      setManualContactPhone(userCont || "");
-      setIsManualMode(false);
-    };
-
-    return (
-      <div className="dashboard-card main-view" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span className="card-flag">MANUAL JOB CREATION</span>
-          <button
-            type="button"
-            onClick={() => setIsManualMode(false)}
-            style={{
-              background: "var(--k-raise)",
-              color: "var(--k-ink)",
-              border: "1px solid var(--k-line)",
-              borderRadius: "8px",
-              padding: "8px 14px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              fontSize: "12px",
-              transition: "transform 120ms ease, opacity 120ms ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = 0.85;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = 1;
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = "scale(0.95)";
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-          >
-            ← Back to AI Chat
-          </button>
-        </div>
-
-        <h2 style={{ margin: 0 }}>Create Job Manually</h2>
-        <p style={{ margin: "0 0 12px", color: "var(--k-ink-3)", fontSize: "13px" }}>
-          Skip the AI chat and post a job directly to the marketplace.
-        </p>
-
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div style={{ display: "grid", gap: "14px", gridTemplateColumns: "1fr 1fr" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--k-ink)" }}>Job Title *</label>
-              <input
-                type="text"
-                value={manualTitle}
-                onChange={(e) => setManualTitle(e.target.value)}
-                placeholder="e.g. Kitchen sink installation"
-                required
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid var(--k-border-strong)",
-                  background: "var(--k-field)",
-                  color: "var(--k-ink)",
-                  font: "inherit",
-                  outline: "none",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--k-ink)" }}>Category / Skill</label>
-              <input
-                type="text"
-                value={manualCategory}
-                onChange={(e) => setManualCategory(e.target.value)}
-                placeholder="e.g. Plumbing"
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid var(--k-border-strong)",
-                  background: "var(--k-field)",
-                  color: "var(--k-ink)",
-                  font: "inherit",
-                  outline: "none",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--k-ink)" }}>Budget / Pay Rate</label>
-              <input
-                type="number"
-                value={manualBudget}
-                onChange={(e) => setManualBudget(e.target.value)}
-                placeholder="e.g. 5000"
-                min="0"
-                step="0.01"
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid var(--k-border-strong)",
-                  background: "var(--k-field)",
-                  color: "var(--k-ink)",
-                  font: "inherit",
-                  outline: "none",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--k-ink)" }}>Contact Phone</label>
-              <input
-                type="tel"
-                value={manualContactPhone}
-                onChange={(e) => setManualContactPhone(e.target.value)}
-                placeholder="+977 98XXXXXXXX"
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid var(--k-border-strong)",
-                  background: "var(--k-field)",
-                  color: "var(--k-ink)",
-                  font: "inherit",
-                  outline: "none",
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--k-ink)" }}>Full Description *</label>
-            <textarea
-              value={manualDescription}
-              onChange={(e) => setManualDescription(e.target.value)}
-              placeholder="Describe the job in detail. This is what workers will see."
-              rows={6}
-              required
-              style={{
-                padding: "12px",
-                borderRadius: "12px",
-                border: "1px solid var(--k-border-strong)",
-                background: "var(--k-field)",
-                color: "var(--k-ink)",
-                font: "inherit",
-                outline: "none",
-                resize: "vertical",
-              }}
-            />
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-            <button
-              type="button"
-              onClick={() => setIsManualMode(false)}
-              style={{
-                background: "var(--k-raise)",
-                color: "var(--k-ink)",
-                border: "1px solid var(--k-line)",
-                borderRadius: "8px",
-                padding: "10px 16px",
-                fontWeight: "bold",
-                cursor: "pointer",
-                fontSize: "13px",
-                transition: "transform 120ms ease, opacity 120ms ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = 0.85;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = 1;
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = "scale(0.95)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                background: "#FF6B1A",
-                color: "#0D0D0D",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 20px",
-                fontWeight: 700,
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-                fontSize: "13px",
-                opacity: isSubmitting ? 0.6 : 1,
-                transition: "transform 120ms ease, opacity 120ms ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = isSubmitting ? 0.6 : 1;
-              }}
-              onMouseDown={(e) => {
-                if (!isSubmitting) e.currentTarget.style.transform = "scale(0.95)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              {isSubmitting ? "Creating..." : "Create Job"}
-            </button>
-          </div>
-        </form>
       </div>
     );
   };
@@ -1053,10 +805,6 @@ export default function Dash1Board({ viewSlug }) {
   };
 
   const resolveAndRenderModule = (slotKey) => {
-    if (isManualMode && slotKey === "main") {
-      return renderManualJobForm();
-    }
-
     const moduleName = slots[slotKey];
     switch (moduleName) {
       case "AiChatTerminal":
