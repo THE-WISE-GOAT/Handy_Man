@@ -143,11 +143,31 @@ export default function Dash1Worker({ viewSlug }) {
                     <p style={{ margin: '0 0 6px 0', fontSize: '0.85em', opacity: 0.8 }}>
                       {job.description?.slice(0, 120)}{job.description?.length > 120 ? '...' : ''}
                     </p>
-                    <div style={{ display: 'flex', gap: '12px', fontSize: '0.8em' }}>
+                    <div style={{ display: 'flex', gap: '12px', fontSize: '0.8em', marginBottom: '8px' }}>
                       <span style={{ color: 'var(--k-orange-ink)', fontWeight: 600 }}>Match: {Math.round(job.match_score)}%</span>
                       <span style={{ color: 'var(--k-ink)' }}>Interested: {job.interested_count || 0}</span>
                       <span style={{ color: 'var(--k-ink-3)' }}>Status: {job.status}</span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        expressInterest(job.job_id, workerChatId);
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        backgroundColor: job.is_interested ? '#FF6B1A' : 'transparent',
+                        color: job.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)',
+                        border: job.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)',
+                        borderRadius: '6px',
+                        cursor: job.is_interested ? 'default' : 'pointer',
+                        fontWeight: 600,
+                        fontSize: '13px'
+                      }}
+                      disabled={job.is_interested}
+                    >
+                      {job.is_interested ? 'Interested ✓' : "I'm Interested"}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -203,20 +223,20 @@ export default function Dash1Worker({ viewSlug }) {
                 <p className="panel-desc">{activeJob.description || activeJob.job_description || "No description available."}</p>
                 <button
                   type="button"
-                  onClick={() => expressInterest(activeJob.booking_chat_id || activeJob.id, workerChatId)}
+                  onClick={() => expressInterest(activeJob.job_id, workerChatId)}
                   style={{
                     marginTop: '16px',
                     padding: '10px 20px',
-                    backgroundColor: isInterested ? '#FF6B1A' : 'transparent',
-                    color: isInterested ? '#0D0D0D' : 'var(--k-orange-ink)',
-                    border: isInterested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)',
+                    backgroundColor: activeJob.is_interested ? '#FF6B1A' : 'transparent',
+                    color: activeJob.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)',
+                    border: activeJob.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontWeight: 600,
                     fontSize: '14px'
                   }}
                 >
-                  {isInterested ? '✓ Interested' : "I'm Interested"}
+                  {activeJob.is_interested ? '✓ Interested' : "I'm Interested"}
                 </button>
               </>
             ) : (
