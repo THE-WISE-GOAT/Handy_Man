@@ -1,11 +1,12 @@
 // components/worker-dashboard/dash1worker.jsx
 import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWorkerDashboardData } from "./useWorkerDashboardData";
 import "./dash1worker.css";
 
 export default function Dash1Worker({ viewSlug }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const {
     workspaceSlots,
@@ -14,6 +15,9 @@ export default function Dash1Worker({ viewSlug }) {
     bidsPipelineText,
     jobSpecsText,
     activeJob,
+    jobDetailModal,
+    openJobDetailModal,
+    closeJobDetailModal,
     isInterested,
     expressInterest,
     workerChatId,
@@ -26,7 +30,16 @@ export default function Dash1Worker({ viewSlug }) {
     fetchMatchedJobs();
   }, [fetchMatchedJobs]);
 
-  // Route state synchronization layer
+  useEffect(() => {
+    const jobIdParam = searchParams.get("jobId");
+    if (!activeJob && jobIdParam) {
+      const found = matchedJobs.find((j) => String(j.job_id) === String(jobIdParam));
+      if (found) {
+        setActiveJob(found);
+      }
+    }
+  }, [searchParams, matchedJobs, activeJob, setActiveJob]);
+
   useEffect(() => {
     if (!viewSlug) return;
 
@@ -131,7 +144,12 @@ export default function Dash1Worker({ viewSlug }) {
                     }}
                     onClick={() => {
                       setActiveJob(job);
-                      swapWorkspaceSlots("bottom");
+                      openJobDetailModal(job);
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.set("jobId", String(job.job_id));
+                        return next;
+                      });
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -312,6 +330,136 @@ export default function Dash1Worker({ viewSlug }) {
       <div className="grid-sidebar">
         {resolveModuleBySlot("sidebar")}
       </div>
+
+      {jobDetailModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeJobDetailModal();
+          }}
+        >
+          <div
+            style={{
+              background: "var(--k-raise)",
+              border: "1px solid var(--k-line)",
+              borderRadius: "16px",
+              boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
+              width: "520px",
+              maxWidth: "92%",
+              maxHeight: "88vh",
+              overflowY: "auto",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+              color: "var(--k-ink)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "1px",
+                  color: "var(--k-orange-ink)",
+                }}
+              >
+                Job Details
+              </span>
+              <button
+                type="button"
+                onClick={closeJobDetailModal}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--k-ink-3)",
+                  fontSize: "18px",
+                  cursor: "pointer",
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <h2 style={{ margin: 0 }}>
+              {jobDetailModal.title || "Untitled Job"}
+            </h2>
+            <p style={{ margin: 0, fontSize: "13px", color: "var(--k-ink-3)" }}>
+              Job ID: {jobDetailModal.booking_chat_id || jobDetailModal.job_id || "N/A"}
+            </p>
+            <p
+              style={{
+                margin: 0,
+                fontSize: "14px",
+                lineHeight: "1.55",
+                color: "var(--k-ink)",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {jobDetailModal.description || "No description available."}
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "16px",
+                fontSize: "13px",
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ color: "var(--k-orange-ink)", fontWeight: 600 }}>
+                Match: {Math.round(jobDetailModal.match_score || 0)}%
+              </span>
+              <span>Rank: #{jobDetailModal.match_rank || "-"}</span>
+              <span>Status: {jobDetailModal.status || "N/A"}</span>
+              <span>
+                Interested: {jobDetailModal.interested_count || 0}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                alert("Joining chat is not implemented yet.");
+              }}
+              style={{
+                marginTop: "8px",
+                padding: "10px 18px",
+                background: "#FF6B1A",
+                color: "#0D0D0D",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: "14px",
+                alignSelf: "flex-start",
+              }}
+            >
+              Join in Chat
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

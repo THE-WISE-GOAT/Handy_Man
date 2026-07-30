@@ -22,7 +22,7 @@ export const createWorkspaceZlice = (set, get) => ({
   // ==========================================
   swapWorkspaceSlots: (clickedSlotName) =>
     set((state) => {
-      if (clickedSlotName === "main") return {}; // Ignore if already main
+      if (clickedSlotName === "main") return {};
 
       const outgoingMain = state.workspaceSlots.main;
       const incomingTarget = state.workspaceSlots[clickedSlotName];
@@ -38,11 +38,15 @@ export const createWorkspaceZlice = (set, get) => ({
 
   workerProfession: "plumber",
   socket: null,
-  activeJob: null, // New state for the incoming job
+  activeJob: null,
+  jobDetailModal: null,
   isInterested: false,
-  matchedJobs: [], // Jobs matched to this worker via semantic matching
+  matchedJobs: [],
 
   setActiveJob: (job) => set({ activeJob: job }),
+  openJobDetailModal: (job) =>
+    set({ jobDetailModal: job, activeJob: job }),
+  closeJobDetailModal: () => set({ jobDetailModal: null }),
 
   fetchMatchedJobs: async () => {
     try {
@@ -50,8 +54,8 @@ export const createWorkspaceZlice = (set, get) => ({
       const response = await fetch("http://127.0.0.1:8000/jobs/for-worker", {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${token}`
-        }
+          "Authorization": `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
@@ -69,30 +73,30 @@ export const createWorkspaceZlice = (set, get) => ({
   },
 
   connectToDispatch: (workerChatId, token) => {
-    // Connect using the token as a query param
-    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${workerChatId}?token=${token}`);
+    const socket = new WebSocket(
+      `ws://127.0.0.1:8000/ws/${workerChatId}?token=${token}`
+    );
 
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
       if (message.type === "NEW_JOB_NOTIFICATION") {
-        // This will update the state, which your React component will see
         set({ activeJob: message.data });
       }
     };
-    
+
     set({ socket });
   },
-  
+
   expressInterest: async (jobId, workerChatId) => {
     const newInterestState = true;
 
     const payload = {
       type: "TOGGLE_INTEREST",
-      data: { job_id: jobId, worker_chat_id: workerChatId, interested: newInterestState }
+      data: { job_id: jobId, worker_chat_id: workerChatId, interested: newInterestState },
     };
 
     set((state) => ({
-      matchedJobs: state.matchedJobs.map(job => {
+      matchedJobs: state.matchedJobs.map((job) => {
         if (job.job_id !== jobId) return job;
         return {
           ...job,
@@ -113,13 +117,13 @@ export const createWorkspaceZlice = (set, get) => ({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ worker_chat_id: workerChatId, interested: newInterestState })
+          body: JSON.stringify({ worker_chat_id: workerChatId, interested: newInterestState }),
         });
         if (!res.ok) {
           set((state) => ({
-            matchedJobs: state.matchedJobs.map(job => {
+            matchedJobs: state.matchedJobs.map((job) => {
               if (job.job_id !== jobId) return job;
               return {
                 ...job,
@@ -133,15 +137,15 @@ export const createWorkspaceZlice = (set, get) => ({
           const data = await res.json();
           if (data.interested_count !== undefined) {
             set((state) => ({
-              matchedJobs: state.matchedJobs.map(job =>
+              matchedJobs: state.matchedJobs.map((job) =>
                 job.job_id === jobId ? { ...job, interested_count: data.interested_count } : job
-              )
+              ),
             }));
           }
         }
       } catch (error) {
         set((state) => ({
-          matchedJobs: state.matchedJobs.map(job => {
+          matchedJobs: state.matchedJobs.map((job) => {
             if (job.job_id !== jobId) return job;
             return {
               ...job,
@@ -155,8 +159,6 @@ export const createWorkspaceZlice = (set, get) => ({
       }
     }
   },
-  
-
 });
 
 
