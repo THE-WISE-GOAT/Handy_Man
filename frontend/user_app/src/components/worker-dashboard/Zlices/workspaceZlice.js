@@ -84,13 +84,24 @@ export const createWorkspaceZlice = (set, get) => ({
   },
   
   expressInterest: async (jobId, workerChatId) => {
-    const newInterestState = !get().isInterested;
-    set({ isInterested: newInterestState });
+    const newInterestState = true;
 
     const payload = {
       type: "TOGGLE_INTEREST",
       data: { job_id: jobId, worker_chat_id: workerChatId, interested: newInterestState }
     };
+
+    set((state) => ({
+      matchedJobs: state.matchedJobs.map(job => {
+        if (job.job_id !== jobId) return job;
+        return {
+          ...job,
+          is_interested: newInterestState,
+          interested_count: (job.interested_count || 0) + 1,
+        };
+      }),
+      isInterested: newInterestState,
+    }));
 
     const socket = get().socket;
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -98,7 +109,7 @@ export const createWorkspaceZlice = (set, get) => ({
     } else {
       try {
         const token = localStorage.getItem("handy_man_access_token");
-        await fetch(`http://127.0.0.1:8000/jobs/${jobId}/interest`, {
+        const res = await fetch(`http://127.0.0.1:8000/jobs/${jobId}/interest`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -106,7 +117,40 @@ export const createWorkspaceZlice = (set, get) => ({
           },
           body: JSON.stringify({ worker_chat_id: workerChatId, interested: newInterestState })
         });
+        if (!res.ok) {
+          set((state) => ({
+            matchedJobs: state.matchedJobs.map(job => {
+              if (job.job_id !== jobId) return job;
+              return {
+                ...job,
+                is_interested: !newInterestState,
+                interested_count: Math.max((job.interested_count || 0) - 1, 0),
+              };
+            }),
+            isInterested: !newInterestState,
+          }));
+        } else {
+          const data = await res.json();
+          if (data.interested_count !== undefined) {
+            set((state) => ({
+              matchedJobs: state.matchedJobs.map(job =>
+                job.job_id === jobId ? { ...job, interested_count: data.interested_count } : job
+              )
+            }));
+          }
+        }
       } catch (error) {
+        set((state) => ({
+          matchedJobs: state.matchedJobs.map(job => {
+            if (job.job_id !== jobId) return job;
+            return {
+              ...job,
+              is_interested: !newInterestState,
+              interested_count: Math.max((job.interested_count || 0) - 1, 0),
+            };
+          }),
+          isInterested: !newInterestState,
+        }));
         console.error("❌ Failed to express interest:", error);
       }
     }
