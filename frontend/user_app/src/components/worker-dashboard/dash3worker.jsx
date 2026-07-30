@@ -870,9 +870,9 @@ export default function Dash3Worker({ viewSlug }) {
               <button
                 type="submit"
                 style={{
-                  background: "#FF6B1A", color: "#FFFFFF", border: "none",
+                  background: "#FF6B1A", color: "#0D0D0D", border: "none",
                   borderRadius: "6px", padding: "0 12px", font: "inherit",
-                  fontSize: "11px", fontWeight: "bold", cursor: "pointer"
+                  fontSize: "11px", fontWeight: 700, cursor: "pointer"
                 }}
               >
                 FIND
@@ -884,7 +884,7 @@ export default function Dash3Worker({ viewSlug }) {
               onClick={handleModalLiveTracking}
               title="Snap to My Current Position"
                 style={{
-                  background: "rgba(59, 130, 246, 0.15)", border: "1px solid rgba(59, 130, 246, 0.3)", borderRadius: "6px",
+                  background: "var(--k-wash)", border: "1px solid rgba(255, 107, 26, 0.4)", borderRadius: "6px",
                   padding: "0 10px", cursor: "pointer", fontSize: "14px", display: "flex",
                   alignItems: "center", justifyContent: "center"
                 }}
@@ -929,9 +929,9 @@ export default function Dash3Worker({ viewSlug }) {
               type="button"
               onClick={confirmMapLocation}
                 style={{
-                  flex: 1, padding: "8px", background: "rgba(74, 222, 128, 0.15)", border: "1px solid rgba(74, 222, 128, 0.3)",
-                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer", color: "#4ade80"
+                  flex: 1, padding: "8px", background: "#FF6B1A", border: "1px solid #FF6B1A",
+                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: 700,
+                  cursor: "pointer", color: "#0D0D0D"
                 }}
               onMouseDown={(e) => e.currentTarget.style.transform = "translate(2px, 2px)"}
               onMouseUp={(e) => e.currentTarget.style.transform = "none"}

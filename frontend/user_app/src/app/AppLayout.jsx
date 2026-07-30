@@ -178,7 +178,7 @@ export default function AppLayout({ role = "customer" }) {
   return (
     <div className="fixfast-page">
       <FixFastNavbar
-        brandTitle="Handy Man"
+        brandTitle="Kamigo"
         brandEyebrow={
           role === "worker"
             ? "Unified Worker Workspace"
@@ -222,14 +222,14 @@ export default function AppLayout({ role = "customer" }) {
         {joinError && (
           <div style={{
             position: "fixed", top: "1rem", right: "1rem", zIndex: 99999,
-            background: "rgba(220, 53, 69, 0.15)", border: "1px solid rgba(220, 53, 69, 0.3)", borderRadius: "8px",
-            padding: "0.8rem 1rem", maxWidth: "400px", font: "inherit", fontSize: "0.85rem", color: "#ff6b6b"
+            background: "var(--k-alert-wash)", border: "1px solid rgba(229, 72, 77, 0.45)", borderRadius: "8px",
+            padding: "0.8rem 1rem", maxWidth: "400px", font: "inherit", fontSize: "0.85rem", color: "var(--k-alert-ink)"
           }}>
             <strong>Error:</strong> {joinError}
             <button
               type="button"
               onClick={() => setJoinError("")}
-              style={{ marginLeft: "0.8rem", border: "none", background: "transparent", cursor: "pointer", fontWeight: "bold", color: "#ff6b6b" }}
+              style={{ marginLeft: "0.8rem", border: "none", background: "transparent", cursor: "pointer", fontWeight: 700, color: "var(--k-alert-ink)" }}
             >
               ✕
             </button>

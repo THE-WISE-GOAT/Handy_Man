@@ -123,10 +123,10 @@ export default function Dash1Worker({ viewSlug }) {
                   <div
                     key={job.job_id}
                     style={{
-                      border: '1px solid #555',
+                      border: '1px solid var(--k-line)',
                       borderRadius: '8px',
                       padding: '12px',
-                      backgroundColor: '#1a1a1a',
+                      backgroundColor: 'var(--k-raise)',
                       cursor: 'pointer',
                     }}
                     onClick={() => {
@@ -136,7 +136,7 @@ export default function Dash1Worker({ viewSlug }) {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                       <strong style={{ fontSize: '1em' }}>{job.title}</strong>
-                      <span style={{ fontSize: '0.8em', color: '#4db8ff', border: '1px solid #555', padding: '2px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '0.8em', color: 'var(--k-orange-ink)', border: '1px solid rgba(255, 107, 26, 0.4)', padding: '2px 6px', borderRadius: '4px' }}>
                         Rank #{job.match_rank}
                       </span>
                     </div>
@@ -144,9 +144,9 @@ export default function Dash1Worker({ viewSlug }) {
                       {job.description?.slice(0, 120)}{job.description?.length > 120 ? '...' : ''}
                     </p>
                     <div style={{ display: 'flex', gap: '12px', fontSize: '0.8em' }}>
-                      <span style={{ color: '#4CAF50' }}>Match: {Math.round(job.match_score)}%</span>
-                      <span style={{ color: '#ff9800' }}>Interested: {job.interested_count || 0}</span>
-                      <span style={{ color: '#aaa' }}>Status: {job.status}</span>
+                      <span style={{ color: 'var(--k-orange-ink)', fontWeight: 600 }}>Match: {Math.round(job.match_score)}%</span>
+                      <span style={{ color: 'var(--k-ink)' }}>Interested: {job.interested_count || 0}</span>
+                      <span style={{ color: 'var(--k-ink-3)' }}>Status: {job.status}</span>
                     </div>
                   </div>
                 ))}
@@ -207,12 +207,12 @@ export default function Dash1Worker({ viewSlug }) {
                   style={{
                     marginTop: '16px',
                     padding: '10px 20px',
-                    backgroundColor: isInterested ? '#4CAF50' : '#2196F3',
-                    color: '#fff',
-                    border: 'none',
+                    backgroundColor: isInterested ? '#FF6B1A' : 'transparent',
+                    color: isInterested ? '#0D0D0D' : 'var(--k-orange-ink)',
+                    border: isInterested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)',
                     borderRadius: '6px',
                     cursor: 'pointer',
-                    fontWeight: 'bold',
+                    fontWeight: 600,
                     fontSize: '14px'
                   }}
                 >

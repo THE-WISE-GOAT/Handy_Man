@@ -64,7 +64,7 @@ export default function HomePage({ onNavigate }) {
             <span className="ind-brand__mark">HM</span>
             <span className="ind-brand__copy">
               <span className="ind-brand__eyebrow">On-Demand Local Works</span>
-              <span className="ind-brand__name">Handy Man Dispatch</span>
+              <span className="ind-brand__name">Kamigo Dispatch</span>
             </span>
           </a>
 
@@ -257,7 +257,7 @@ export default function HomePage({ onNavigate }) {
 
       <footer className="ind-footer">
         <div className="ind-container ind-footer__bar">
-          <span className="ind-footer__meta">Handy Man Dispatch</span>
+          <span className="ind-footer__meta">Kamigo Dispatch</span>
           <span>
             Industrial technical layout built for local home service operations.
           </span>

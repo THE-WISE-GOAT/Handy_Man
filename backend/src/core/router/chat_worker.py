@@ -966,7 +966,7 @@ async def add_skill_chat(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "Not currently in an add-skill flow. "
+                "Not currently in an add-skill flow."
                 "Call POST /worker-interview/{id}/add-skill first."
             ),
         )

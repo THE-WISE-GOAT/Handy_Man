@@ -17,26 +17,36 @@
   grid-column: 1;
   grid-row: 1;
   display: flex;
+  min-width: 0;
 }
 
 .grid-sidebar {
   grid-column: 2;
   grid-row: 1 / span 2;
   display: flex;
+  min-width: 0;
 }
 
+/* Real half-widths instead of the old margin-based fake split. */
 .grid-bottom-left {
   grid-column: 1;
   grid-row: 2;
   display: flex;
-  margin-right: 50%;
+  min-width: 0;
+  padding-right: 8px;
+  box-sizing: border-box;
+  width: 50%;
 }
 
 .grid-bottom-right {
   grid-column: 1;
   grid-row: 2;
   display: flex;
+  min-width: 0;
   margin-left: 50%;
+  padding-left: 8px;
+  box-sizing: border-box;
+  width: 50%;
 }
 
 /* ==========================================================================
@@ -49,7 +59,7 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 20px;
   box-sizing: border-box;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -65,11 +75,12 @@
 }
 
 .card-header {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #7A7A7A;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--fixfast-ink-3, #9A9A9A);
   margin-bottom: 12px;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
 }
 
@@ -77,16 +88,21 @@
    3. INTERNAL PRESENTATION FIELDS
    ========================================================================== */
 .main-panel h2 {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-weight: 800;
-  font-size: 1.8rem;
+  font-family: var(--fixfast-display, 'Segoe UI', system-ui, sans-serif);
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
   margin: 0 0 8px 0;
   color: #FFFFFF;
 }
 
+.light .main-panel h2 {
+  color: #0D0D0D;
+}
+
 .panel-desc {
-  font-size: 0.95rem;
-  color: #7A7A7A;
+  font-size: 0.9rem;
+  color: var(--fixfast-ink-3, #9A9A9A);
   margin-bottom: 16px;
 }
 
@@ -98,25 +114,41 @@
 }
 
 .badge {
-  display: inline-block;
-  padding: 10px 18px;
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 14px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  background-color: rgba(31, 31, 31, 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.34rem 0.72rem;
+  border: 1px solid rgba(245, 245, 247, 0.18);
+  border-radius: 999px;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background-color: transparent;
   width: fit-content;
-  color: #F5F5F7;
+  color: var(--fixfast-ink-3, #9A9A9A);
 }
 
 .badge-highlight {
-  background-color: rgba(255, 107, 26, 0.12);
+  background-color: rgba(255, 107, 26, 0.1);
   color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.3);
+  border-color: rgba(255, 107, 26, 0.4);
+}
+
+.light .badge {
+  border-color: rgba(13, 13, 13, 0.16);
+  color: #5B5B5B;
+}
+
+.light .badge-highlight {
+  background-color: rgba(255, 107, 26, 0.1);
+  color: #B7440A;
+  border-color: rgba(255, 107, 26, 0.4);
 }
 
 .card-summary {
-  font-size: 0.85rem;
-  color: #7A7A7A;
-  margin: 8px 0 0 4px;
+  font-size: 0.88rem;
+  color: var(--fixfast-ink-3, #9A9A9A);
+  margin: 8px 0 0;
 }

@@ -23,7 +23,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 24, fontFamily: 'monospace', color: '#ff6b6b', background: '#0D0D0D', minHeight: '100vh' }}>
+        <div style={{ padding: 24, fontFamily: 'monospace', color: '#FF8A8E', background: '#0D0D0D', minHeight: '100vh' }}>
           <h2>Application error</h2>
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>
             {String((this.state.error && this.state.error.stack) || this.state.error)}

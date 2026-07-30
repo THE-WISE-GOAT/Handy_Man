@@ -29,7 +29,7 @@ const personSvg = `
 
 const staticWorkerIcon = L.divIcon({
   className: 'custom-worker-icon',
-  html: `<div style="color: #7300ff; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
+  html: `<div style="color: #1F1F1F; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
   iconSize: [30, 30],
   iconAnchor: [15, 15],
   popupAnchor: [0, -15]
@@ -45,7 +45,7 @@ const blinkingWorkerIcon = L.divIcon({
 
 const goldenWorkerIcon = L.divIcon({
   className: 'custom-worker-icon golden-worker-icon',
-  html: `<div style="color: #FFD700; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
+  html: `<div style="color: #FF6B1A; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
   iconSize: [30, 30],
   iconAnchor: [15, 15],
   popupAnchor: [0, -15]
@@ -134,7 +134,7 @@ export default function Dash2Board({ viewSlug }) {
       {position === "main" ? (
         <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <h2 style={{ flexShrink: 0 }}>ACTIVE BIDDINGS ENGINE</h2>
-          <h3 style={{ color: "#010509", flexShrink: 0 }}>
+          <h3 style={{ color: "var(--k-ink-3)", flexShrink: 0 }}>
             Bids for job: {selectedJob ? selectedJob.title : "No Job Selected"}
           </h3>
           <div className="bids-box" style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginTop: '10px' }}>
@@ -177,17 +177,17 @@ export default function Dash2Board({ viewSlug }) {
         <style>
           {`
             @keyframes blinkRedIcon {
-              0% { color: #f44336; transform: scale(1); filter: drop-shadow(0 0 2px rgba(244,67,54,0.6)); }
-              50% { color: #ff7961; transform: scale(1.3); filter: drop-shadow(0 0 10px rgba(244,67,54,1)); }
-              100% { color: #f44336; transform: scale(1); filter: drop-shadow(0 0 2px rgba(244,67,54,0.6)); }
+              0% { color: #E5484D; transform: scale(1); filter: drop-shadow(0 0 2px rgba(229,72,77,0.6)); }
+              50% { color: #FF8A8E; transform: scale(1.3); filter: drop-shadow(0 0 10px rgba(229,72,77,1)); }
+              100% { color: #E5484D; transform: scale(1); filter: drop-shadow(0 0 2px rgba(229,72,77,0.6)); }
             }
             .blinking-red-icon div {
               animation: blinkRedIcon 1.2s infinite ease-in-out;
             }
             @keyframes goldGlow {
-              0% { filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.6)); }
-              50% { filter: drop-shadow(0 0 10px rgba(255, 215, 0, 1)); }
-              100% { filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.6)); }
+              0% { filter: drop-shadow(0 0 2px rgba(255, 107, 26, 0.6)); }
+              50% { filter: drop-shadow(0 0 10px rgba(255, 107, 26, 1)); }
+              100% { filter: drop-shadow(0 0 2px rgba(255, 107, 26, 0.6)); }
             }
             .golden-worker-icon div {
               animation: goldGlow 1.5s infinite ease-in-out;
@@ -236,14 +236,14 @@ export default function Dash2Board({ viewSlug }) {
                           Match Score: {worker.match_score}%<br/>
                           <button 
                             onClick={() => toggleWorkerInterest(worker.worker_chat_id)}
-                            style={{ 
-                              marginTop: '8px', 
-                              padding: '4px 8px', 
-                              backgroundColor: '#007bff', 
-                              color: '#fff', 
-                              border: 'none', 
+                            style={{
+                              marginTop: '8px',
+                              padding: '4px 8px',
+                              backgroundColor: '#FF6B1A',
+                              color: '#0D0D0D',
+                              border: 'none',
                               borderRadius: '4px',
-                              cursor: 'pointer' 
+                              cursor: 'pointer'
                             }}
                           >
                             Toggle Interest (Test)
@@ -288,13 +288,13 @@ export default function Dash2Board({ viewSlug }) {
               <span>Matched Profiles For: {selectedJob ? selectedJob.title : "No Job Selected"}</span>
               
               {selectedJob?.matchCategory && (
-                <span style={{ 
-                  fontSize: '0.65em', 
-                  backgroundColor: selectedJob.matchedByCategory ? 'rgba(235, 244, 235, 0.15)' : 'rgba(255, 152, 0, 0.15)', 
-                  color: selectedJob.matchedByCategory ? '#4CAF50' : '#ff9800', 
-                  padding: '4px 8px', 
+                <span style={{
+                  fontSize: '0.65em',
+                  backgroundColor: 'var(--k-wash)',
+                  color: selectedJob.matchedByCategory ? 'var(--k-orange-ink)' : 'var(--k-ink-3)',
+                  padding: '4px 8px',
                   borderRadius: '4px',
-                  border: `1px solid ${selectedJob.matchedByCategory ? '#4CAF50' : '#ff9800'}`
+                  border: `1px solid ${selectedJob.matchedByCategory ? 'rgba(255, 107, 26, 0.5)' : 'var(--k-border-strong)'}`
                 }}>
                   {selectedJob.matchedByCategory 
                     ? `Category Match: ${selectedJob.matchCategory}` 
@@ -325,47 +325,47 @@ export default function Dash2Board({ viewSlug }) {
                       key={worker.worker_chat_id} 
                       ref={el => workerCardRefs.current[worker.worker_chat_id] = el}
                       style={{
-                        border: isSelected ? '3px solid #FFD700' : '1px solid #444',
+                        border: isSelected ? '2px solid #FF6B1A' : '1px solid var(--k-line)',
                         borderRadius: '8px',
                         padding: '15px',
-                        backgroundColor: isSelected ? '#FFFDE7' : '#dbddda', 
-                        boxShadow: isSelected ? '0 0 12px rgba(255, 215, 0, 0.6)' : '0 2px 4px rgb(0, 0, 0)',
+                        backgroundColor: isSelected ? 'var(--k-wash)' : 'var(--k-raise)',
+                        boxShadow: isSelected ? '0 0 0 4px rgba(255, 107, 26, 0.12)' : '0 2px 8px rgba(0, 0, 0, 0.3)',
                         transform: isSelected ? 'scale(1.02)' : 'none',
                         transition: 'all 0.2s ease-in-out'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <strong style={{ fontSize: '1.1em', color: '#090f09' }}>{worker.username}</strong>
+                          <strong style={{ fontSize: '1.1em', color: 'var(--k-ink)' }}>{worker.username}</strong>
                           {isSelected && (
-                            <span style={{ 
-                              backgroundColor: '#FFD700', 
-                              color: '#000', 
-                              padding: '2px 8px', 
-                              borderRadius: '4px', 
-                              fontWeight: 'bold', 
-                              fontSize: '0.75em' 
+                            <span style={{
+                              backgroundColor: '#FF6B1A',
+                              color: '#0D0D0D',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontWeight: 700,
+                              fontSize: '0.75em'
                             }}>
                               🏆 Rank #{rank}
                             </span>
                           )}
                         </div>
-                        <span style={{ fontSize: '0.85em', color: '#0a0707af', border: '1px solid #555', padding: '2px 6px', borderRadius: '4px' }}>
+                        <span style={{ fontSize: '0.85em', color: 'var(--k-ink-3)', border: '1px solid var(--k-border-strong)', padding: '2px 6px', borderRadius: '4px' }}>
                           ID: {worker.worker_chat_id}
                         </span>
                       </div>
 
-                    <p style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: '#010201', fontStyle: 'italic', lineHeight: '1.4' }}>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--k-ink-3)', fontStyle: 'italic', lineHeight: '1.4' }}>
                       "{worker.job_description}"
                     </p>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', fontSize: '0.85em' }}>
-                      <span style={{ 
-                        backgroundColor: 'rgba(0, 123, 255, 0.2)', 
-                        color: '#4db8ff', 
-                        padding: '4px 8px', 
+                      <span style={{
+                        backgroundColor: 'var(--k-wash)',
+                        color: 'var(--k-orange-ink)',
+                        padding: '4px 8px',
                         borderRadius: '4px',
-                        fontWeight: 'bold' 
+                        fontWeight: 700
                       }}>
                         Vector Match Score: {worker.match_score}%
                       </span>
@@ -406,14 +406,14 @@ export default function Dash2Board({ viewSlug }) {
             animation: blinkDot 1.5s infinite ease-in-out;
             width: 8px;
             height: 8px;
-            background-color: #f44336;
+            background-color: #E5484D;
             border-radius: 50%;
             display: inline-block;
           }
           ::-webkit-scrollbar { width: 8px; }
           ::-webkit-scrollbar-track { background: transparent; }
-          ::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
-          ::-webkit-scrollbar-thumb:hover { background-color: #777; }
+          ::-webkit-scrollbar-thumb { background-color: var(--k-border-strong); border-radius: 4px; }
+          ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 107, 26, 0.6); }
         `}
       </style>
 
@@ -445,23 +445,23 @@ export default function Dash2Board({ viewSlug }) {
                       setSelectedJob(job);
                     }}
                     style={{
-                      border: isActive ? '2px solid #4CAF50' : '1px solid #555',
+                      border: isActive ? '2px solid #FF6B1A' : '1px solid var(--k-border-strong)',
                       padding: '15px',
                       cursor: 'pointer',
-                      backgroundColor: isActive ? '#e8f5e9' : 'transparent',
-                      color: isActive ? '#000' : 'inherit',
+                      backgroundColor: isActive ? 'var(--k-wash)' : 'transparent',
+                      color: 'inherit',
                       borderRadius: '5px',
                       transition: 'all 0.2s ease-in-out'
                     }}
                   >
-                    <div style={{ display: 'flex', gap: '20px', marginBottom: '8px', fontSize: '0.85em', fontWeight: 'bold' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#555' }}>
+                    <div style={{ display: 'flex', gap: '20px', marginBottom: '8px', fontSize: '0.85em', fontWeight: 600 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--k-ink-3)' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                         </svg>
                         <span>{job.matchedCount || 0} matched professionals</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#d32f2f' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--k-alert-ink)' }}>
                         <span className="status-indicator-dot"></span>
                         <span>{job.interestedCount || 0} interested</span>
                       </div>

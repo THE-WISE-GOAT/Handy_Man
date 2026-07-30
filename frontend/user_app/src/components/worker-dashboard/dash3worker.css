@@ -18,6 +18,7 @@
   grid-row: 1;
   display: flex;
   min-height: 0;
+  min-width: 0;
 }
 
 .grid-area-sidebar {
@@ -44,7 +45,7 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 20px;
   box-sizing: border-box;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -60,11 +61,12 @@
 }
 
 .card-header {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #7A7A7A;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--fixfast-ink-3, #9A9A9A);
   margin-bottom: 12px;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
 }
 
@@ -93,7 +95,7 @@
 
 .module-preview .panel-desc {
   font-size: 0.85rem;
-  color: #7A7A7A;
+  color: var(--fixfast-ink-3, #9A9A9A);
   margin: 0;
 }
 
@@ -108,17 +110,19 @@
    4. INNER ELEMENT PRESENTATION WORKPLACE
    ========================================================================== */
 .main-panel h2 {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-weight: 800;
-  font-size: 1.8rem;
+  font-family: var(--fixfast-display, 'Segoe UI', system-ui, sans-serif);
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
   margin: 0 0 8px 0;
   color: #FFFFFF;
 }
 
 .main-panel h3 {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-weight: 800;
-  font-size: 1.2rem;
+  font-family: var(--fixfast-display, 'Segoe UI', system-ui, sans-serif);
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
   margin: 0 0 8px 0;
   color: #FFFFFF;
 }
@@ -129,8 +133,8 @@
 }
 
 .panel-desc {
-  font-size: 0.95rem;
-  color: #7A7A7A;
+  font-size: 0.9rem;
+  color: var(--fixfast-ink-3, #9A9A9A);
   margin-bottom: 16px;
 }
 
@@ -142,52 +146,57 @@
 }
 
 .badge {
-  display: inline-block;
-  padding: 10px 18px;
-  border: 1px solid var(--ind-border);
-  border-radius: 14px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  background-color: rgba(31, 31, 31, 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.34rem 0.72rem;
+  border: 1px solid rgba(245, 245, 247, 0.18);
+  border-radius: 999px;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background-color: transparent;
   width: fit-content;
-  color: #F5F5F7;
+  color: var(--fixfast-ink-3, #9A9A9A);
   transition: var(--fixfast-ease);
 }
 
 .badge-highlight {
-  background-color: rgba(255, 107, 26, 0.12);
+  background-color: rgba(255, 107, 26, 0.1);
   color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.3);
+  border-color: rgba(255, 107, 26, 0.4);
 }
 
 .badge--rejected {
-  background-color: rgba(220, 53, 69, 0.15);
-  color: #ff6b6b;
-  border-color: rgba(220, 53, 69, 0.3);
+  background-color: rgba(229, 72, 77, 0.12);
+  color: #FF8A8E;
+  border-color: rgba(229, 72, 77, 0.45);
 }
 
 .light .badge {
-  background-color: #FFFFFF;
-  border-color: #E2E8F0;
-  color: #0D0D0D;
+  background-color: transparent;
+  border-color: rgba(13, 13, 13, 0.16);
+  color: #5B5B5B;
 }
 
 .light .badge-highlight {
-  background-color: rgba(255, 107, 26, 0.08);
-  color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.25);
+  background-color: rgba(255, 107, 26, 0.1);
+  color: #B7440A;
+  border-color: rgba(255, 107, 26, 0.4);
 }
 
 .light .badge--rejected {
-  background-color: rgba(220, 53, 69, 0.06);
-  color: #c0392b;
-  border-color: rgba(220, 53, 69, 0.2);
+  background-color: rgba(229, 72, 77, 0.08);
+  color: #C0292E;
+  border-color: rgba(229, 72, 77, 0.35);
 }
 
 .card-summary {
-  font-size: 0.85rem;
-  color: #7A7A7A;
-  margin: 8px 0 0 4px;
+  font-size: 0.88rem;
+  color: var(--fixfast-ink-3, #9A9A9A);
+  margin: 8px 0 0;
 }
 
 .start-interview-prompt {
@@ -201,16 +210,17 @@
 }
 
 .start-interview-prompt h3 {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-weight: 800;
-  font-size: 1.3rem;
+  font-family: var(--fixfast-display, 'Segoe UI', system-ui, sans-serif);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
   margin: 0;
   color: #FFFFFF;
 }
 
 .start-interview-prompt .panel-desc {
   max-width: 400px;
-  color: #7A7A7A;
+  color: var(--fixfast-ink-3, #9A9A9A);
 }
 
 .light .start-interview-prompt h3 {
@@ -218,7 +228,7 @@
 }
 
 .light .start-interview-prompt .panel-desc {
-  color: #555555;
+  color: #5B5B5B;
 }
 
 /* ==========================================================================
@@ -234,20 +244,26 @@
 .turns-badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 6px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  background: rgba(255, 107, 26, 0.12);
+  border: 1px solid rgba(255, 107, 26, 0.4);
+  border-radius: 999px;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  background: rgba(255, 107, 26, 0.1);
   color: #FF6B1A;
   margin-left: 0.5rem;
 }
 
+.light .turns-badge {
+  color: #B7440A;
+}
+
 .chat-box {
   border: 1px solid var(--ind-border);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 0.8rem;
-  background: rgba(31, 31, 31, 0.4);
+  background: rgba(13, 13, 13, 0.4);
   min-height: 200px;
   max-height: 400px;
   overflow-y: auto;
@@ -260,76 +276,89 @@
 
 .chat-msg {
   margin: 0;
-  padding: 10px 14px;
-  border-radius: 14px;
+  padding: 0.6rem 0.85rem;
+  border-radius: 12px;
   max-width: 85%;
   word-wrap: break-word;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .chat-msg strong {
   display: block;
   margin-bottom: 2px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  opacity: 0.82;
 }
 
+/* Worker speaks in brand orange; was blue (#3b82f6). */
 .chat-msg--user {
-  background: rgba(59, 130, 246, 0.15);
-  border-left: 3px solid #3b82f6;
-  color: #F5F5F7;
+  background: #FF6B1A;
+  border-left: none;
+  color: #0D0D0D;
   align-self: flex-end;
-  border-radius: 14px 4px 14px 14px;
+  border-radius: 12px 3px 12px 12px;
 }
 
 .chat-msg--assistant {
-  background: rgba(31, 31, 31, 0.4);
-  border-left: 3px solid #7A7A7A;
+  background: var(--fixfast-raise, #262626);
+  border: 1px solid var(--ind-border);
+  border-left: 3px solid rgba(245, 245, 247, 0.18);
   color: #F5F5F7;
   align-self: flex-start;
-  border-radius: 4px 14px 14px 14px;
+  border-radius: 3px 12px 12px 12px;
 }
 
 .chat-msg--system {
   background: rgba(255, 107, 26, 0.1);
   border-left: 3px solid #FF6B1A;
-  font-style: italic;
-  color: #F5F5F7;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-style: normal;
+  color: #FF6B1A;
   align-self: flex-start;
-  border-radius: 4px 14px 14px 14px;
+  border-radius: 3px 12px 12px 12px;
+}
+
+.chat-msg--system strong {
+  opacity: 1;
 }
 
 .light .chat-box {
   background: #FFFFFF;
-  border-color: #E2E8F0;
+  border-color: rgba(13, 13, 13, 0.1);
 }
 
 .light .chat-msg--user {
-  background: #FFF3E0;
-  border-left: 3px solid #FF6B1A;
+  background: #FF6B1A;
+  border-left: none;
   color: #0D0D0D;
 }
 
 .light .chat-msg--assistant {
-  background: #E3F2FD;
-  border-left: 3px solid #3b82f6;
+  background: #F4F5F7;
+  border-left: 3px solid rgba(13, 13, 13, 0.16);
   color: #0D0D0D;
 }
 
 .light .chat-msg--system {
-  background: #E3F2FD;
-  border-left: 3px solid #3b82f6;
-  color: #0D0D0D;
+  background: rgba(255, 107, 26, 0.1);
+  border-left: 3px solid #FF6B1A;
+  color: #B7440A;
 }
 
+/* .chat-form / .chat-btn themselves live in the customer dash1board.css. */
 .light .chat-form input {
   background: #FFFFFF;
-  border-color: #E2E8F0;
+  border-color: rgba(13, 13, 13, 0.42);
   color: #0D0D0D;
 }
 
 .light .chat-form input::placeholder {
-  color: #555555;
+  color: #5B5B5B;
 }
 
 /* ==========================================================================
@@ -344,29 +373,31 @@
 .extraction-panel,
 .location-panel {
   border: 1px solid var(--ind-border);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 0.8rem;
-  background: rgba(31, 31, 31, 0.4);
+  background: rgba(13, 13, 13, 0.4);
 }
 
 .extraction-panel h3,
 .location-panel h3 {
   margin: 0 0 0.5rem;
-  font-size: 0.85rem;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #FFFFFF;
+  letter-spacing: 0.15em;
+  color: var(--fixfast-ink-3, #9A9A9A);
 }
 
 .light .extraction-panel,
 .light .location-panel {
   background: #FFFFFF;
-  border-color: #E2E8F0;
+  border-color: rgba(13, 13, 13, 0.1);
 }
 
 .light .extraction-panel h3,
 .light .location-panel h3 {
-  color: #0D0D0D;
+  color: #5B5B5B;
 }
 
 .light .extracted-label {
@@ -374,36 +405,40 @@
 }
 
 .light .extracted-value {
-  color: #555555;
+  color: #5B5B5B;
 }
 
 .light .extracted-row {
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid rgba(13, 13, 13, 0.1);
 }
 
 .extracted-data {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 }
 
 .extracted-row {
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.2rem 0;
+  padding: 0.3rem 0;
   border-bottom: 1px solid rgba(245, 245, 247, 0.06);
 }
 
 .extracted-label {
-  font-weight: 700;
-  text-transform: capitalize;
-  color: #F5F5F7;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fixfast-ink-3, #9A9A9A);
 }
 
 .extracted-value {
-  color: #7A7A7A;
+  color: #F5F5F7;
+  font-weight: 500;
   text-align: right;
   word-break: break-word;
 }
@@ -417,78 +452,117 @@
 .location-form label {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.78rem;
-  font-weight: 700;
+  gap: 0.25rem;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: #F5F5F7;
+  color: var(--fixfast-ink-3, #9A9A9A);
 }
 
 .location-form input {
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 6px;
-  padding: 0.4rem;
+  border: var(--fixfast-border-strong, 1px solid rgba(245, 245, 247, 0.42));
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
   font: inherit;
   font-size: 0.85rem;
-  background: rgba(31, 31, 31, 0.4);
+  background: rgba(13, 13, 13, 0.4);
   color: #FFFFFF;
+  transition: var(--fixfast-ease);
+}
+
+.location-form input:focus {
+  outline: none;
+  border-color: #FF6B1A;
+  box-shadow: 0 0 0 3px rgba(255, 107, 26, 0.1);
 }
 
 .location-form input[readonly] {
-  background: rgba(31, 31, 31, 0.6);
+  background: rgba(13, 13, 13, 0.6);
   cursor: pointer;
 }
 
+.light .location-form input {
+  background: #FFFFFF;
+  border-color: rgba(13, 13, 13, 0.42);
+  color: #0D0D0D;
+}
+
+/* Was blue (#3b82f6). Secondary action, so ghost rather than filled. */
 .map-open-btn {
-  padding: 0.5rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 6px;
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+  padding: 0.6rem;
+  border: var(--fixfast-border-strong, 1px solid rgba(245, 245, 247, 0.42));
+  border-radius: 8px;
+  background: transparent;
+  color: #F5F5F7;
   font: inherit;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: var(--fixfast-ease);
 }
 
 .map-open-btn:hover {
-  background: rgba(59, 130, 246, 0.25);
-  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(255, 107, 26, 0.1);
+  border-color: #FF6B1A;
+  color: #FF6B1A;
+}
+
+.map-open-btn:focus-visible {
+  outline: 2px solid #FF6B1A;
+  outline-offset: 2px;
 }
 
 .map-open-btn:active {
-  transform: translate(1px, 1px);
+  transform: translateY(1px);
 }
 
+.light .map-open-btn {
+  color: #0D0D0D;
+  border-color: rgba(13, 13, 13, 0.42);
+}
+
+.light .map-open-btn:hover {
+  color: #B7440A;
+}
+
+/* Was green (#4ade80). This is the primary action of the sidebar. */
 .submit-app-btn {
-  padding: 0.7rem;
-  border: 1px solid rgba(74, 222, 128, 0.3);
+  padding: 0.75rem;
+  border: 1px solid #FF6B1A;
   border-radius: 8px;
-  background: rgba(74, 222, 128, 0.15);
-  color: #4ade80;
+  background: #FF6B1A;
+  color: #0D0D0D;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 14px rgba(255, 107, 26, 0.28);
   transition: var(--fixfast-ease);
 }
 
 .submit-app-btn:hover {
-  background: rgba(74, 222, 128, 0.25);
-  border-color: rgba(74, 222, 128, 0.5);
+  background: #E85D14;
+  border-color: #E85D14;
+  box-shadow: 0 6px 18px rgba(255, 107, 26, 0.38);
+}
+
+.submit-app-btn:focus-visible {
+  outline: 2px solid #FF6B1A;
+  outline-offset: 2px;
 }
 
 .submit-app-btn:active {
-  transform: translate(2px, 2px);
+  transform: translateY(1px);
 }
 
 .submit-app-btn:disabled {
-  background: rgba(122, 122, 122, 0.15);
-  color: #7A7A7A;
-  border-color: rgba(122, 122, 122, 0.3);
+  background: transparent;
+  color: var(--fixfast-ink-3, #9A9A9A);
+  border-color: rgba(245, 245, 247, 0.18);
+  box-shadow: none;
   cursor: not-allowed;
 }
 
@@ -502,14 +576,20 @@
 }
 
 .profile-section {
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid var(--ind-border);
   border-radius: 12px;
   padding: 1rem;
-  background: rgba(31, 31, 31, 0.4);
+  background: rgba(13, 13, 13, 0.4);
 }
 
 .profile-section--worker {
-  background: rgba(31, 31, 31, 0.3);
+  background: rgba(13, 13, 13, 0.3);
+}
+
+.light .profile-section,
+.light .profile-section--worker {
+  background: #FFFFFF;
+  border-color: rgba(13, 13, 13, 0.1);
 }
 
 .profile-section-header {
@@ -521,17 +601,17 @@
 
 .profile-section-header h3 {
   margin: 0;
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-weight: 800;
-  font-size: 0.95rem;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-weight: 500;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #FFFFFF;
+  letter-spacing: 0.15em;
+  color: var(--fixfast-ink-3, #9A9A9A);
 }
 
 .icon-btn {
   background: transparent;
-  border: 1px solid rgba(245, 245, 247, 0.14);
+  border: 1px solid rgba(245, 245, 247, 0.18);
   border-radius: 8px;
   padding: 0.3rem 0.6rem;
   cursor: pointer;
@@ -545,21 +625,42 @@
   color: var(--fixfast-yellow);
 }
 
+.icon-btn:focus-visible {
+  outline: 2px solid #FF6B1A;
+  outline-offset: 2px;
+}
+
 .icon-btn:active {
-  transform: translate(1px, 1px);
+  transform: translateY(1px);
 }
 
 .icon-btn--cancel {
-  background: rgba(220, 53, 69, 0.15);
-  color: #ff6b6b;
-  border-color: rgba(220, 53, 69, 0.3);
+  background: transparent;
+  color: #FF8A8E;
+  border-color: rgba(229, 72, 77, 0.45);
+}
+
+.icon-btn--cancel:hover {
+  background: rgba(229, 72, 77, 0.14);
+  border-color: #E5484D;
+  color: #FF8A8E;
+}
+
+.light .icon-btn {
+  color: #0D0D0D;
+  border-color: rgba(13, 13, 13, 0.16);
+}
+
+.light .icon-btn--cancel {
+  color: #C0292E;
 }
 
 .badge--readonly {
-  background: rgba(122, 122, 122, 0.2);
-  color: #7A7A7A;
-  font-size: 0.72rem;
-  padding: 0.2rem 0.5rem;
+  background: transparent;
+  color: var(--fixfast-ink-3, #9A9A9A);
+  border-color: rgba(245, 245, 247, 0.18);
+  font-size: 0.66rem;
+  padding: 0.2rem 0.55rem;
 }
 
 .profile-read-only {
@@ -578,27 +679,39 @@
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.3rem 0;
+  padding: 0.35rem 0;
   border-bottom: 1px solid rgba(245, 245, 247, 0.06);
 }
 
+.light .profile-detail-row {
+  border-bottom-color: rgba(13, 13, 13, 0.1);
+}
+
 .profile-detail-label {
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #7A7A7A;
+  color: var(--fixfast-ink-3, #9A9A9A);
   flex-shrink: 0;
 }
 
 .profile-detail-value {
   font-size: 0.85rem;
+  font-weight: 500;
   text-align: right;
   word-break: break-word;
   color: #F5F5F7;
 }
 
+.light .profile-detail-value {
+  color: #0D0D0D;
+}
+
 .profile-detail-value--empty {
-  color: #7A7A7A;
+  color: var(--fixfast-ink-3, #9A9A9A);
+  font-weight: 400;
   font-style: italic;
 }
 
@@ -615,20 +728,29 @@
 }
 
 .profile-edit-form .profile-field label {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: #7A7A7A;
+  color: var(--fixfast-ink-3, #9A9A9A);
 }
 
 .profile-edit-form .profile-field input {
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 6px;
-  padding: 0.4rem;
+  border: var(--fixfast-border-strong, 1px solid rgba(245, 245, 247, 0.42));
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
   font: inherit;
   font-size: 0.85rem;
-  background: rgba(31, 31, 31, 0.4);
+  background: rgba(13, 13, 13, 0.4);
   color: #FFFFFF;
+  transition: var(--fixfast-ease);
+}
+
+.profile-edit-form .profile-field input:focus {
+  outline: none;
+  border-color: #FF6B1A;
+  box-shadow: 0 0 0 3px rgba(255, 107, 26, 0.1);
 }
 
 .profile-actions {
@@ -640,15 +762,24 @@
 
 .profile-save-message {
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
+/* Success was green (#4ade80); now brand orange. */
 .profile-save-message--success {
-  color: #4ade80;
+  color: #FF6B1A;
 }
 
 .profile-save-message--error {
-  color: #ff6b6b;
+  color: #FF8A8E;
+}
+
+.light .profile-save-message--success {
+  color: #B7440A;
+}
+
+.light .profile-save-message--error {
+  color: #C0292E;
 }
 
 /* ==========================================================================
@@ -662,29 +793,49 @@
 }
 
 .status-badge {
-  display: inline-block;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.34rem 0.72rem;
+  border: 1px solid rgba(245, 245, 247, 0.18);
+  border-radius: 999px;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fixfast-ink-3, #9A9A9A);
   margin-top: 0.5rem;
 }
 
 .status-badge--review {
-  background: rgba(255, 177, 0, 0.15);
+  background: rgba(255, 107, 26, 0.1);
   color: #FF6B1A;
-  border-color: rgba(255, 177, 0, 0.3);
+  border-color: rgba(255, 107, 26, 0.4);
+}
+
+.light .status-badge {
+  border-color: rgba(13, 13, 13, 0.16);
+  color: #5B5B5B;
+}
+
+.light .status-badge--review {
+  color: #B7440A;
 }
 
 .rejection-reason-box {
   margin-top: 1rem;
   padding: 0.8rem;
-  border: 1px solid rgba(220, 53, 69, 0.3);
+  border: 1px solid rgba(229, 72, 77, 0.45);
   border-radius: 8px;
-  background: rgba(220, 53, 69, 0.1);
-  color: #ff6b6b;
+  background: rgba(229, 72, 77, 0.12);
+  color: #FF8A8E;
   font-size: 0.85rem;
+}
+
+.light .rejection-reason-box {
+  background: rgba(229, 72, 77, 0.08);
+  color: #C0292E;
 }
 
 /* ==========================================================================
@@ -741,28 +892,51 @@
 }
 
 .profile-field label {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: #7A7A7A;
+  color: var(--fixfast-ink-3, #9A9A9A);
 }
 
 .profile-field input,
 .profile-field textarea {
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 6px;
-  padding: 0.4rem;
+  border: var(--fixfast-border-strong, 1px solid rgba(245, 245, 247, 0.42));
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
   font: inherit;
   font-size: 0.85rem;
-  background: rgba(31, 31, 31, 0.4);
+  background: rgba(13, 13, 13, 0.4);
   color: #FFFFFF;
   resize: vertical;
+  transition: var(--fixfast-ease);
+}
+
+.profile-field input:focus,
+.profile-field textarea:focus {
+  outline: none;
+  border-color: #FF6B1A;
+  box-shadow: 0 0 0 3px rgba(255, 107, 26, 0.1);
+}
+
+.light .profile-field input,
+.light .profile-field textarea,
+.light .profile-edit-form .profile-field input {
+  background: #FFFFFF;
+  border-color: rgba(13, 13, 13, 0.42);
+  color: #0D0D0D;
 }
 
 .profile-field textarea {
   min-height: 60px;
 }
 
+/* --------------------------------------------------------------------------
+   NOTE: the blocks below repeat rules already defined earlier in this file
+   (they were duplicated in the original and are kept as-is so nothing is
+   removed). They restate the same declarations, so they have no net effect.
+   -------------------------------------------------------------------------- */
 .profile-actions {
   display: flex;
   align-items: center;
@@ -771,15 +945,15 @@
 
 .profile-save-message {
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .profile-save-message--success {
-  color: #4ade80;
+  color: #FF6B1A;
 }
 
 .profile-save-message--error {
-  color: #ff6b6b;
+  color: #FF8A8E;
 }
 
 .status-badges {
@@ -790,28 +964,34 @@
 }
 
 .status-badge {
-  display: inline-block;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid rgba(245, 245, 247, 0.14);
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.34rem 0.72rem;
+  border: 1px solid rgba(245, 245, 247, 0.18);
+  border-radius: 999px;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fixfast-ink-3, #9A9A9A);
   margin-top: 0.5rem;
 }
 
 .status-badge--review {
-  background: rgba(255, 177, 0, 0.15);
+  background: rgba(255, 107, 26, 0.1);
   color: #FF6B1A;
-  border-color: rgba(255, 177, 0, 0.3);
+  border-color: rgba(255, 107, 26, 0.4);
 }
 
 .rejection-reason-box {
   margin-top: 1rem;
   padding: 0.8rem;
-  border: 1px solid rgba(220, 53, 69, 0.3);
+  border: 1px solid rgba(229, 72, 77, 0.45);
   border-radius: 8px;
-  background: rgba(220, 53, 69, 0.1);
-  color: #ff6b6b;
+  background: rgba(229, 72, 77, 0.12);
+  color: #FF8A8E;
   font-size: 0.85rem;
 }
 
