@@ -1,5 +1,6 @@
 # routers/job_router.py
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from sqlalchemy import select, func, case
 from sqlalchemy.orm import Session
 from src.core import model, schema, job_manager, matching_manager
 from src.database.database import get_db
@@ -147,7 +148,9 @@ def get_jobs_by_status_endpoint(
             "address_text": row.address_text,
             "latitude": row.latitude,
             "longitude": row.longitude,
-            "updated_at": row.updated_at
+            "updated_at": row.updated_at,
+            "matched_count": row.matched_count or 0,
+            "interested_count": row.interested_count or 0,
         }
         for row in results
     ]
@@ -165,3 +168,113 @@ def delete_job_endpoint(
         raise HTTPException(status_code=404, detail="Job not found or unauthorized")
     
     return {"status": "success", "message": "Job deleted successfully"}
+
+
+interest_subquery = (
+    select(
+        model.JobWorkerMatch.job_id,
+        func.count(model.JobWorkerMatch.id).label("interested_count"),
+    )
+    .where(
+        model.JobWorkerMatch.is_active == True,
+        model.JobWorkerMatch.is_interested == True,
+    )
+    .group_by(model.JobWorkerMatch.job_id)
+    .subquery()
+)
+
+
+@router.get("/for-worker", summary="Fetch all active matched jobs for the authenticated worker")
+def get_worker_matched_jobs(
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user)
+):
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        return {"status": "success", "jobs": []}
+
+    stmt = (
+        select(model.JobWorkerMatch, model.Job, func.coalesce(interest_subquery.c.interested_count, 0))
+        .join(model.Job, model.JobWorkerMatch.job_id == model.Job.id)
+        .outerjoin(interest_subquery, model.Job.id == interest_subquery.c.job_id)
+        .where(
+            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.is_active == True,
+            model.JobWorkerMatch.is_rejected == False,
+        )
+        .order_by(model.JobWorkerMatch.created_at.desc())
+    )
+
+    results = db.execute(stmt).all()
+
+    jobs = [
+        {
+            "job_id": job.id,
+            "title": job.title,
+            "description": job.description,
+            "budget": None,
+            "location": job.address_text,
+            "match_score": match.match_score,
+            "match_rank": match.match_rank,
+            "created_at": match.created_at,
+            "status": job.status,
+            "is_interested": match.is_interested,
+            "interested_count": int(interest_count),
+        }
+        for match, job, interest_count in results
+    ]
+
+    return {"status": "success", "jobs": jobs}
+
+
+@router.post("/{job_id}/interest", summary="Worker expresses interest in a job")
+def express_interest_in_job(
+    job_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+
+    match = db.execute(
+        select(model.JobWorkerMatch).where(
+            model.JobWorkerMatch.job_id == job_id,
+            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.is_active == True,
+        )
+    ).scalar_one_or_none()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="No active match found for this job")
+
+    requested_interest = payload.get("interested", True)
+    match.is_interested = bool(requested_interest)
+    db.commit()
+    db.refresh(match)
+
+    interested_count = db.execute(
+        select(func.count(model.JobWorkerMatch.id)).where(
+            model.JobWorkerMatch.job_id == job_id,
+            model.JobWorkerMatch.is_active == True,
+            model.JobWorkerMatch.is_interested == True,
+        )
+    ).scalar_one()
+
+    return {
+        "status": "success",
+        "job_id": job_id,
+        "is_interested": match.is_interested,
+        "interested_count": int(interested_count or 0),
+    }

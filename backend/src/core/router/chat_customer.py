@@ -503,11 +503,9 @@ def find_help(
             "category_tag": worker.category_tag,
             "job_description": worker.job_description,
             "match_score": match.match_score,
-            # The specific capability that surfaced this worker — a plumber can be
-            # here for their general plumbing baseline or for a tested speciality,
-            # and the customer should be able to tell which.
             "matched_skill": skill.title if skill is not None else None,
             "matched_skill_description": skill.description if skill is not None else None,
+            "is_interested": match.is_interested,
         }
         for match, worker, username, skill in matches
     ]
