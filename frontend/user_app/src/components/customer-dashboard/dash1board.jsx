@@ -975,7 +975,7 @@ export default function Dash1Board({ viewSlug }) {
   const renderActivePosts = (slotKey) => {
     if (slotKey === "main") {
       return (
-        <div className="dashboard-card main-view" style={{ overflowY: "auto" }}>
+        <div className="dashboard-card main-view" style={{ overflow: "scroll", maxHeight:"33vw" }}>
           <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
           <h2>ACTIVE PENDING POSTS</h2>
           <button 
