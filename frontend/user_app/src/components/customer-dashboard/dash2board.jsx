@@ -213,14 +213,15 @@ export default function Dash2Board({ viewSlug }) {
                 )}
 
                 {/* 2. Worker Location Markers */}
-                {currentWorkers.map((worker, index) => {
-                  const locInfo = workerLocations[worker.worker_chat_id];
-                  if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
-                  
-                  const workerPos = [locInfo.latitude, locInfo.longitude];
-                  const rank = index + 1;
-                  const isTopThree = rank <= 3;
-                  const iconToUse = isTopThree ? goldenWorkerIcon : (locInfo.is_interested ? blinkingWorkerIcon : staticWorkerIcon);
+                 {currentWorkers.map((worker, index) => {
+                   const locInfo = workerLocations[worker.worker_chat_id];
+                   if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
+                   
+                   const workerPos = [locInfo.latitude, locInfo.longitude];
+                   const rank = index + 1;
+                   const isTopThree = rank <= 3;
+                   const isInterested = worker.is_interested || locInfo.is_interested;
+                   const iconToUse = isTopThree ? goldenWorkerIcon : (isInterested ? blinkingWorkerIcon : staticWorkerIcon);
 
                   return (
                     <Marker 
@@ -347,6 +348,18 @@ export default function Dash2Board({ viewSlug }) {
                               fontSize: '0.75em'
                             }}>
                               🏆 Rank #{rank}
+                            </span>
+                          )}
+                          {worker.is_interested && (
+                            <span style={{
+                              backgroundColor: '#28a745',
+                              color: '#fff',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontWeight: 700,
+                              fontSize: '0.75em'
+                            }}>
+                              Interested
                             </span>
                           )}
                         </div>
