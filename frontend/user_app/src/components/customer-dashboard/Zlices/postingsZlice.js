@@ -66,8 +66,8 @@ export const createPostingsZlice = (set, get) => ({
             id: job.booking_chat_id,
             latitude: lat,
             longitude: lng,
-            matchedCount: job.matchedCount || 0,       
-            interestedCount: job.interestedCount || 0  
+            matchedCount: job.matched_count || 0,
+            interestedCount: job.interested_count || 0
           };
         });
 
