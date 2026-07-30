@@ -355,11 +355,10 @@ class WorkerMatchOut(BaseModel):
     job_category: str
     category_tag: str
     job_description: str
-    match_score: float  # 1.0 = near-identical meaning, 0 = unrelated, negative = opposite
-    # Which of the worker's capabilities won this match. None for matches recorded
-    # before per-skill matching, or if the skill has since been removed.
+    match_score: float
     matched_skill: Optional[str] = None
     matched_skill_description: Optional[str] = None
+    is_interested: bool = False
 
 class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used
