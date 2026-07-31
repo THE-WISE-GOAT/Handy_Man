@@ -28,6 +28,7 @@ from src.core.oauth2 import get_current_user
 from src.core import model, schema, job_manager, matching_manager
 from src.core.manager import manager
 import math
+from src.core.matching_manager import create_matches_for_job
 
 from src.ai.customer_chat_analyser_nvidia import (
     _nvidia_client,
@@ -447,17 +448,91 @@ def _extract_primary_category(categories: list[dict]) -> tuple[str | None, bool]
     top = categories[0]
     return top.get("category"), bool(top.get("is_custom_category", False)) 
 
+# @router.get(
+#     "/match/{booking_chat_id}/find-help",
+#     response_model=schema.FindHelpOut,
+#     summary="Fetch pre-calculated matching workers for a completed job layout from DB",
+# )
+# def find_help(
+#     booking_chat_id: int,
+#     db: Session = Depends(get_db),
+#     current_user: model.User = Depends(get_current_user),
+# ):
+
+#     job_data = db.execute(
+#         select(model.Job).where(
+#             model.Job.booking_chat_id == booking_chat_id,
+#             model.Job.customer_id == current_user.id,
+#         )
+#     ).scalar_one_or_none()
+
+#     if not job_data:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="No operational job data found for this booking_chat_id.",
+#         )
+
+#     category, is_custom = _extract_primary_category(job_data.categories or [])
+    
+#     stmt = (
+#         select(model.JobWorkerMatch, model.WorkerProfile, model.User.username, model.WorkerSkill)
+#         .join(model.WorkerProfile, model.WorkerProfile.id == model.JobWorkerMatch.worker_id)
+#         .join(model.User, model.User.id == model.WorkerProfile.user_id)
+#         # OUTER: matched_skill_id is nullable (SET NULL on skill removal, and rows
+#         # written before multi-vector matching have none), so an inner join would
+#         # silently drop otherwise-valid matches.
+#         .outerjoin(model.WorkerSkill, model.WorkerSkill.id == model.JobWorkerMatch.matched_skill_id)
+#         .where(
+#             model.JobWorkerMatch.job_id == job_data.id,
+#             model.JobWorkerMatch.is_active == True
+#         )
+#         .order_by(model.JobWorkerMatch.match_rank.asc())
+#     )
+#     matches = db.execute(stmt).all()
+
+#     if not matches:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="No matching workers found recorded for this job specification.",
+#         )
+
+#     workers = [
+#         {
+#             "worker_chat_id": worker.worker_chat_id,
+#             "username": username,
+#             "job_category": worker.job_category,
+#             "category_tag": worker.category_tag,
+#             "job_description": worker.job_description,
+#             "match_score": match.match_score,
+#             # The specific capability that surfaced this worker — a plumber can be
+#             # here for their general plumbing baseline or for a tested speciality,
+#             # and the customer should be able to tell which.
+#             "matched_skill": skill.title if skill is not None else None,
+#             "matched_skill_description": skill.description if skill is not None else None,
+#         }
+#         for match, worker, username, skill in matches
+#     ]
+
+#     return {
+#         "matched_by_category": bool(category),
+#         "category": category,
+#         "workers": workers,
+#     }
+
+
+
+
+
 @router.get(
     "/match/{booking_chat_id}/find-help",
     response_model=schema.FindHelpOut,
-    summary="Fetch pre-calculated matching workers for a completed job layout from DB",
+    summary="Fetch pre-calculated matching workers and dynamically append new ones from DB",
 )
 def find_help(
     booking_chat_id: int,
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-
     job_data = db.execute(
         select(model.Job).where(
             model.Job.booking_chat_id == booking_chat_id,
@@ -472,20 +547,30 @@ def find_help(
         )
 
     category, is_custom = _extract_primary_category(job_data.categories or [])
-    
+
+    # 1. Incremental search appends newly registered DB workers without clearing existing matches
+    if job_data.description_vector is not None and job_data.location is not None:
+        create_matches_for_job(
+            db=db,
+            job_id=job_data.id,
+            query_vector=job_data.description_vector,
+            customer_location=job_data.location,
+            radius_meters=60_000,
+            job_description=job_data.description,
+            job_category=category,
+        )
+
+    # 2. Fetch complete set of accumulated matches (old + new) ordered descending by match score
     stmt = (
         select(model.JobWorkerMatch, model.WorkerProfile, model.User.username, model.WorkerSkill)
         .join(model.WorkerProfile, model.WorkerProfile.id == model.JobWorkerMatch.worker_id)
         .join(model.User, model.User.id == model.WorkerProfile.user_id)
-        # OUTER: matched_skill_id is nullable (SET NULL on skill removal, and rows
-        # written before multi-vector matching have none), so an inner join would
-        # silently drop otherwise-valid matches.
         .outerjoin(model.WorkerSkill, model.WorkerSkill.id == model.JobWorkerMatch.matched_skill_id)
         .where(
             model.JobWorkerMatch.job_id == job_data.id,
             model.JobWorkerMatch.is_active == True
         )
-        .order_by(model.JobWorkerMatch.match_rank.asc())
+        .order_by(model.JobWorkerMatch.match_score.desc()) # <--- ORDER BY MATCH SCORE DESCENDING
     )
     matches = db.execute(stmt).all()
 
@@ -495,22 +580,28 @@ def find_help(
             detail="No matching workers found recorded for this job specification.",
         )
 
-    workers = [
-        {
+    # 3. Final safety deduplication per human user_id
+    seen_user_ids: set[int] = set()
+    workers = []
+
+    for match, worker, username, skill in matches:
+        user_id = worker.user_id
+
+        if user_id in seen_user_ids:
+            continue
+
+        seen_user_ids.add(user_id)
+
+        workers.append({
             "worker_chat_id": worker.worker_chat_id,
             "username": username,
             "job_category": worker.job_category,
             "category_tag": worker.category_tag,
             "job_description": worker.job_description,
             "match_score": match.match_score,
-            # The specific capability that surfaced this worker — a plumber can be
-            # here for their general plumbing baseline or for a tested speciality,
-            # and the customer should be able to tell which.
             "matched_skill": skill.title if skill is not None else None,
             "matched_skill_description": skill.description if skill is not None else None,
-        }
-        for match, worker, username, skill in matches
-    ]
+        })
 
     return {
         "matched_by_category": bool(category),
