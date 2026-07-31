@@ -264,8 +264,7 @@
   border-radius: 12px;
   padding: 0.8rem;
   background: rgba(13, 13, 13, 0.4);
-  min-height: 200px;
-  max-height: 400px;
+  min-height: 80%;
   overflow-y: auto;
   font-size: 0.85rem;
   flex: 1;

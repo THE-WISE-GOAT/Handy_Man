@@ -39,89 +39,89 @@ async def _broadcast_notifications(worker_chat_ids: list[int], job_payload: dict
             logger.warning(f"Failed live alert broadcast to worker {worker_chat_id}: {ws_err}")
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, summary="Create a job directly without AI chat")
-async def create_job_direct_endpoint(
-    payload: schema.CreateJobIn,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user: model.User = Depends(get_current_user),
-):
-    lng = payload.location.longitude
-    lat = payload.location.latitude
-    wkt_point = f"POINT({lng} {lat})"
+# @router.post("", status_code=status.HTTP_201_CREATED, summary="Create a job directly without AI chat")
+# async def create_job_direct_endpoint(
+#     payload: schema.CreateJobIn,
+#     background_tasks: BackgroundTasks,
+#     db: Session = Depends(get_db),
+#     current_user: model.User = Depends(get_current_user),
+# ):
+#     lng = payload.location.longitude
+#     lat = payload.location.latitude
+#     wkt_point = f"POINT({lng} {lat})"
 
-    job_desc = payload.description.strip()
-    if not job_desc:
-        job_desc = f"{payload.title}: {payload.contact_name or ''}".strip()
-    if not job_desc:
-        raise HTTPException(status_code=400, detail="Job description is required.")
+#     job_desc = payload.description.strip()
+#     if not job_desc:
+#         job_desc = f"{payload.title}: {payload.contact_name or ''}".strip()
+#     if not job_desc:
+#         raise HTTPException(status_code=400, detail="Job description is required.")
 
-    try:
-        embedding_vector = await get_worker_description_embedding(job_desc)
-    except Exception as exc:
-        logger.error(f"Embedding error: {exc}")
-        raise HTTPException(status_code=502, detail="Failed to generate job embedding.")
+#     try:
+#         embedding_vector = await get_worker_description_embedding(job_desc)
+#     except Exception as exc:
+#         logger.error(f"Embedding error: {exc}")
+#         raise HTTPException(status_code=502, detail="Failed to generate job embedding.")
 
-    address_text = await _get_address_from_coords(lat, lng)
+#     address_text = await _get_address_from_coords(lat, lng)
 
-    categories = []
-    if payload.category:
-        categories = [{"category": payload.category, "tags": [], "is_custom_category": False}]
+#     categories = []
+#     if payload.category:
+#         categories = [{"category": payload.category, "tags": [], "is_custom_category": False}]
 
-    job_fields = {
-        "title": payload.title,
-        "description": job_desc,
-        "status": payload.status,
-        "is_job_request": True,
-        "categories": categories,
-        "contact_name": payload.contact_name,
-        "contact_phone": payload.contact_phone,
-        "mode": payload.mode,
-        "attachments": payload.attachments,
-        "latitude": lat,
-        "longitude": lng,
-        "location": wkt_point,
-        "description_vector": embedding_vector,
-        "address_text": address_text,
-    }
+#     job_fields = {
+#         "title": payload.title,
+#         "description": job_desc,
+#         "status": payload.status,
+#         "is_job_request": True,
+#         "categories": categories,
+#         "contact_name": payload.contact_name,
+#         "contact_phone": payload.contact_phone,
+#         "mode": payload.mode,
+#         "attachments": payload.attachments,
+#         "latitude": lat,
+#         "longitude": lng,
+#         "location": wkt_point,
+#         "description_vector": embedding_vector,
+#         "address_text": address_text,
+#     }
 
-    try:
-        job_data = job_manager.create_job_direct(db, current_user.id, job_fields)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Job creation failed: {e}")
-        raise HTTPException(status_code=500, detail="Database update failed.")
+#     try:
+#         job_data = job_manager.create_job_direct(db, current_user.id, job_fields)
+#         db.commit()
+#     except Exception as e:
+#         db.rollback()
+#         logger.error(f"Job creation failed: {e}")
+#         raise HTTPException(status_code=500, detail="Database update failed.")
 
-    try:
-        matching_result = matching_manager.create_matches_for_job(
-            db=db,
-            job_id=job_data.id,
-            query_vector=embedding_vector,
-            customer_location=wkt_point,
-            radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
-        )
-        db.commit()
-    except Exception as engine_err:
-        db.rollback()
-        logger.error(f"Matching Engine failed: {engine_err}")
-        raise HTTPException(status_code=500, detail="Failed to compile marketplace matches.")
+#     try:
+#         matching_result = matching_manager.create_matches_for_job(
+#             db=db,
+#             job_id=job_data.id,
+#             query_vector=embedding_vector,
+#             customer_location=wkt_point,
+#             radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
+#         )
+#         db.commit()
+#     except Exception as engine_err:
+#         db.rollback()
+#         logger.error(f"Matching Engine failed: {engine_err}")
+#         raise HTTPException(status_code=500, detail="Failed to compile marketplace matches.")
 
-    job_payload = {
-        "booking_chat_id": None,
-        "title": payload.title,
-        "description": job_desc,
-    }
+#     job_payload = {
+#         "booking_chat_id": None,
+#         "title": payload.title,
+#         "description": job_desc,
+#     }
 
-    worker_chat_ids = matching_result.get("worker_chat_ids", [])
-    if worker_chat_ids:
-        background_tasks.add_task(_broadcast_notifications, worker_chat_ids, job_payload)
+#     worker_chat_ids = matching_result.get("worker_chat_ids", [])
+#     if worker_chat_ids:
+#         background_tasks.add_task(_broadcast_notifications, worker_chat_ids, job_payload)
 
-    return {
-        "status": "success",
-        "message": f"Job created. Established {matching_result.get('count', 0)} matches successfully.",
-        "job_id": job_data.id,
-    }
+#     return {
+#         "status": "success",
+#         "message": f"Job created. Established {matching_result.get('count', 0)} matches successfully.",
+#         "job_id": job_data.id,
+#     }
 
 
 @router.get("/status/{status_val}")
