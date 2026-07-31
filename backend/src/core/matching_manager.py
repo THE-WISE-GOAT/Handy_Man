@@ -8,6 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from geoalchemy2 import Geography
 from geoalchemy2.elements import WKBElement
+from fastapi import APIRouter, Depends, HTTPException, status
 from src.core import model
 from src.core.schema import MatchingResult, MatchDetail, WorkerMatchingResult, MatchedJobDetail
 from dotenv import load_dotenv
@@ -54,17 +55,59 @@ def _ensure_geography(location: Any):
 
     return location
 
+# def _search_workers(
+#     db: Session,
+#     query_vector: list[float],
+#     customer_location: Any,
+#     radius_meters: int,
+# ) -> list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]:
+#     """Vector search against each active worker capability
+#     (WorkerSkill.embedding).
+
+#     Each worker capability is stored as its own row so matching selects
+#     the worker's best-fitting skill rather than an averaged profile
+#     vector.
+#     """
+#     distance_expr = model.WorkerSkill.embedding.cosine_distance(query_vector)
+#     spatial_point = _ensure_geography(customer_location)
+
+#     stmt = (
+#         select(
+#             model.WorkerProfile,
+#             model.User,
+#             model.WorkerSkill,
+#             distance_expr.label("distance"),
+#         )
+#         .join(
+#             model.WorkerSkill,
+#             model.WorkerSkill.worker_id == model.WorkerProfile.id,
+#         )
+#         .join(model.User, model.User.id == model.WorkerProfile.user_id)
+#         .where(
+#             model.WorkerSkill.embedding.isnot(None),
+#             model.WorkerSkill.is_active.is_(True),
+#             model.WorkerProfile.location.isnot(None),
+#             model.WorkerProfile.is_complete.is_(True),
+#             model.WorkerProfile.is_rejected.is_(False),
+#             func.ST_DWithin(
+#                 model.WorkerProfile.location, spatial_point, radius_meters
+#             ),
+#         )
+#         .order_by(distance_expr.asc())
+#     )
+
+#     return db.execute(stmt).all()
 
 def _search_workers(
     db: Session,
     query_vector: list[float],
     customer_location: Any,
     radius_meters: int,
+    exclude_user_ids: list[int] | None = None,
 ) -> list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]:
     """
     Vector search against each active worker capability (WorkerSkill.embedding).
-    Each worker capability is stored as its own row so matching selects the
-    worker's best-fitting skill rather than an averaged profile vector.
+    Excludes specified human user_ids to prevent re-evaluating existing matched people.
     """
     distance_expr = model.WorkerSkill.embedding.cosine_distance(query_vector)
     spatial_point = _ensure_geography(customer_location)
@@ -86,9 +129,13 @@ def _search_workers(
             model.WorkerProfile.is_rejected.is_(False),
             func.ST_DWithin(model.WorkerProfile.location, spatial_point, radius_meters),
         )
-        .order_by(distance_expr.asc())
     )
 
+    # Exclude human users who have already been evaluated/matched for this job
+    if exclude_user_ids:
+        stmt = stmt.where(model.WorkerProfile.user_id.notin_(exclude_user_ids))
+
+    stmt = stmt.order_by(distance_expr.asc())
     return db.execute(stmt).all()
 
 
@@ -143,10 +190,11 @@ def _llm_rerank_matches(
     job_description: str,
     job_category: str | None,
     rich_matches: list[MatchDetail],
+    rank_offset: int = 0,
 ) -> list[MatchDetail]:
     """
-    Final decision step: hands the vector-qualified, per-user-deduplicated candidates to an
-    LLM to drop candidates whose trade or skill doesn't fit the actual job requirements.
+    Final decision step: hands candidate matches to an LLM to drop non-trade fits,
+    preserving rank sequence with rank_offset.
     """
     if not rich_matches:
         logger.info("No candidate matches passed to LLM reranker.")
@@ -200,11 +248,11 @@ def _llm_rerank_matches(
     reranked: list[MatchDetail] = []
     seen_ids: set[int] = set()
 
-    for new_rank, worker_id in enumerate(ordered_ids, start=1):
+    for i, worker_id in enumerate(ordered_ids, start=1):
         match = by_worker_id.get(worker_id)
         if match is None or worker_id in seen_ids:
             continue
-        match["rank"] = new_rank
+        match["rank"] = rank_offset + i
         reranked.append(match)
         seen_ids.add(worker_id)
 
@@ -213,9 +261,116 @@ def _llm_rerank_matches(
         return rich_matches
 
     for i, match in enumerate(leftover, start=len(reranked) + 1):
-        match["rank"] = i
+        match["rank"] = rank_offset + i
 
     return reranked + leftover
+
+
+# def create_matches_for_job(
+#     db: Session,
+#     job_id: int,
+#     query_vector: list[float],
+#     customer_location: Any,
+#     radius_meters: int,
+#     job_description: str,
+#     job_category: str | None = None,
+# ) -> MatchingResult:
+#     """Core Entry Point: Purges stale matches, queries per-skill vector
+#     embeddings, deduplicates down to the best skill per user, scores, filters
+#     by threshold, reranks via LLM, and persists final match rows with
+#     matched_skill_id.
+#     """
+#     logger.info(
+#         f"[job {job_id}] starting match run — radius_meters={radius_meters}, "
+#         f"job_category={job_category}, query_vector_len={len(query_vector) if query_vector else 0}"
+#     )
+
+#     # 1. Clear historical stale match rows for this job
+#     db.query(model.JobWorkerMatch).filter(
+#         model.JobWorkerMatch.job_id == job_id
+#     ).delete(synchronize_session=False)
+
+#     # 2. Extract potential candidate skills (ordered by distance)
+#     search_results = _search_workers(
+#         db, query_vector, customer_location, radius_meters
+#     )
+#     logger.info(
+#         f"[job {job_id}] _search_workers returned {len(search_results)} candidate skill matches"
+#     )
+
+#     search_results = _deduplicate_by_user(search_results)
+#     logger.info(
+#         f"[job {job_id}] {len(search_results)} candidates remain after per-user dedup"
+#     )
+
+#     rich_matches: list[MatchDetail] = []
+#     distance_by_worker_id: dict[int, float] = {}
+#     vector_rank = 1
+
+#     for worker, user, skill, distance in search_results:
+#         score = calculate_match_score(float(distance))
+
+#         logger.info(
+#             f"[job {job_id}] candidate worker_id={worker.id} category={worker.job_category} "
+#             f"matched_skill='{skill.title}' distance={float(distance):.4f} score={score} (threshold={SCORE_THRESHOLD})"
+#         )
+
+#         if score > SCORE_THRESHOLD:
+#             rich_matches.append({
+#                 "worker_profile": worker,
+#                 "user": user,
+#                 "score": score,
+#                 "rank": vector_rank,
+#                 "worker_chat_id": worker.worker_chat_id,
+#                 "matched_skill_id": skill.id,
+#                 "matched_skill_title": skill.title,
+#                 "matched_skill_description": skill.description,
+#             })
+#             distance_by_worker_id[worker.id] = float(distance)
+#             vector_rank += 1
+
+#     logger.info(
+#         f"[job {job_id}] {len(rich_matches)} candidates cleared SCORE_THRESHOLD={SCORE_THRESHOLD}"
+#     )
+
+#     # 3. LLM makes the final trade-fit decision
+#     rich_matches = _llm_rerank_matches(
+#         job_description, job_category, rich_matches
+#     )
+#     logger.info(
+#         f"[job {job_id}] {len(rich_matches)} candidates remain after LLM reranker"
+#     )
+
+#     # 4. Persist the final match set
+#     new_match_records = []
+#     notifiable_worker_chat_ids = []
+
+#     for match in rich_matches:
+#         worker = match["worker_profile"]
+#         match_row = model.JobWorkerMatch(
+#             job_id=job_id,
+#             worker_id=worker.id,
+#             matched_skill_id=match.get("matched_skill_id"),
+#             match_score=match["score"],
+#             match_rank=match["rank"],
+#             semantic_distance=distance_by_worker_id[worker.id],
+#             is_active=True,
+#             is_interested=False,
+#             is_selected=False,
+#             is_rejected=False,
+#         )
+#         new_match_records.append(match_row)
+#         notifiable_worker_chat_ids.append(match["worker_chat_id"])
+
+#     if new_match_records:
+#         db.add_all(new_match_records)
+#         db.flush()
+
+#     return {
+#         "matches": rich_matches,
+#         "worker_chat_ids": notifiable_worker_chat_ids,
+#         "count": len(rich_matches),
+#     }
 
 
 def create_matches_for_job(
@@ -228,30 +383,48 @@ def create_matches_for_job(
     job_category: str | None = None,
 ) -> MatchingResult:
     """
-    Core Entry Point: Purges stale matches, queries per-skill vector embeddings,
-    deduplicates down to the best skill per user, scores, filters by threshold,
-    reranks via LLM, and persists final match rows with matched_skill_id.
+    Incremental Entry Point: Fetches existing matched user IDs, searches ONLY for 
+    un-matched human users in DB, scores, reranks new candidates with proper rank offsets, 
+    and appends them to the database.
     """
+    vector_len = len(query_vector) if query_vector is not None else 0
     logger.info(
-        f"[job {job_id}] starting match run — radius_meters={radius_meters}, "
-        f"job_category={job_category}, query_vector_len={len(query_vector) if query_vector else 0}"
+        f"[job {job_id}] starting incremental match run — radius_meters={radius_meters}, "
+        f"job_category={job_category}, query_vector_len={vector_len}"
     )
 
-    # 1. Clear historical stale match rows for this job
-    db.query(model.JobWorkerMatch).filter(
-        model.JobWorkerMatch.job_id == job_id
-    ).delete(synchronize_session=False)
+    # 1. Fetch existing matched user_ids (Do NOT delete historical matches)
+    existing_user_ids = (
+        db.query(model.WorkerProfile.user_id)
+        .join(model.JobWorkerMatch, model.JobWorkerMatch.worker_id == model.WorkerProfile.id)
+        .filter(model.JobWorkerMatch.job_id == job_id)
+        .all()
+    )
+    exclude_user_ids = [u.user_id for u in existing_user_ids]
 
-    # 2. Extract potential candidate skills (ordered by distance)
-    search_results = _search_workers(db, query_vector, customer_location, radius_meters)
-    logger.info(f"[job {job_id}] _search_workers returned {len(search_results)} candidate skill matches")
+    # Get current max rank so new matches append sequentially
+    max_rank = (
+        db.query(func.max(model.JobWorkerMatch.match_rank))
+        .filter(model.JobWorkerMatch.job_id == job_id)
+        .scalar()
+    ) or 0
+
+    # 2. Extract potential candidate skills for new/un-matched human users
+    search_results = _search_workers(
+        db, query_vector, customer_location, radius_meters, exclude_user_ids=exclude_user_ids
+    )
+    logger.info(f"[job {job_id}] _search_workers found {len(search_results)} new candidate skill matches")
+
+    if not search_results:
+        logger.info(f"[job {job_id}] No new workers found to evaluate.")
+        return {"matches": [], "worker_chat_ids": [], "count": 0}
 
     search_results = _deduplicate_by_user(search_results)
-    logger.info(f"[job {job_id}] {len(search_results)} candidates remain after per-user dedup")
+    logger.info(f"[job {job_id}] {len(search_results)} new candidates remain after per-user dedup")
 
     rich_matches: list[MatchDetail] = []
     distance_by_worker_id: dict[int, float] = {}
-    vector_rank = 1
+    vector_rank = max_rank + 1
 
     for worker, user, skill, distance in search_results:
         score = calculate_match_score(float(distance))
@@ -275,13 +448,16 @@ def create_matches_for_job(
             distance_by_worker_id[worker.id] = float(distance)
             vector_rank += 1
 
-    logger.info(f"[job {job_id}] {len(rich_matches)} candidates cleared SCORE_THRESHOLD={SCORE_THRESHOLD}")
+    if not rich_matches:
+        logger.info(f"[job {job_id}] No new candidates cleared SCORE_THRESHOLD={SCORE_THRESHOLD}")
+        return {"matches": [], "worker_chat_ids": [], "count": 0}
 
-    # 3. LLM makes the final trade-fit decision
-    rich_matches = _llm_rerank_matches(job_description, job_category, rich_matches)
-    logger.info(f"[job {job_id}] {len(rich_matches)} candidates remain after LLM reranker")
+    # 3. LLM reranks ONLY newly discovered candidates with offset applied
+    rich_matches = _llm_rerank_matches(
+        job_description, job_category, rich_matches, rank_offset=max_rank
+    )
 
-    # 4. Persist the final match set
+    # 4. Persist newly appended match records
     new_match_records = []
     notifiable_worker_chat_ids = []
 
