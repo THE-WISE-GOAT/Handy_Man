@@ -115,6 +115,7 @@ def upsert_baseline_skill(
         description=description,
         embedding=embedding,
         is_active=True,
+        stage="pending_admin_review"
     )
     db.add(baseline)
     return baseline
@@ -183,6 +184,7 @@ def upsert_speciality_skill(
         scenario_answer=scenario_answer,
         scenario_score=scenario_score,
         is_active=True,
+        stage="pending_admin_review"
     )
     db.add(skill)
     logger.info("Added new speciality %r for worker_id=%s.", normalised, worker_id)
