@@ -37,6 +37,10 @@ export const createPostingsZlice = (set, get) => ({  // ========================
   pipelineStatus: "Post Network Pipeline Monitor Active",
 
   customerSocket: null,
+  chatSocket: null,
+  chatMessages: [],
+  chatBookingChatId: null,
+  isChatConnected: false,
 
   // ==========================================
   // 3. ACTIONS AND INTEGRATION PIPELINES
@@ -208,7 +212,7 @@ export const createPostingsZlice = (set, get) => ({  // ========================
 
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      
+
       if (message.type === "WORKER_INTEREST_UPDATE") {
         const { job_id, worker_chat_id, interested } = message.data;
         set((state) => ({
@@ -226,7 +230,7 @@ export const createPostingsZlice = (set, get) => ({  // ========================
           }
         }));
       }
-      
+
       if (message.type === "NEW_BID") {
         const { job_id, bid } = message.data;
         set((state) => ({
@@ -234,7 +238,91 @@ export const createPostingsZlice = (set, get) => ({  // ========================
         }));
       }
     };
-    
+
     set({ customerSocket: socket });
   },
-});
+
+  appendMessage: (sender, text) =>
+    set((state) => ({
+      chatMessages: [
+        ...state.chatMessages,
+        { id: crypto.randomUUID(), sender, text }
+      ]
+    })),
+
+  connectCustomerChat: async (bookingChatId) => {
+    get().disconnectCustomerChat();
+    const token = localStorage.getItem("handy_man_access_token");
+    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
+    const socket = new WebSocket(
+      `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`
+    );
+
+    socket.onopen = () => {
+      set({ isChatConnected: true, chatBookingChatId: bookingChatId });
+    };
+
+    socket.onerror = (err) =>
+      console.error("❌ Customer chat WebSocket error:", err);
+
+    socket.onclose = () =>
+      set({ isChatConnected: false, chatBookingChatId: null });
+
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === "HUMAN_MESSAGE") {
+        const { sender, message: msgContent } = message.data;
+        set((state) => ({
+          chatMessages: [
+            ...state.chatMessages,
+            { id: crypto.randomUUID(), sender, text: msgContent }
+          ]
+        }));
+      }
+    };
+
+    set({ chatSocket: socket });
+  },
+
+  disconnectCustomerChat: () => {
+    const { chatSocket } = get();
+    if (chatSocket) {
+      chatSocket.close();
+      set({ chatSocket: null, isChatConnected: false, chatBookingChatId: null, chatMessages: [] });
+    }
+  },
+
+    sendHumanMessage: async (bookingChatId, sender, text) => {
+      try {
+        const data = await apiClient.post(
+          `/dispatch/chat/${bookingChatId}/message`,
+          { sender, message: text }
+        );
+        return data;
+      } catch (error) {
+        console.error("❌ Failed to send human message:", error);
+        throw error;
+      }
+    },
+
+  fetchChatHistory: async (bookingChatId) => {
+      try {
+        const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
+        const history = data.history || [];
+        const messages = history
+          .filter((msg) => msg.role !== "system")
+          .map((msg) => ({
+            id: crypto.randomUUID(),
+            sender: msg.role === "user" ? "customer" : "worker",
+            text: msg.content,
+          }));
+        set({ chatMessages: messages });
+      } catch (error) {
+        if (error.status === 500) {
+          console.error("❌ Chat history fetch failed (server error), skipping retry:", error.message);
+        } else {
+          console.error("❌ Failed to fetch chat history:", error);
+        }
+      }
+    },
+  });
