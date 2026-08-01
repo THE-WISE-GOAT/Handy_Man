@@ -44,6 +44,42 @@ async def worker_websocket_endpoint(
         manager.disconnect_worker(worker_chat_id)
 
 
+@router.websocket("/ws/{worker_chat_id}")
+async def worker_websocket_endpoint_short(
+    websocket: WebSocket,
+    worker_chat_id: int,
+    token: str,
+    db: Session = Depends(get_db),
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+    )
+    try:
+        token_data = verify_access_token(token, credentials_exception)
+    except HTTPException:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    session_record = db.execute(
+        select(model.WorkerInterviewSession).where(
+            model.WorkerInterviewSession.id == worker_chat_id,
+            model.WorkerInterviewSession.user_id == int(token_data.id),
+        )
+    ).scalar_one_or_none()
+
+    if not session_record:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await manager.connect_worker(websocket, worker_chat_id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect_worker(worker_chat_id)
+
+
 @router.websocket("/ws/booking/{booking_chat_id}")
 async def customer_websocket_endpoint(
     websocket: WebSocket, 
