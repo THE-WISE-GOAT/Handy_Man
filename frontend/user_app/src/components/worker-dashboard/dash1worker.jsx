@@ -440,7 +440,10 @@ export default function Dash1Worker({ viewSlug }) {
             <button
               type="button"
               onClick={() => {
-                alert("Joining chat is not implemented yet.");
+                closeJobDetailModal();
+                navigate(
+              `/worker/workspace/WorkspaceJobDetails?jobId=${jobDetailModal.job_id}`
+            );
               }}
               style={{
                 marginTop: "8px",

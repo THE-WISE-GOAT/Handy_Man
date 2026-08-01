@@ -480,9 +480,31 @@ export default function Dash2Board({ viewSlug }) {
                       </div>
                     </div>
 
-                    <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
-                    <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
-                  </div>
+                      <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
+                      <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedJob(job);
+                            navigate('/customer/postings/ActiveBiddingsEngine');
+                          }}
+                          style={{
+                            padding: '8px 20px',
+                            background: '#FF6B1A',
+                            color: '#0D0D0D',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                          }}
+                        >
+                          Chat
+                        </button>
+                      </div>
+                    </div>
                 );
               })
             )}
