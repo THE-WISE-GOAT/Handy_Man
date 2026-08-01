@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerDashboardData } from './useCustomerDashboardData';
 import './dash2board.css';
@@ -79,23 +79,29 @@ const Card = ({ slug, title, position, onSelect, children }) => {
 
 export default function Dash2Board({ viewSlug }) {
   const navigate = useNavigate();
-  const workerCardRefs = React.useRef({});
+   const workerCardRefs = React.useRef({});
+   const chatEndRef = React.useRef(null);
+   const [chatInput, setChatInput] = React.useState("");
   
-  const {
-    postingsSlots,
-    swapPostingsSlots,
-    biddingsStream,
-    pendingJobs,
-    selectedJob,
-    setSelectedJob,
-    fetchPendingJobs,
-    
-    matchedWorkersMap,
+   const {
+     postingsSlots,
+     swapPostingsSlots,
+     biddingsStream,
+     pendingJobs,
+     selectedJob,
+     setSelectedJob,
+     fetchPendingJobs,
+     chatMessages,
+     connectCustomerChat,
+     sendHumanMessage,
+     appendMessage,
+     disconnectCustomerChat,
+     matchedWorkersMap,
     workerLocations,          
     toggleWorkerInterest,     
-
     selectedWorkerId,
-    setSelectedWorkerId
+    setSelectedWorkerId,
+    fetchChatHistory,
   } = useCustomerDashboardData();
 
   useEffect(() => {
@@ -117,33 +123,120 @@ export default function Dash2Board({ viewSlug }) {
     }
   }, [selectedWorkerId]);
 
-  useEffect(() => {
-    if (!viewSlug) return;
-    if (postingsSlots.main !== viewSlug) {
-      const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
-      if (targetSlot) swapPostingsSlots(targetSlot);
-    }
-  }, [viewSlug, postingsSlots, swapPostingsSlots]);
+   useEffect(() => {
+     if (chatEndRef.current) {
+       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+     }
+   }, [chatMessages]);
+
+   useEffect(() => {
+     if (selectedJob) {
+       const bookingChatId = selectedJob.booking_chat_id || selectedJob.id;
+       if (bookingChatId) {
+         fetchChatHistory(bookingChatId);
+       }
+     }
+   }, [selectedJob]);
+
+   useEffect(() => {
+     if (!viewSlug) return;
+     if (postingsSlots.main !== viewSlug) {
+       const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
+       if (targetSlot) swapPostingsSlots(targetSlot);
+     }
+   }, [viewSlug, postingsSlots, swapPostingsSlots]);
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/customer/postings/${targetSlug}`);
   };
 
-  const renderBiddingsEngine = (position) => (
+  const renderBiddingsEngine = (position) => {
+    const handleSendChat = async (e) => {
+      e.preventDefault();
+      if (!chatInput.trim() || !selectedJob) return;
+      const bookingChatId = selectedJob.booking_chat_id || selectedJob.id;
+      if (!bookingChatId) return;
+      try {
+        await sendHumanMessage(bookingChatId, "customer", chatInput.trim());
+        appendMessage("customer", chatInput.trim());
+        setChatInput("");
+      } catch (err) {
+        console.error("Failed to send message:", err);
+      }
+    };
+
+    return (
     <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position} onSelect={handleModuleSelect}>
       {position === "main" ? (
-        <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <h2 style={{ flexShrink: 0 }}>ACTIVE BIDDINGS ENGINE</h2>
-          <h3 style={{ color: "var(--k-ink-3)", flexShrink: 0 }}>
-            Bids for job: {selectedJob ? selectedJob.title : "No Job Selected"}
-          </h3>
-          <div className="bids-box" style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginTop: '10px' }}>
-            {biddingsStream.map(bid => (
-              <div key={bid.id} className="bid-row">
-                <span><strong>{bid.provider}</strong>: {bid.offer}</span>
-                <span className="status-badge">{bid.status}</span>
-              </div>
-            ))}
+        <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'row', gap: '20px', minHeight: 0 }}>
+          {/* Left Panel - Job Details & Bids */}
+          <div style={{ flex: 2, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+            <h2 style={{ flexShrink: 0 }}>ACTIVE BIDDINGS ENGINE</h2>
+            <h3 style={{ color: "var(--k-ink-3)", flexShrink: 0 }}>
+              Bids for job: {selectedJob ? selectedJob.title : "No Job Selected"}
+            </h3>
+            <div className="bids-box" style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginTop: '10px' }}>
+              {biddingsStream.map(bid => (
+                <div key={bid.id} className="bid-row">
+                  <span><strong>{bid.provider}</strong>: {bid.offer}</span>
+                  <span className="status-badge">{bid.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Panel - Chat Window */}
+          <div style={{ flex: 1, minWidth: '350px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--k-line)', paddingLeft: '16px', height: '100%' }}>
+            <h3 style={{ flexShrink: 0 }}>Chat</h3>
+            <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
+              {chatMessages
+                .filter(
+                  (msg) =>
+                    msg.sender === "customer" || msg.sender === "worker"
+                )
+                .map((msg) => (
+                  <p key={msg.id} className={`chat-msg chat-msg--${msg.sender}`}>
+                    <strong>{msg.sender.toUpperCase()}:</strong> {msg.text}
+                  </p>
+                ))}
+              <div ref={chatEndRef} />
+            </div>
+            <form onSubmit={handleSendChat} style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--k-line)', flexShrink: 0 }}>
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Type a message..."
+                disabled={!selectedJob}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--k-border-strong)',
+                  background: 'var(--k-field)',
+                  color: 'var(--k-ink)',
+                  font: 'inherit',
+                  outline: 'none',
+                  fontSize: '13px'
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim() || !selectedJob}
+                style={{
+                  padding: '6px 14px',
+                  background: '#FF6B1A',
+                  color: '#0D0D0D',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '13px'
+                }}
+              >
+                Send
+              </button>
+            </form>
           </div>
         </div>
       ) : (
@@ -160,7 +253,8 @@ export default function Dash2Board({ viewSlug }) {
         </div>
       )}
     </Card>
-  );
+    );
+  };
 
   const renderLiveMap = (position) => {
     // 🛠️ ARCHITECTURAL FIX: Consumes seamlessly flattened store coordinates safely
