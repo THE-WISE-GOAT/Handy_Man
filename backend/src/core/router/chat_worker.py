@@ -42,7 +42,6 @@ from src.ai.worker_chat_analyser_nvidia import (
     extract_worker_profile,
     get_worker_description_embedding,
     is_general_competency_test,
-    parse_control_signal,
     ADD_SKILL_GREETING,
     INITIAL_GREETING,
     MAX_PRETEST_TURNS,
@@ -50,7 +49,6 @@ from src.ai.worker_chat_analyser_nvidia import (
     REJECTION_TOKEN,
     TEST_TOKEN_RE,
     COMPLETE_TOKEN,
-    NO_SPECIALITY_TOKEN,
     SCENARIO_PASS_THRESHOLD,
 )
 from src.core.worker_profile_helper import (
@@ -69,62 +67,6 @@ DEFAULT_SEARCH_RADIUS_METERS = 60_000  # 60 km hard marketplace cutoff
 # Matches [TEST_REQUIRED: some text] case-insensitively, handles extra spaces.
 _ADD_SKILL_TEST_RE = re.compile(r"\[TEST_REQUIRED\s*:\s*(.+?)\]", re.IGNORECASE)
 _ADD_SKILL_REJECTED_RE = re.compile(r"\[REJECTED\]", re.IGNORECASE)
-_NO_SPECIALITY_RE = re.compile(r"\[NO_SPECIALITY\]", re.IGNORECASE)
-
-
-# ── General-competency test record ───────────────────────────────────────────
-# The interview now grades TWO scenarios: a general competency test right after
-# the licence question, then optionally a speciality test. The general result
-# has to survive into the later request that finishes the interview, because
-# chat_session.scenario_score/scenario_passed get overwritten by the speciality
-# test. Rather than add columns and a migration, the result is written into
-# `history` (already JSONB and already persisted) as one system message and
-# read back with a regex.
-_GENERAL_RECORD_RE = re.compile(
-    r"\[GENERAL_TEST_PASSED subject=(.*?) score=(\d{1,3})\]", re.DOTALL
-)
-
-
-def _record_general_pass(history: list[dict], subject: str, score: int) -> None:
-    """
-    Append the durable record of a passed general competency test.
-
-    `subject` is free-form text the interviewer model wrote, so it is
-    sanitised before going into a delimited record: a stray "]", newline, or
-    literal "score=" inside it would otherwise break _read_general_pass and
-    silently drop the worker back into the pre-test phase.
-    """
-    safe_subject = re.sub(r"\s+", " ", (subject or "").replace("]", "")).strip()
-    safe_subject = safe_subject.replace("score=", "score ")
-    if not safe_subject:
-        safe_subject = "general competency"
-    history.append({
-        "role": "system",
-        "content": (
-            f"[GENERAL_TEST_PASSED subject={safe_subject} score={int(score)}] "
-            "The general competency test has PASSED. The worker has earned "
-            "registration. Do NOT test general competency again. Now follow "
-            "RULE 6 STEP A: ask whether they have one advanced speciality "
-            "inside their work. Ask that single question and nothing else."
-        ),
-    })
-
-
-def _read_general_pass(history: list[dict]) -> tuple[str | None, int]:
-    """
-    Recover (subject, score) of the passed general test, or (None, 0).
-
-    Used to decide whether the speciality phase has been unlocked, and to
-    supply the score that registers a worker who ends up with no verified
-    speciality.
-    """
-    for msg in reversed(history):
-        if msg.get("role") != "system":
-            continue
-        match = _GENERAL_RECORD_RE.search(msg.get("content") or "")
-        if match:
-            return match.group(1).strip(), int(match.group(2))
-    return None, 0
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -469,97 +411,17 @@ def worker_chat(
 
 # ── 2a. Grade a scenario answer ───────────────────────────────────────────────
 
-def _finalise_registration(
-    chat_session: model.WorkerInterviewSession,
-    history: list[dict],
-    sub_skill: str,
-    has_verified_specialty: bool,
-    score: int,
-    db: Session,
-) -> dict:
-    """
-    Close a successful interview: extract the profile and mark it complete.
-
-    Reached from three places, which is why it is factored out — a speciality
-    test that PASSED, a speciality test that FAILED (the worker still keeps the
-    registration the general test earned, minus the speciality), and RULE 6
-    STEP E where the worker has no speciality to test at all.
-    """
-    chat_session.history = history
-
-    try:
-        profile = extract_worker_profile(
-            history=history,
-            pending_sub_skill=sub_skill,
-            has_verified_specialty=has_verified_specialty,
-            scenario_score=score,
-            model_name=MODEL_NAME,
-        )
-        chat_session.profile = profile.model_dump()
-        ai_response = "Technical verification complete. Your profile has been registered."
-    except Exception as exc:
-        chat_session.profile = None
-        ai_response = (
-            "Technical verification complete, but we hit an internal error "
-            "building your profile. Our team will finish this manually — "
-            "no need to redo the interview."
-        )
-        logger.error(
-            "[WorkerInterview] Profile extraction failed for worker_chat_id=%s: %s",
-            chat_session.id, exc,
-        )
-
-    chat_session.stage = "complete"
-    chat_session.is_complete = True
-    chat_session.is_rejected = False
-    chat_session.has_verified_specialty = has_verified_specialty
-    _commit_or_500(db)
-
-    turns_used = count_user_turns(chat_session.history)
-    return {
-        "worker_chat_id": chat_session.id,
-        "ai_response": ai_response,
-        "stage": chat_session.stage,
-        "is_complete": True,
-        "is_rejected": False,
-        "scenario_question": None,
-        "turns_used": turns_used,
-        "turns_remaining": max(0, MAX_PRETEST_TURNS - turns_used),
-    }
-
-
 def _handle_scenario_answer(
     chat_session: model.WorkerInterviewSession,
     answer: str,
     db: Session,
 ) -> dict:
-    """
-    Grade one scenario answer.
-
-    Which test this is decides what happens next:
-
-      GENERAL COMPETENCY (fired by RULE 4B, right after the licence question)
-        pass -> the interview does NOT finish. The worker has earned
-                registration, but the session returns to "interviewing" so the
-                speciality probe (RULE 6) can run. The pass is recorded in
-                history so a later request can still see it.
-        fail -> rejected. This is the only scenario failure that rejects.
-
-      SPECIALITY (fired by RULE 6 STEP D)
-        pass -> registered WITH the verified speciality.
-        fail -> still registered, baseline only. The general test already
-                proved competence; failing an optional niche must not cost the
-                worker the standing they earned.
-    """
     history = list(chat_session.history)
     history.append({"role": "user", "content": answer})
 
-    sub_skill = chat_session.pending_sub_skill or ""
-    is_general = is_general_competency_test(sub_skill)
-
     try:
         passed, score, _report = evaluate_answer(
-            sub_skill=sub_skill,
+            sub_skill=chat_session.pending_sub_skill,
             scenario=chat_session.pending_scenario,
             answer=answer,
             model_name=MODEL_NAME,
@@ -573,197 +435,76 @@ def _handle_scenario_answer(
     chat_session.scenario_score = score
     chat_session.scenario_passed = passed
 
-    # ══ PHASE 1 — general competency ══════════════════════════════════════
-    if is_general:
-        if not passed:
-            history.append({
-                "role": "assistant",
-                "content": (
-                    f"[TEST_REQUIRED: {sub_skill}]\n"
-                    f"System record: general competency test answered. "
-                    f"Score: {score}/100. FAIL. {REJECTION_TOKEN}"
-                ),
-            })
-            chat_session.history = history
-            chat_session.stage = "complete"
-            chat_session.is_complete = True
-            chat_session.is_rejected = True
-            chat_session.has_verified_specialty = False
-            chat_session.rejection_reason = (
-                f"General competency test failed — score {score}/100 "
-                f"(required >{SCENARIO_PASS_THRESHOLD}) for '{sub_skill}'."
-            )
-            _commit_or_500(db)
-
-            turns_used = count_user_turns(chat_session.history)
-            return {
-                "worker_chat_id": chat_session.id,
-                "ai_response": (
-                    "Your answer did not demonstrate enough field knowledge for "
-                    "this role. This application cannot proceed right now."
-                ),
-                "stage": chat_session.stage,
-                "is_complete": True,
-                "is_rejected": True,
-                "scenario_question": None,
-                "turns_used": turns_used,
-                "turns_remaining": 0,
-            }
-
-        # Passed. Record it durably, then hand back to the interviewer for the
-        # speciality probe instead of completing the session.
-        history.append({
-            "role": "assistant",
-            "content": (
-                f"[TEST_REQUIRED: {sub_skill}]\n"
-                f"System record: general competency test answered. "
-                f"Score: {score}/100. PASS."
-            ),
-        })
-        _record_general_pass(history, sub_skill, score)
-
-        try:
-            speciality_question: str = _nvidia_client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=history,
-                temperature=0.0,
-                max_tokens=80,
-            ).choices[0].message.content.strip()
-        except Exception as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"NVIDIA NIM inference error: {exc}",
-            )
-
-        # The model must ask a question here, not emit a token. If it emits one
-        # anyway, fall back to RULE 6 STEP A's own wording rather than leaking
-        # a raw token to the worker or ending the interview early.
-        signal, _payload = parse_control_signal(speciality_question)
-        if signal != "message" or not speciality_question:
-            speciality_question = (
-                "Do you have any speciality inside your work — something not "
-                "every worker in your trade can do?"
-            )
-
-        history.append({"role": "assistant", "content": speciality_question})
-        chat_session.history = history
-        chat_session.stage = "interviewing"
-        chat_session.pending_sub_skill = None
-        chat_session.pending_scenario = None
-        chat_session.has_verified_specialty = False
-        _commit_or_500(db)
-
-        turns_used = count_user_turns(chat_session.history)
-        return {
-            "worker_chat_id": chat_session.id,
-            "ai_response": speciality_question,
-            "stage": "interviewing",
-            "is_complete": False,
-            "is_rejected": False,
-            "scenario_question": None,
-            "turns_used": turns_used,
-            "turns_remaining": max(0, MAX_PRETEST_TURNS - turns_used),
-        }
-
-    # ══ PHASE 2 — speciality ══════════════════════════════════════════════
-    general_subject, general_score = _read_general_pass(history)
-
     if passed:
         history.append({
             "role": "assistant",
             "content": (
-                f"[TEST_REQUIRED: {sub_skill}]\n"
-                f"System record: speciality test answered. "
-                f"Score: {score}/100. PASS. {COMPLETE_TOKEN}"
+                f"[TEST_REQUIRED: {chat_session.pending_sub_skill}]\n"
+                f"System record: scenario answered. Score: {score}/100. PASS. {COMPLETE_TOKEN}"
             ),
         })
-        return _finalise_registration(
-            chat_session, history, sub_skill,
-            has_verified_specialty=True, score=score, db=db,
-        )
+        chat_session.history = history
 
-    # Speciality failed. The worker keeps the registration the general test
-    # earned; only the unproven niche is dropped. Registering with the general
-    # subject and score means extract_worker_profile writes a baseline-only
-    # profile, exactly as it does for a worker who never claimed a niche.
-    #
-    # Unless there is no general pass on record. That means the model skipped
-    # RULE 4B and jumped straight to a speciality test, so this failed answer is
-    # the ONLY graded evidence in the session — registering on it would let an
-    # untested worker through. Reject, matching the old single-test behaviour.
-    if general_subject is None:
-        logger.warning(
-            "[WorkerInterview] Speciality test failed with no general pass on "
-            "record for worker_chat_id=%s; rejecting rather than registering "
-            "an ungraded worker.",
-            chat_session.id,
-        )
+        try:
+            profile = extract_worker_profile(
+                history=history,
+                pending_sub_skill=chat_session.pending_sub_skill,
+                has_verified_specialty=bool(chat_session.has_verified_specialty),
+                scenario_score=score,
+                model_name=MODEL_NAME,
+            )
+            chat_session.profile = profile.model_dump()
+            ai_response = "Technical verification complete. Your profile has been registered."
+        except Exception as exc:
+            chat_session.profile = None
+            ai_response = (
+                "Technical verification complete, but we hit an internal error "
+                "building your profile. Our team will finish this manually — "
+                "no need to redo the interview."
+            )
+            logger.error(
+                "[WorkerInterview] Profile extraction failed for worker_chat_id=%s: %s",
+                chat_session.id, exc,
+            )
+
+        chat_session.stage = "complete"
+        chat_session.is_complete = True
+        chat_session.is_rejected = False
+
+    else:
         history.append({
             "role": "assistant",
             "content": (
-                f"[TEST_REQUIRED: {sub_skill}]\n"
-                f"System record: scenario answered. Score: {score}/100. FAIL. "
-                f"{REJECTION_TOKEN}"
+                f"[TEST_REQUIRED: {chat_session.pending_sub_skill}]\n"
+                f"System record: scenario answered. Score: {score}/100. FAIL. {REJECTION_TOKEN}"
             ),
         })
         chat_session.history = history
         chat_session.stage = "complete"
         chat_session.is_complete = True
         chat_session.is_rejected = True
-        chat_session.has_verified_specialty = False
         chat_session.rejection_reason = (
             f"Scenario test failed — score {score}/100 "
-            f"(required >{SCENARIO_PASS_THRESHOLD}) for '{sub_skill}'."
+            f"(required >{SCENARIO_PASS_THRESHOLD}) for '{chat_session.pending_sub_skill}'."
         )
-        _commit_or_500(db)
-
-        turns_used = count_user_turns(chat_session.history)
-        return {
-            "worker_chat_id": chat_session.id,
-            "ai_response": (
-                "Your answer did not demonstrate enough field knowledge for this "
-                "role. This application cannot proceed right now."
-            ),
-            "stage": chat_session.stage,
-            "is_complete": True,
-            "is_rejected": True,
-            "scenario_question": None,
-            "turns_used": turns_used,
-            "turns_remaining": 0,
-        }
-
-    history.append({
-        "role": "assistant",
-        "content": (
-            f"[TEST_REQUIRED: {sub_skill}]\n"
-            f"System record: speciality test answered. Score: {score}/100. FAIL. "
-            f"Speciality not added; registration stands on the passed general "
-            f"competency test. {COMPLETE_TOKEN}"
-        ),
-    })
-    logger.info(
-        "[WorkerInterview] Speciality %r failed (%d/100) for worker_chat_id=%s; "
-        "registering baseline-only.",
-        sub_skill, score, chat_session.id,
-    )
-    result = _finalise_registration(
-        chat_session,
-        history,
-        general_subject,
-        has_verified_specialty=False,
-        score=general_score,
-        db=db,
-    )
-    # Only reword a clean success. If extraction broke, _finalise_registration
-    # returned the "we'll finish this manually" message and that must survive.
-    if chat_session.profile is not None:
-        result["ai_response"] = (
-            f"Your speciality answer scored {score}/100, below the "
-            f"{SCENARIO_PASS_THRESHOLD} needed to verify it, so no speciality was "
-            "added. You already passed the general competency test, so your "
-            "registration is complete and you can add a speciality later."
+        ai_response = (
+            "Your answer did not demonstrate enough field knowledge for this role. "
+            "This application cannot proceed right now."
         )
-    return result
+
+    _commit_or_500(db)
+
+    turns_used = count_user_turns(chat_session.history)
+    return {
+        "worker_chat_id": chat_session.id,
+        "ai_response": ai_response,
+        "stage": chat_session.stage,
+        "is_complete": chat_session.is_complete,
+        "is_rejected": chat_session.is_rejected,
+        "scenario_question": None,
+        "turns_used": turns_used,
+        "turns_remaining": max(0, MAX_PRETEST_TURNS - turns_used),
+    }
 
 
 # ── 2b. Regular interview turn ────────────────────────────────────────────────
@@ -776,12 +517,6 @@ def _handle_interview_turn(
     history = list(chat_session.history)
     history.append({"role": "user", "content": message})
     turns_used = count_user_turns(history)
-
-    # Has the general competency test already been passed? If so the interview
-    # is in its speciality phase, and the only things left that can end it are
-    # a speciality test or [NO_SPECIALITY] — never another general test.
-    general_subject, general_score = _read_general_pass(history)
-    in_speciality_phase = general_subject is not None
 
     try:
         ai_reply: str = _nvidia_client.chat.completions.create(
@@ -801,25 +536,17 @@ def _handle_interview_turn(
         turns_used >= MAX_PRETEST_TURNS
         and REJECTION_TOKEN not in ai_reply
         and not TEST_TOKEN_RE.search(ai_reply)
-        and not _NO_SPECIALITY_RE.search(ai_reply)
     ):
         history.append({"role": "assistant", "content": ai_reply})
-        if in_speciality_phase:
-            forced_instruction = (
-                "The interview has run long. The general competency test is "
-                "already passed, so the worker is registering either way. "
-                "Respond with ONLY one of: "
-                "[TEST_REQUIRED: <their specific advanced speciality>], or "
-                f"{NO_SPECIALITY_TOKEN} if they have not named a genuine one. "
-                "No other text."
-            )
-        else:
-            forced_instruction = (
+        history.append({
+            "role": "system",
+            "content": (
                 "The interview has run long. Based on everything discussed, "
                 f"respond with ONLY one of: {REJECTION_TOKEN}, or "
-                "[TEST_REQUIRED: <job> — general competency]. No other text."
-            )
-        history.append({"role": "system", "content": forced_instruction})
+                "[TEST_REQUIRED: <speciality, or '<job> — general competency'>]. "
+                "No other text."
+            ),
+        })
         try:
             ai_reply = _nvidia_client.chat.completions.create(
                 model=MODEL_NAME,
@@ -833,47 +560,9 @@ def _handle_interview_turn(
                 detail=f"NVIDIA NIM inference error: {exc}",
             )
 
-        # Final safety net if the forced call still doesn't comply. In the
-        # speciality phase that means closing with no speciality — never a
-        # rejection, since competence is already proven.
-        if (
-            REJECTION_TOKEN not in ai_reply
-            and not TEST_TOKEN_RE.search(ai_reply)
-            and not _NO_SPECIALITY_RE.search(ai_reply)
-        ):
-            ai_reply = NO_SPECIALITY_TOKEN if in_speciality_phase else REJECTION_TOKEN
-
-    # ── No speciality to test: close on the passed general test ───────────
-    if _NO_SPECIALITY_RE.search(ai_reply):
-        if in_speciality_phase:
-            history.append({"role": "assistant", "content": ai_reply})
-            return _finalise_registration(
-                chat_session, history, general_subject,
-                has_verified_specialty=False, score=general_score, db=db,
-            )
-        # Emitted before the general test was ever taken. Strip it and let the
-        # turn fall through rather than registering an untested worker.
-        logger.warning(
-            "[WorkerInterview] %s emitted before the general test on "
-            "worker_chat_id=%s; ignoring.",
-            NO_SPECIALITY_TOKEN, chat_session.id,
-        )
-        ai_reply = _NO_SPECIALITY_RE.sub("", ai_reply).strip()
-
-    # ── A rejection after the general test has passed ─────────────────────
-    # Competence is already proven and registration already earned, so RULE 6
-    # running aground must not undo it. Close baseline-only instead.
-    if REJECTION_TOKEN in ai_reply and in_speciality_phase:
-        logger.info(
-            "[WorkerInterview] %s during the speciality phase on "
-            "worker_chat_id=%s; registering baseline-only instead.",
-            REJECTION_TOKEN, chat_session.id,
-        )
-        history.append({"role": "assistant", "content": ai_reply})
-        return _finalise_registration(
-            chat_session, history, general_subject,
-            has_verified_specialty=False, score=general_score, db=db,
-        )
+        # Final safety net: if the forced call still doesn't comply, reject.
+        if REJECTION_TOKEN not in ai_reply and not TEST_TOKEN_RE.search(ai_reply):
+            ai_reply = REJECTION_TOKEN
 
     # ── Route on the terminal signal ──────────────────────────────────────
     if REJECTION_TOKEN in ai_reply:
@@ -902,24 +591,7 @@ def _handle_interview_turn(
     test_match = TEST_TOKEN_RE.search(ai_reply)
     if test_match:
         sub_skill = test_match.group(1).strip()
-        has_verified_specialty = not is_general_competency_test(sub_skill)
-
-        # The general test is taken exactly once. If the model asks for another
-        # one after it has already passed, that is RULE 6 STEP E in disguise:
-        # the worker has no niche worth testing, so close baseline-only rather
-        # than re-grading the competency they already proved.
-        if in_speciality_phase and not has_verified_specialty:
-            logger.info(
-                "[WorkerInterview] Second general competency test requested on "
-                "worker_chat_id=%s; closing baseline-only instead.",
-                chat_session.id,
-            )
-            history.append({"role": "assistant", "content": ai_reply})
-            return _finalise_registration(
-                chat_session, history, general_subject,
-                has_verified_specialty=False, score=general_score, db=db,
-            )
-
+        has_verified_specialty = "general competency" not in sub_skill.lower()
         visible_reply = ai_reply[: test_match.start()].strip()
         history.append({"role": "assistant", "content": ai_reply})
 
@@ -1294,7 +966,7 @@ async def add_skill_chat(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "Not currently in an add-skill flow."
+                "Not currently in an add-skill flow. "
                 "Call POST /worker-interview/{id}/add-skill first."
             ),
         )
