@@ -209,24 +209,32 @@ def list_pending_applications(
             detail="Admin access required.",
         )
 
-    # Optimized to prevent N+1 Queries
+    # Fetch strictly based on WorkerSkill stage
     stmt = (
-        select(model.WorkerProfile, model.User, model.WorkerInterviewSession)
+        select(model.WorkerProfile, model.User, model.WorkerInterviewSession, model.WorkerSkill)
         .join(model.User, model.WorkerProfile.user_id == model.User.id)
-        .outerjoin(model.WorkerInterviewSession, model.WorkerProfile.worker_chat_id == model.WorkerInterviewSession.id)
-        .where(
-            model.WorkerProfile.stage.in_(["pending_admin_review", "complete"]),
+        .outerjoin(
+            model.WorkerInterviewSession, 
+            model.WorkerProfile.worker_chat_id == model.WorkerInterviewSession.id
         )
-        .order_by(model.WorkerProfile.id.desc())
+        .join(model.WorkerSkill, model.WorkerProfile.id == model.WorkerSkill.worker_id)
+        .where(
+            model.WorkerSkill.stage == "pending_admin_review" # Strict filter on WorkerSkill
+        )
+        .order_by(model.WorkerSkill.updated_at.desc())
     )
 
     results = db.execute(stmt).all()
     applications = []
     
-    for profile, user, session in results:
-        # Dictionary unpacking safely merges objects for the Pydantic model
+    for profile, user, session, skill in results:
         app_data = {
             **profile.__dict__,
+            # Override WorkerProfile stage with WorkerSkill stage
+            "stage": skill.stage,
+            "skill_id": skill.id,
+            "skill_title": skill.title,
+            "skill_type": skill.skill_type,
             "username": user.username,
             "email": user.email,
             "firstName": user.firstName,
@@ -238,102 +246,89 @@ def list_pending_applications(
 
     return applications
 
-
 @router.post(
-    "/admin/applications/{worker_id}/approve",
-    summary="Admin-only: approve a worker application",
+    "/admin/applications/{skill_id}/approve",
+    status_code=status.HTTP_200_OK,
+    summary="Admin-only: Approve a worker application skill",
 )
-async def approve_worker_application(
-    worker_id: int,
+def approve_worker_application(
+    skill_id: int,
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
     if not _is_admin(current_user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
-
-    profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
-
-    if not profile or profile.stage not in ("pending_admin_review", "complete"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Valid pending application not found.")
-
-    profile.is_complete = True
-    profile.stage = "approved"
-    profile.is_rejected = False
-    profile.rejection_reason = None
-
-    if not profile.job_category and profile.worker_chat_id:
-        session = db.execute(select(model.WorkerInterviewSession).where(model.WorkerInterviewSession.id == profile.worker_chat_id)).scalar_one_or_none()
-        if session and session.profile:
-            sync_profile_extracted_fields(profile, session.profile)
-
-    # Only build a baseline here if the worker doesn't already have a usable one.
-    # The chat registration path writes a better baseline — layered text embedded
-    # on its own — and re-deriving it from the composed job_description on every
-    # approve would overwrite that with a weaker vector and burn an embedding call.
-    existing_baseline = db.execute(
-        select(model.WorkerSkill).where(
-            model.WorkerSkill.worker_id == profile.id,
-            model.WorkerSkill.skill_type == model.SkillType.BASELINE,
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
         )
-    ).scalar_one_or_none()
 
-    needs_baseline = existing_baseline is None or existing_baseline.embedding is None
+    # 1. Locate the specific WorkerSkill being approved
+    skill = db.scalar(select(model.WorkerSkill).where(model.WorkerSkill.id == skill_id))
+    if not skill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Worker skill entry {skill_id} not found.",
+        )
 
-    if profile.job_description and needs_baseline:
-        try:
-            embedding_vec = await get_worker_description_embedding(profile.job_description)
-        except Exception as exc:
-            logger.error("Failed to embed worker job_description on approve: %s", exc)
-            embedding_vec = None
+    # 2. Update the skill stage
+    skill.stage = "complete"
+    skill.rejection_reason = None
 
-        primary_title = profile.job_category or "General Skill"
-        upsert_baseline_skill(db, profile.id, primary_title, profile.job_description, embedding_vec)
+    # 3. Locate and update the parent WorkerProfile
+    profile = db.scalar(select(model.WorkerProfile).where(model.WorkerProfile.id == skill.worker_id))
+    if profile:
+        profile.stage = "approved"
+        profile.is_complete = True
+        profile.is_rejected = False
+        profile.rejection_reason = None
 
-    user = db.query(model.User).filter(model.User.id == profile.user_id).first()
-    worker_role = db.query(model.Role).filter(model.Role.name.ilike("worker")).first()
-    if user and worker_role and worker_role not in user.roles:
-        user.roles.append(worker_role)
+    db.commit()
+    if profile:
+        db.refresh(profile)
+    db.refresh(skill)
 
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to approve application.")
-
-    return {"message": "Application approved successfully.", "worker_id": worker_id}
+    return {"message": f"Worker application skill {skill_id} approved successfully."}
 
 
 @router.post(
-    "/admin/applications/{worker_id}/reject",
-    summary="Admin-only: reject a worker application with a reason",
+    "/admin/applications/{skill_id}/reject",
+    status_code=status.HTTP_200_OK,
+    summary="Admin-only: Reject a worker application skill",
 )
 def reject_worker_application(
-    worker_id: int,
+    skill_id: int,
     payload: schema.RejectWorkerIn,
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
     if not _is_admin(current_user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
 
-    profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
+    skill = db.scalar(select(model.WorkerSkill).where(model.WorkerSkill.id == skill_id))
+    if not skill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Worker skill entry {skill_id} not found.",
+        )
 
-    if not profile or profile.stage not in ("pending_admin_review", "complete"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Valid pending application not found.")
+    skill.stage = "rejected"
+    skill.rejection_reason = payload.reason
 
-    profile.is_complete = False
-    profile.is_rejected = True
-    profile.rejection_reason = payload.reason
-    profile.stage = "rejected"
+    profile = db.scalar(select(model.WorkerProfile).where(model.WorkerProfile.id == skill.worker_id))
+    if profile:
+        profile.stage = "rejected"
+        profile.is_rejected = True
+        profile.rejection_reason = payload.reason
 
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to reject application.")
+    db.commit()
+    if profile:
+        db.refresh(profile)
+    db.refresh(skill)
 
-    return {"message": "Application rejected.", "worker_id": worker_id, "reason": payload.reason}
-
+    return {"message": f"Worker application skill {skill_id} rejected."}
 
 @router.patch(
     "/my-profile",
