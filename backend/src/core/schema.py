@@ -76,18 +76,23 @@ class WorkerAppStatusOut(BaseModel):
 
     class Config:
         from_attributes = True
-
+        
 class AdminPendingAppOut(BaseModel):
+    skill_id: int
+    skill_title: str
+    skill_type: str
+    stage: str  
+    
     id: int
     user_id: int
     username: str
     email: str
     firstName: str | None = None
     lastName: str | None = None
-    stage: str
     is_complete: bool
     is_rejected: bool
     rejection_reason: str | None = None
+    skill_rejection_reason: str | None = Field(None, validation_alias="rejection_reason") # maps skill's rejection reason cleanly
     job_category: str
     category_tag: str
     specialities: List[str]
@@ -97,6 +102,10 @@ class AdminPendingAppOut(BaseModel):
     address_text: str | None = None
     history: List[dict] | None = None
     profile: dict | None = None
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 class RejectWorkerIn(BaseModel):
     reason: str = Field(..., min_length=1, max_length=1000)
