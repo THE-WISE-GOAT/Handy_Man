@@ -15,7 +15,7 @@ Public surface
                                   interview router's _handle_interview_turn)
   SCENARIO_PASS_THRESHOLD      — score a worker must exceed to pass
   INITIAL_GREETING             — first assistant message, seeded into history
-  REJECTION_TOKEN / TEST_TOKEN_RE / COMPLETE_TOKEN
+  REJECTION_TOKEN / TEST_TOKEN_RE / COMPLETE_TOKEN / NO_SPECIALITY_TOKEN
                                 — control signals the interviewer model
                                   emits; the router watches for these to
                                   drive the state machine
@@ -142,15 +142,29 @@ row.
 
 Design notes on the interview flow itself
 ----------------------------------------------
+  * TWO TESTS, IN A FIXED ORDER. Every worker takes a GENERAL COMPETENCY
+    test on the ordinary everyday work of their trade (RULE 4B), fired the
+    moment they answer the licence/certification question. Passing it is
+    what earns registration. Only after it passes does the interviewer
+    begin the speciality probe (RULE 6), and a claimed niche gets its own
+    second scenario test.
+
+    The original single-test flow asked about speciality first and tested
+    only whatever came out of that, so a worker who claimed no niche was
+    tested generally and a worker who claimed one was never tested on
+    their ordinary trade work at all. Ordering the general test first
+    means the baseline layer — the half of the profile that matches most
+    customer requests — is always backed by a graded answer.
+
   * SPECIALTY PROBING IS DEPTH-FIRST, NOT PASS/FAIL ON ITS OWN. The
     interviewer tries to find one genuine advanced niche, but a worker who
-    genuinely doesn't have one is NOT auto-rejected the way the original
-    single-shot version did. RULE 6 (STEP E) explicitly pivots to a
-    general-competency question and a general-level scenario test instead.
-    Only outright non-answers (0 experience, gibberish, evasive, abusive)
-    are rejected outright — "I don't have a specialty, I just do standard
-    work" is a valid, testable answer, and the resulting profile is
-    flagged has_verified_specialty=False rather than discarded.
+    genuinely doesn't have one is NOT rejected: RULE 6 STEP E emits
+    NO_SPECIALITY_TOKEN and the worker registers on the general test they
+    already passed, flagged has_verified_specialty=False. Failing the
+    SPECIALITY test is likewise not a rejection — the worker keeps the
+    registration the general test earned and simply gains no speciality
+    row. Only outright non-answers (0 experience, gibberish, evasive,
+    abusive) and a failed GENERAL test reject an application.
 
   * THE ROUTER NEVER TRUSTS A BARE [COMPLETE] DURING THE INTERVIEW STAGE.
     Completion can ONLY happen after evaluate_answer() has actually scored
@@ -238,6 +252,13 @@ REJECTION_TOKEN = "[REJECTED]"
 TEST_TOKEN_RE   = re.compile(r"\[TEST_REQUIRED:\s*(.+?)\]", re.IGNORECASE | re.DOTALL)
 COMPLETE_TOKEN  = "[COMPLETE]"
 
+# Emitted by RULE 6 STEP E: the worker passed the general competency test but
+# has no advanced niche to test. Terminal and NON-rejecting — it closes the
+# interview on the general competency they already proved. Before the two-phase
+# split, STEP E emitted a second [TEST_REQUIRED: ... general competency] here,
+# which would now re-test the exact thing RULE 4B just graded.
+NO_SPECIALITY_TOKEN = "[NO_SPECIALITY]"
+
 # Marks a TEST_REQUIRED payload as the general-competency fallback rather
 # than a claimed niche. The interviewer prompt is told to append it; the
 # router should read has_verified_specialty from
@@ -273,11 +294,12 @@ RULE 3 — WHAT TO COLLECT, IN THIS ORDER
   b) BASELINE SCOPE CHECK — see RULE 4. Ask this immediately after you know the job, before anything else.
   c) How many years of professional experience?
   d) Any license, certificate, or formal training? ("no formal certification" is a fine, complete answer.)
-  e) Do they have one advanced speciality within their job? (see RULE 6 — this step always runs, even if the answer ends up being "no")
-  f) What specialized tools, machines, or equipment do they personally own or operate, beyond ordinary hand tools?
-  g) Are they available for emergency or after-hours calls?
+  e) GENERAL COMPETENCY TEST — see RULE 4B. The moment they answer (d), you STOP asking questions and hand off to this test. Do not ask about speciality, tools, or emergencies before it.
+  f) Do they have one advanced speciality within their job? (see RULE 6 — this phase only begins AFTER the general test has been passed)
+  g) What specialized tools, machines, or equipment do they personally own or operate, beyond ordinary hand tools?
+  h) Are they available for emergency or after-hours calls?
 
-Collect strictly one at a time, in this order. Do not ask about tools before you've asked about speciality. Do not skip ahead.
+Collect strictly one at a time, in this order. Do not ask about tools before you've asked about speciality. Do not skip ahead, and never reach (f) before the general test in (e) has been passed.
 
 ════════════════════════════════════
 RULE 4 — BASELINE SCOPE CHECK (ask once, right after you learn the job)
@@ -299,6 +321,20 @@ Those are examples of the SHAPE of the question. For any other trade, work out i
 If the worker says they do NOT do some of what you listed, accept it immediately without argument and move on to RULE 3(c). Do not treat it as a bad sign — it is normal and useful, and their answer here decides what work they get sent. Never ask about baseline scope a second time.
 
 ════════════════════════════════════
+RULE 4B — GENERAL COMPETENCY TEST (fires right after the licence question)
+════════════════════════════════════
+Every worker is tested on the ordinary everyday work of their trade BEFORE any talk of a speciality. Passing this is what earns registration; a speciality is an optional extra on top.
+
+The moment the worker answers RULE 3(d) — the licence, certificate, or training question — you stop asking questions. Ask nothing about speciality, tools, or emergency availability. Output exactly and only:
+  [TEST_REQUIRED: <their job, in plain words> — {GENERAL_COMPETENCY_SUFFIX}]
+
+Do not comment on their licence answer. Do not announce the test. Do not ask whether they are ready. The token is the entire reply.
+
+"no formal certification" is a complete answer to RULE 3(d) — it is never a reason to ask a follow-up, and never a reason to reject.
+
+The system grades this test and injects the result. Only after it has PASSED do you continue to RULE 6.
+
+════════════════════════════════════
 RULE 5 — OUTRIGHT REJECTION
 ════════════════════════════════════
 Output ONLY the exact token {REJECTION_TOKEN} — nothing else, no other words — when:
@@ -314,9 +350,11 @@ Give exactly ONE follow-up question to clarify an unclear answer before rejectin
 Saying "no" to part of the baseline scope in RULE 4 is NEVER a reason to reject. Neither is having no speciality.
 
 ════════════════════════════════════
-RULE 6 — SPECIALITY PROBE (the core of the interview — read carefully)
+RULE 6 — SPECIALITY PROBE (runs ONLY after the general test has passed)
 ════════════════════════════════════
-Goal: find ONE genuine advanced niche within their job — something not every worker with that job title can do. A worker who genuinely has no such niche is NOT a rejection; see STEP E.
+Do not begin this rule until the system has told you the general competency test PASSED. Until that message arrives, RULE 4B is the only thing you do after the licence question.
+
+Goal: find ONE genuine advanced niche within their job — something not every worker with that job title can do. A worker who genuinely has no such niche is NOT a rejection; see STEP E. They are already registered on the strength of the general test they passed.
 
 STEP A — Ask plainly, using the word "speciality" in simple terms:
   "Do you have any speciality inside your [job] work — something not every [job] worker can do?"
@@ -342,9 +380,9 @@ STEP C — If they name something, check it isn't just the basic job — that is
 STEP D — If, after that one push-back, they name a genuine advanced niche (needs extra training or experience beyond the basic job — e.g. "solar water heater installation and pressurised system commissioning," "three-phase industrial panel wiring," "TIG welding of stainless steel," "traditional Newari wood carving"), stop all other questions immediately and output exactly:
   [TEST_REQUIRED: <the speciality in plain words>]
 
-STEP E — If, after the one push-back, they still cannot name anything beyond the basic job — this is expected and FINE, do not reject and do not say anything is wrong. Just move on. Ask any remaining RULE 3 items (tools, emergency availability) if not yet asked, then output exactly:
-  [TEST_REQUIRED: <their job, in plain words> — {GENERAL_COMPETENCY_SUFFIX}]
-  This tests their core job knowledge instead of a niche. A worker with no speciality can still pass and register, and will be sent the ordinary everyday work of their trade.
+STEP E — If, after the one push-back, they still cannot name anything beyond the basic job — this is expected and FINE, do not reject and do not say anything is wrong. They have already passed the general test and are registering on that basis. Just move on. Ask any remaining RULE 3 items (tools, emergency availability) if not yet asked, then output exactly:
+  {NO_SPECIALITY_TOKEN}
+  This closes the interview with the general competency they already proved. Never issue a second general competency test — that test has already been taken and passed.
 
 Never loop STEP C more than once. One push-back only, then move to STEP D or STEP E based on what they actually said.
 
@@ -353,19 +391,27 @@ Write the speciality inside the token in plain descriptive words, not as a singl
 ════════════════════════════════════
 RULE 7 — RUNNING LONG
 ════════════════════════════════════
-If you reach your 9th question in this interview and have not yet reached STEP D or STEP E of RULE 6, stop wherever you are, ask one last question — "What is the hardest version of your everyday work?" — and immediately treat the answer as STEP D (if specific) or STEP E (if still generic). Do not let the interview run past this without resolving to a test.
+If you reach your 9th question in this interview and have not yet reached STEP D or STEP E of RULE 6, stop wherever you are, ask one last question — "What is the hardest version of your everyday work?" — and immediately treat the answer as STEP D (if specific) or STEP E (if still generic). Do not let the interview run past this without resolving.
+
+If you are somehow still asking questions and the general competency test of RULE 4B has not been issued yet, issue it immediately instead of asking anything further.
 
 ════════════════════════════════════
-RULE 8 — AFTER THE SCENARIO TEST
+RULE 8 — AFTER A SCENARIO TEST
 ════════════════════════════════════
-The system will inject a message telling you the test result. You do not grade it yourself.
-  - If PASSED: output exactly {COMPLETE_TOKEN} and nothing else.
-  - If FAILED: output exactly {REJECTION_TOKEN} and nothing else.
+The system will inject a message telling you the test result. You do not grade it yourself. There are two different tests, so read which one the message refers to:
+
+  GENERAL COMPETENCY TEST (RULE 4B):
+    - If PASSED: do NOT output {COMPLETE_TOKEN}. Move straight to RULE 6 STEP A and ask about their speciality.
+    - If FAILED: output exactly {REJECTION_TOKEN} and nothing else.
+
+  SPECIALITY TEST (RULE 6 STEP D):
+    - If PASSED: output exactly {COMPLETE_TOKEN} and nothing else.
+    - If FAILED: output exactly {COMPLETE_TOKEN} and nothing else. They keep the registration they earned by passing the general test; only the speciality is not added. Do not reject them for this.
 
 ════════════════════════════════════
 RULE 9 — TOKENS ARE NEVER MIXED WITH PROSE
 ════════════════════════════════════
-When you output {REJECTION_TOKEN}, [TEST_REQUIRED: ...], or {COMPLETE_TOKEN}, that token is the ENTIRE reply. No explanation before it, no sentence after it, no quotes or formatting around it.
+When you output {REJECTION_TOKEN}, [TEST_REQUIRED: ...], {NO_SPECIALITY_TOKEN}, or {COMPLETE_TOKEN}, that token is the ENTIRE reply. No explanation before it, no sentence after it, no quotes or formatting around it.
 
 ════════════════════════════════════
 TONE
@@ -667,7 +713,7 @@ def parse_control_signal(reply: str) -> tuple[str, str | None]:
     """
     Read an interviewer reply into (signal, payload).
 
-    signal is one of: "rejected", "test", "complete", "message".
+    signal is one of: "rejected", "test", "no_speciality", "complete", "message".
     payload is the sub-skill string for "test", the cleaned assistant text
     for "message", and None otherwise.
 
@@ -675,8 +721,8 @@ def parse_control_signal(reply: str) -> tuple[str, str | None]:
     checks, which meant a model that wrapped a token in prose or quotes
     (RULE 9 exists precisely because small models do this) either stalled
     the state machine or leaked a raw token to the worker. Rejection is
-    checked first, then test, then completion: if a confused model emits
-    more than one signal, the safest reading wins.
+    checked first, then test, then no-speciality, then completion: if a
+    confused model emits more than one signal, the safest reading wins.
 
     This function reports what the model SAID. It deliberately does not
     decide whether that signal is legal at the current stage — the router
@@ -696,6 +742,9 @@ def parse_control_signal(reply: str) -> tuple[str, str | None]:
         if sub_skill:
             return "test", sub_skill
         logger.warning("TEST_REQUIRED token had an empty payload; treating as message.")
+
+    if NO_SPECIALITY_TOKEN.lower() in text.lower():
+        return "no_speciality", None
 
     if COMPLETE_TOKEN.lower() in text.lower():
         return "complete", None
