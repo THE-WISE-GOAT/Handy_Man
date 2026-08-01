@@ -266,6 +266,9 @@ class WorkerSkill(Base):
         index=True,
     )
 
+    stage: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., "complete"
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Short human-readable label: the trade name for a baseline row, the tested
     # sub-skill for a speciality row. Shown in admin and match UIs.
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -298,6 +301,8 @@ class WorkerSkill(Base):
         "WorkerProfile",
         back_populates="skills",
     )
+
+
 
 
 class CustomerChatData(Base):
