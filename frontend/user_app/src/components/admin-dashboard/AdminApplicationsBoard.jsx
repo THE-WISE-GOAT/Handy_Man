@@ -33,10 +33,10 @@ export default function AdminApplicationsBoard({ viewSlug }) {
     loadApplications();
   }, []);
 
-  const handleApprove = async (workerId) => {
-    setActionLoading(`approve-${workerId}`);
+const handleApprove = async (skillId) => {
+    setActionLoading(`approve-${skillId}`);
     try {
-      await apiClient.post(`/worker-onboarding/admin/applications/${workerId}/approve`);
+      await apiClient.post(`/worker-onboarding/admin/applications/${skillId}/approve`);
       await loadApplications();
     } catch (err) {
       const normalized = normalizeApiError(err, "Failed to approve application.");
@@ -51,12 +51,12 @@ export default function AdminApplicationsBoard({ viewSlug }) {
     setRejectReason("");
   };
 
-  const handleRejectConfirm = async () => {
+const handleRejectConfirm = async () => {
     if (!rejectTarget || !rejectReason.trim()) return;
-    setActionLoading(`reject-${rejectTarget.id}`);
+    setActionLoading(`reject-${rejectTarget.skill_id}`);
     try {
       await apiClient.post(
-        `/worker-onboarding/admin/applications/${rejectTarget.id}/reject`,
+        `/worker-onboarding/admin/applications/${rejectTarget.skill_id}/reject`,
         { reason: rejectReason.trim() }
       );
       setRejectTarget(null);
@@ -199,9 +199,9 @@ export default function AdminApplicationsBoard({ viewSlug }) {
                         {app.email} • ID: {app.user_id} • App ID: {app.id}
                       </p>
                       <div className="admin-application-details">
-                        <span className="admin-detail-tag">Category: {app.job_category || "—"}</span>
-                        <span className="admin-detail-tag">Tag: {app.category_tag || "—"}</span>
-                        <span className="admin-detail-tag">Experience: {app.years_experience} yrs</span>
+                          <span className="admin-detail-tag">Skill: {app.skill_title || "—"}</span>
+                          <span className="admin-detail-tag">Type: {app.skill_type || "—"}</span>
+                          <span className="admin-detail-tag">Experience: {app.years_experience} yrs</span>
                         <span className="admin-detail-tag">Specialities: {app.specialities?.length > 0 ? app.specialities.join(", ") : "—"}</span>
                         {app.phone_number && (
                           <span className="admin-detail-tag">Phone: {app.phone_number}</span>
@@ -211,25 +211,25 @@ export default function AdminApplicationsBoard({ viewSlug }) {
                         )}
                       </div>
                     </div>
-                    <div className="admin-application-actions">
-                      <button
-                        className="admin-btn admin-btn--approve"
-                        onClick={(e) => { e.stopPropagation(); handleApprove(app.id); }}
-                        disabled={actionLoading === `approve-${app.id}`}
-                      >
-                        {actionLoading === `approve-${app.id}` ? "Approving..." : "Approve"}
-                      </button>
-                      <button
-                        className="admin-btn admin-btn--reject"
-                        onClick={(e) => { e.stopPropagation(); handleRejectClick(app); }}
-                        disabled={actionLoading === `reject-${app.id}`}
-                      >
-                        Reject
-                      </button>
-                      <span className="admin-expand-hint">
-                        {expandedId === app.id ? "▲ Hide" : "▼ View Details"}
-                      </span>
-                    </div>
+                      <div className="admin-application-actions">
+                          <button
+                            className="admin-btn admin-btn--approve"
+                            onClick={(e) => { e.stopPropagation(); handleApprove(app.skill_id); }}
+                            disabled={actionLoading === `approve-${app.skill_id}`}
+                          >
+                            {actionLoading === `approve-${app.skill_id}` ? "Approving..." : "Approve"}
+                          </button>
+                          <button
+                            className="admin-btn admin-btn--reject"
+                            onClick={(e) => { e.stopPropagation(); handleRejectClick(app); }}
+                            disabled={actionLoading === `reject-${app.skill_id}`}
+                          >
+                            Reject
+                          </button>
+                          <span className="admin-expand-hint">
+                            {expandedId === app.id ? "▲ Hide" : "▼ View Details"}
+                          </span>
+                        </div>
                   </div>
 
                   {expandedId === app.id && (
@@ -308,14 +308,14 @@ export default function AdminApplicationsBoard({ viewSlug }) {
               <button
                 type="button"
                 onClick={handleRejectConfirm}
-                disabled={!rejectReason.trim() || actionLoading === `reject-${rejectTarget.id}`}
+                disabled={!rejectReason.trim() || actionLoading === `reject-${rejectTarget.skill_id}`}
                 style={{
                   flex: 1, padding: "10px", background: "rgba(220, 53, 69, 0.15)", border: "1px solid rgba(220, 53, 69, 0.3)",
                   borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
                   cursor: "pointer", color: "#ff6b6b"
                 }}
               >
-                {actionLoading === `reject-${rejectTarget.id}` ? "Rejecting..." : "Confirm Reject"}
+                {actionLoading === `reject-${rejectTarget.skill_id}` ? "Rejecting..." : "Confirm Reject"}
               </button>
             </div>
           </div>

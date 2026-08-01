@@ -392,7 +392,10 @@ export default function Dash3Worker({ viewSlug }) {
             <span className="badge">
               {chatMessages.length > 1 ? `${chatMessages.length} messages` : "Not started"}
             </span>
+
           </div>
+
+
         </div>
       );
     }
@@ -403,7 +406,41 @@ export default function Dash3Worker({ viewSlug }) {
 
     return (
       <div className="dashboard-card slot-main">
-        <div className="card-header">••• AI INTERVIEW TERMINAL</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+        <div className="card-header">•••AI INTERVIEW TERMINAL</div>        
+            <button
+              type="button"
+              onClick={() => {
+                
+              }}
+              style={{
+                background: "#FF6B1A",
+                color: "#0D0D0D",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 14px",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: "12px",
+                transition: "transform 120ms ease, opacity 120ms ease",
+                display: 'none'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = 0.85;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = 1;
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "scale(0.95)";
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >ADD CATEGORY</button>
+
+        </div>
+        
         <div className="main-panel chat-terminal-panel">
           {!hasActiveChat && !applicationSubmitted ? (
             <div className="start-interview-prompt">
@@ -425,7 +462,7 @@ export default function Dash3Worker({ viewSlug }) {
               {turnsRemaining !== undefined && (
                 <span className="turns-badge">TURNS LEFT: {turnsRemaining}</span>
               )}
-              <div className="chat-box">
+              <div className="chat-box" style={{ minHeight:"80%", maxHeight:'' }}>
                 {chatMessages.map((m) => (
                   <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
                     <strong>{m.sender.toUpperCase()}:</strong> {m.text}
@@ -870,9 +907,9 @@ export default function Dash3Worker({ viewSlug }) {
               <button
                 type="submit"
                 style={{
-                  background: "#FF6B1A", color: "#FFFFFF", border: "none",
+                  background: "#FF6B1A", color: "#0D0D0D", border: "none",
                   borderRadius: "6px", padding: "0 12px", font: "inherit",
-                  fontSize: "11px", fontWeight: "bold", cursor: "pointer"
+                  fontSize: "11px", fontWeight: 700, cursor: "pointer"
                 }}
               >
                 FIND
@@ -884,7 +921,7 @@ export default function Dash3Worker({ viewSlug }) {
               onClick={handleModalLiveTracking}
               title="Snap to My Current Position"
                 style={{
-                  background: "rgba(59, 130, 246, 0.15)", border: "1px solid rgba(59, 130, 246, 0.3)", borderRadius: "6px",
+                  background: "var(--k-wash)", border: "1px solid rgba(255, 107, 26, 0.4)", borderRadius: "6px",
                   padding: "0 10px", cursor: "pointer", fontSize: "14px", display: "flex",
                   alignItems: "center", justifyContent: "center"
                 }}
@@ -929,9 +966,9 @@ export default function Dash3Worker({ viewSlug }) {
               type="button"
               onClick={confirmMapLocation}
                 style={{
-                  flex: 1, padding: "8px", background: "rgba(74, 222, 128, 0.15)", border: "1px solid rgba(74, 222, 128, 0.3)",
-                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer", color: "#4ade80"
+                  flex: 1, padding: "8px", background: "#FF6B1A", border: "1px solid #FF6B1A",
+                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: 700,
+                  cursor: "pointer", color: "#0D0D0D"
                 }}
               onMouseDown={(e) => e.currentTarget.style.transform = "translate(2px, 2px)"}
               onMouseUp={(e) => e.currentTarget.style.transform = "none"}

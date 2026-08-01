@@ -140,9 +140,9 @@ const profile = await login({
       <div className={`auth-shell ${activeMode === 'signup' ? 'is-signup' : ''}`}>
         <aside className="auth-shell__intro">
           <div className="auth-shell__brand">
-            <span className="auth-shell__mark">HM</span>
+            <span className="auth-shell__mark">K</span>
             <div>
-              <p className="auth-shell__eyebrow">Handy Man Dispatch</p>
+              <p className="auth-shell__eyebrow">Kamigo Dispatch</p>
               <h1>Instant access to verified local experts.</h1>
             </div>
           </div>
@@ -260,9 +260,9 @@ const profile = await login({
                     marginTop: '1rem',
                     padding: '12px 14px',
                     borderRadius: '8px',
-                    backgroundColor: statusType === 'success' ? 'rgba(74, 222, 128, 0.15)' : 'rgba(220, 53, 69, 0.1)',
-                    color: statusType === 'success' ? '#4ade80' : '#ff6b6b',
-                    borderLeft: statusType === 'success' ? '3px solid #4ade80' : '3px solid #ff6b6b',
+                    backgroundColor: statusType === 'success' ? 'var(--k-wash)' : 'var(--k-alert-wash)',
+                    color: statusType === 'success' ? 'var(--k-orange-ink)' : 'var(--k-alert-ink)',
+                    borderLeft: statusType === 'success' ? '3px solid #FF6B1A' : '3px solid #E5484D',
                     textAlign: statusType === 'success' ? 'center' : 'left',
                     lineHeight: '1.5',
                     gridColumn: '1 / -1'

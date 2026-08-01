@@ -27,6 +27,10 @@ def upgrade() -> None:
     op.drop_table('worker_expertises')
     op.drop_column('customer_chat_data', 'address')
     op.drop_column('customer_chat_data', 'phone_number')
+    # 1. Prune orphan rows in job_worker_matches before adding FK constraint
+    op.execute("DELETE FROM job_worker_matches WHERE job_id NOT IN (SELECT id FROM jobs)")
+
+    # 2. Existing foreign key creation
     op.create_foreign_key(None, 'job_worker_matches', 'jobs', ['job_id'], ['id'], ondelete='CASCADE')
     op.drop_column('workers', 'address')
     # ### end Alembic commands ###

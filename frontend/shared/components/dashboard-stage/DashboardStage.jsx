@@ -12,7 +12,7 @@ export function FixFastNavbar({
   return (
     <header className="fixfast-nav">
       <div className="fixfast-nav__brand">
-        <div className="fixfast-nav__logo">HM</div>
+        <div className="fixfast-nav__logo">K</div>
         <div>
           <div className="fixfast-nav__eyebrow">{brandEyebrow}</div>
           <div className="fixfast-nav__title">{brandTitle}</div>

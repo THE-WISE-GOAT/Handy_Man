@@ -113,14 +113,14 @@ class Bids(Base):
 )
     
 # in my point of view not needed
-class WorkerSkillsSchema(BaseModel):
-    primary_trades: List[str] = Field(default_factory=list, description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
-    specific_skills: List[str] = Field(default_factory=list, description="Specific tasks they can do, e.g., fixing leaks, installing ceiling fans, drywall patching")
-    years_of_experience: int = Field(default=0, description="Total years of experience as an integer")
-    special_tools: List[str] = Field(default_factory=list, description="Key tools they own, e.g., ladders, power drills, welding gear, snakes")
-    certifications: List[str] = Field(default_factory=list, description="Any professional licenses or certifications mentioned")
-    estimated_hourly_rate: Optional[float] = Field(None, description="Their preferred hourly rate if mentioned, otherwise null")
-    ai_confidence_summary: str = Field(default="", description="A brief paragraph summarizing their professional background and reliability based on the chat")
+# class WorkerSkillsSchema(BaseModel):
+#     primary_trades: List[str] = Field(default_factory=list, description="Main categories like Plumbing, Electrical, Carpentry, HVAC")
+#     specific_skills: List[str] = Field(default_factory=list, description="Specific tasks they can do, e.g., fixing leaks, installing ceiling fans, drywall patching")
+#     years_of_experience: int = Field(default=0, description="Total years of experience as an integer")
+#     special_tools: List[str] = Field(default_factory=list, description="Key tools they own, e.g., ladders, power drills, welding gear, snakes")
+#     certifications: List[str] = Field(default_factory=list, description="Any professional licenses or certifications mentioned")
+#     estimated_hourly_rate: Optional[float] = Field(None, description="Their preferred hourly rate if mentioned, otherwise null")
+#     ai_confidence_summary: str = Field(default="", description="A brief paragraph summarizing their professional background and reliability based on the chat")
 
 #### models for the Worker Interview Session, this will be used to store the worker interview session data, including the chat history, the current stage of the interview, and the final outcome. 
 class WorkerInterviewSession(Base):
@@ -139,6 +139,15 @@ class WorkerInterviewSession(Base):
     scenario_score: Mapped[int | None]= mapped_column(Integer, nullable=True) # store score
     scenario_passed: Mapped[bool | None]= mapped_column(Boolean, nullable=True) # store passed or not
     profile: Mapped[dict | None]= mapped_column(JSONB, nullable=True) # this will store the final profile of the worker after the interview is complete
+
+    # ── Add-skill sub-conversation ────────────────────────────────────────────
+    # An already-verified worker can reopen THIS session to add another
+    # speciality to the same trade. Those turns are kept separate from `history`
+    # on purpose: `history` holds the original vetting interview, and replaying it
+    # would push the model into re-interviewing a worker whose competence is
+    # already established. Cleared at the start of each add-skill attempt.
+    add_skill_turns: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
+
     created_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False) # this will store the time when the interview session is created
     updated_at: Mapped[datetime]= mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False) # this will store the time when the interview session is updated
 
@@ -199,6 +208,101 @@ class WorkerProfile(Base):
         back_populates="worker",
         cascade="all, delete-orphan",
     )
+
+    skills: Mapped[List["WorkerSkill"]] = relationship(
+        "WorkerSkill",
+        back_populates="worker",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class SkillType(str, enum.Enum):
+    """
+    BASELINE   — the ordinary everyday scope of the worker's trade. Exactly one
+                 per worker; every registered worker has one.
+    SPECIALITY — one verified advanced niche, added only after a scenario test
+                 was actually passed for it. Zero or many per worker.
+    """
+    BASELINE = "baseline"
+    SPECIALITY = "speciality"
+
+
+class WorkerSkill(Base):
+    """
+    One independently embedded, independently matchable capability of a worker.
+
+    WHY THIS TABLE EXISTS
+    ---------------------
+    Previously a worker had a single description_vector built by concatenating
+    their trade's baseline scope with their tested speciality. Averaging two
+    different meanings into one vector puts it between both: a plumber verified
+    on "solar water heater commissioning" landed too far from "my kitchen tap is
+    leaking" AND too far from a genuine solar job to reliably win either.
+
+    Storing each capability as its own row with its own vector means a worker is
+    matched on their BEST-fitting skill (MIN cosine distance across their rows)
+    rather than on a blurred average. It also makes skills additive: a worker can
+    return later, pass another scenario test, and gain a new row without
+    disturbing the vectors that already match well.
+
+    One row per capability, all rows sharing worker_id. Same trade = more rows on
+    the same worker (and the same worker_chat_id). A genuinely different trade is
+    a separate interview and therefore a separate worker row entirely.
+    """
+    __tablename__ = "worker_skills"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
+
+    worker_id: Mapped[int] = mapped_column(
+        ForeignKey("workers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    skill_type: Mapped[SkillType] = mapped_column(
+        Enum(SkillType, name="worker_skill_type_enum", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        index=True,
+    )
+
+    stage: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., "complete"
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Short human-readable label: the trade name for a baseline row, the tested
+    # sub-skill for a speciality row. Shown in admin and match UIs.
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # The exact text that was embedded into `embedding`. Kept alongside the
+    # vector so a description can be re-embedded later (model upgrade, repair
+    # job) without re-interviewing the worker.
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+
+    embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(4096), nullable=True)
+
+    # Provenance of a speciality row: which scenario proved it. NULL on baseline
+    # rows, which are asserted by the trade itself rather than tested.
+    scenario_question: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scenario_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scenario_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Soft delete: a worker who stops offering a skill should stop matching on it
+    # without destroying the record of having been verified for it.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
+    )
+
+    worker: Mapped["WorkerProfile"] = relationship(
+        "WorkerProfile",
+        back_populates="skills",
+    )
+
+
 
 
 class CustomerChatData(Base):
@@ -283,6 +387,17 @@ class JobWorkerMatch(Base):
         index=True,
     )
 
+    # Which of the worker's skills actually won this match (the row with the
+    # smallest cosine distance). Lets the UI explain WHY a worker surfaced —
+    # matched on ordinary trade scope vs. on a verified speciality — and makes a
+    # bad match traceable to the specific vector that caused it.
+    # SET NULL rather than CASCADE: deleting a skill must not delete match history.
+    matched_skill_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("worker_skills.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Matching Information
     match_score: Mapped[float] = mapped_column(Float, nullable=False)
     match_rank: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -312,3 +427,5 @@ class JobWorkerMatch(Base):
         "WorkerProfile",
         back_populates="job_matches",
     )
+
+    matched_skill: Mapped[Optional["WorkerSkill"]] = relationship("WorkerSkill")

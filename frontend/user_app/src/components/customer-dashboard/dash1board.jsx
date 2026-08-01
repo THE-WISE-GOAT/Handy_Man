@@ -6,14 +6,6 @@ import "./dash1board.css";
 export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
-  const [isManualMode, setIsManualMode] = useState(false);
-
-  const [manualTitle, setManualTitle] = useState("");
-  const [manualCategory, setManualCategory] = useState("");
-  const [manualBudget, setManualBudget] = useState("");
-  const [manualDescription, setManualDescription] = useState("");
-  const [manualContactName, setManualContactName] = useState("");
-  const [manualContactPhone, setManualContactPhone] = useState("");
 
   // 🗺️ MAP STATES
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -57,10 +49,10 @@ export default function Dash1Board({ viewSlug }) {
     startNewSession,
     sendCustomerMessage,
     turns_remaining,
-    is_complete,
     ai_response,
     current_tags,
     categories,
+    is_complete,
     createJobDirect,
     isSubmitting,
   } = useCustomerDashboardData();
@@ -114,6 +106,18 @@ export default function Dash1Board({ viewSlug }) {
     scrollContainer.addEventListener("wheel", handleWheel, { passive: false });
     return () => scrollContainer.removeEventListener("wheel", handleWheel);
   }, [slots.main]);
+
+const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false);
+
+  useEffect(() => {
+    if (is_complete && !hasNavigatedForCompletion) {
+      setHasNavigatedForCompletion(true);
+      navigate("/customer/bookings/JobDescriptionWorkspace");
+    } else if (!is_complete && hasNavigatedForCompletion) {
+      // Reset the flag when a new chat session starts and is_complete goes back to false
+      setHasNavigatedForCompletion(false);
+    }
+  }, [is_complete, hasNavigatedForCompletion, navigate]);
 
   // ====================================================
   // 🗺️ OPENSTREETMAP ASYNC ASSET LOADER
@@ -340,14 +344,16 @@ export default function Dash1Board({ viewSlug }) {
             <h2 style={{ margin: 0 }}>AI CHAT TERMINAL</h2>
             <button
               type="button"
-              onClick={() => setIsManualMode(true)}
+              onClick={() => {
+                navigate("/customer/bookings/JobDescriptionWorkspace");
+              }}
               style={{
                 background: "#FF6B1A",
-                color: "#fff",
+                color: "#0D0D0D",
                 border: "none",
                 borderRadius: "8px",
                 padding: "8px 14px",
-                fontWeight: "bold",
+                fontWeight: 700,
                 cursor: "pointer",
                 fontSize: "12px",
                 transition: "transform 120ms ease, opacity 120ms ease",
@@ -412,240 +418,7 @@ export default function Dash1Board({ viewSlug }) {
     );
   };
 
-  const renderManualJobForm = () => {
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      if (!manualTitle.trim() || !manualDescription.trim()) {
-        alert("Title and description are required.");
-        return;
-      }
-
-      await createJobDirect({
-        title: manualTitle.trim(),
-        category: manualCategory.trim(),
-        budget: manualBudget ? parseFloat(manualBudget) : null,
-        description: manualDescription.trim(),
-        contactName: manualContactName.trim(),
-        contactPhone: manualContactPhone.trim(),
-      });
-
-      setManualTitle("");
-      setManualCategory("");
-      setManualBudget("");
-      setManualDescription("");
-      setManualContactName(userName || "");
-      setManualContactPhone(userCont || "");
-      setIsManualMode(false);
-    };
-
-    return (
-      <div className="dashboard-card main-view" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span className="card-flag">MANUAL JOB CREATION</span>
-          <button
-            type="button"
-            onClick={() => setIsManualMode(false)}
-            style={{
-              background: "rgba(31, 31, 31, 0.4)",
-              color: "#F5F5F7",
-              border: "1px solid rgba(245, 245, 247, 0.14)",
-              borderRadius: "8px",
-              padding: "8px 14px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              fontSize: "12px",
-              transition: "transform 120ms ease, opacity 120ms ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = 0.85;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = 1;
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = "scale(0.95)";
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = "scale(1)";
-            }}
-          >
-            ← Back to AI Chat
-          </button>
-        </div>
-
-        <h2 style={{ margin: 0 }}>Create Job Manually</h2>
-        <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: "13px" }}>
-          Skip the AI chat and post a job directly to the marketplace.
-        </p>
-
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div style={{ display: "grid", gap: "14px", gridTemplateColumns: "1fr 1fr" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#f8fafc" }}>Job Title *</label>
-              <input
-                type="text"
-                value={manualTitle}
-                onChange={(e) => setManualTitle(e.target.value)}
-                placeholder="e.g. Kitchen sink installation"
-                required
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(148, 163, 184, 0.24)",
-                  background: "rgba(15, 23, 42, 0.72)",
-                  color: "#f8fafc",
-                  font: "inherit",
-                  outline: "none",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#f8fafc" }}>Category / Skill</label>
-              <input
-                type="text"
-                value={manualCategory}
-                onChange={(e) => setManualCategory(e.target.value)}
-                placeholder="e.g. Plumbing"
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(148, 163, 184, 0.24)",
-                  background: "rgba(15, 23, 42, 0.72)",
-                  color: "#f8fafc",
-                  font: "inherit",
-                  outline: "none",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#f8fafc" }}>Budget / Pay Rate</label>
-              <input
-                type="number"
-                value={manualBudget}
-                onChange={(e) => setManualBudget(e.target.value)}
-                placeholder="e.g. 5000"
-                min="0"
-                step="0.01"
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(148, 163, 184, 0.24)",
-                  background: "rgba(15, 23, 42, 0.72)",
-                  color: "#f8fafc",
-                  font: "inherit",
-                  outline: "none",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "13px", fontWeight: "bold", color: "#f8fafc" }}>Contact Phone</label>
-              <input
-                type="tel"
-                value={manualContactPhone}
-                onChange={(e) => setManualContactPhone(e.target.value)}
-                placeholder="+977 98XXXXXXXX"
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(148, 163, 184, 0.24)",
-                  background: "rgba(15, 23, 42, 0.72)",
-                  color: "#f8fafc",
-                  font: "inherit",
-                  outline: "none",
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <label style={{ fontSize: "13px", fontWeight: "bold", color: "#f8fafc" }}>Full Description *</label>
-            <textarea
-              value={manualDescription}
-              onChange={(e) => setManualDescription(e.target.value)}
-              placeholder="Describe the job in detail. This is what workers will see."
-              rows={6}
-              required
-              style={{
-                padding: "12px",
-                borderRadius: "12px",
-                border: "1px solid rgba(148, 163, 184, 0.24)",
-                background: "rgba(15, 23, 42, 0.72)",
-                color: "#f8fafc",
-                font: "inherit",
-                outline: "none",
-                resize: "vertical",
-              }}
-            />
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-            <button
-              type="button"
-              onClick={() => setIsManualMode(false)}
-              style={{
-                background: "rgba(31, 31, 31, 0.4)",
-                color: "#F5F5F7",
-                border: "1px solid rgba(245, 245, 247, 0.14)",
-                borderRadius: "8px",
-                padding: "10px 16px",
-                fontWeight: "bold",
-                cursor: "pointer",
-                fontSize: "13px",
-                transition: "transform 120ms ease, opacity 120ms ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = 0.85;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = 1;
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = "scale(0.95)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                background: "#FF6B1A",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 20px",
-                fontWeight: "bold",
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-                fontSize: "13px",
-                opacity: isSubmitting ? 0.6 : 1,
-                transition: "transform 120ms ease, opacity 120ms ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = isSubmitting ? 0.6 : 1;
-              }}
-              onMouseDown={(e) => {
-                if (!isSubmitting) e.currentTarget.style.transform = "scale(0.95)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              {isSubmitting ? "Creating..." : "Create Job"}
-            </button>
-          </div>
-        </form>
-      </div>
-    );
-  };
+ 
 
   const renderJobDescription = (slotKey) => {
     if (slotKey === "main") {
@@ -717,7 +490,7 @@ export default function Dash1Board({ viewSlug }) {
                   left: "-5px",
                   zIndex: 10,
                   background: "#FF6B1A",
-                  color: "#FFFFFF",
+                  color: "#0D0D0D",
                   border: "none",
                   borderRadius: "50%",
                   width: "22px",
@@ -784,15 +557,16 @@ export default function Dash1Board({ viewSlug }) {
                       minWidth: "65px",
                       maxWidth: "65px",
                       height: "65px",
-                      border: "1px solid #000",
-                      borderRadius: "4px",
-                      background: "#f9f9f9",
+                      border: "1px solid var(--k-border-strong)",
+                      borderRadius: "8px",
+                      background: "var(--k-raise)",
+                      color: "var(--k-ink)",
                       fontSize: "11px",
                       padding: "4px",
                       boxSizing: "border-box",
                     }}
                   >
-                    <span style={{ fontWeight: "bold" }}>[{file.type}]</span>
+                    <span style={{ fontWeight: 700, color: "var(--k-orange-ink)" }}>[{file.type}]</span>
                     <span style={{ fontSize: "9px", textOverflow: "ellipsis", overflow: "hidden", width: "100%", textAlign: "center" }}>
                       {file.name}
                     </span>
@@ -810,7 +584,7 @@ export default function Dash1Board({ viewSlug }) {
                   right: "-5px",
                   zIndex: 10,
                   background: "#FF6B1A",
-                  color: "#FFFFFF",
+                  color: "#0D0D0D",
                   border: "none",
                   borderRadius: "50%",
                   width: "22px",
@@ -894,9 +668,9 @@ export default function Dash1Board({ viewSlug }) {
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
-                    color: "mediumblue",
+                    color: "var(--k-orange-ink)",
                     textDecoration: "underline",
-                    fontWeight: "bold",
+                    fontWeight: 700,
                   }}
                   title={userAddrText || "CLICK TO SET LOCATION"}
                 >
@@ -923,7 +697,7 @@ export default function Dash1Board({ viewSlug }) {
               name="post"
               style={{
                 background: "#FF6B1A",
-                color: "#FFFFFF",
+                color: "#0D0D0D",
                 border: "none",
                 borderRadius: "8px",
                 padding: "10px 18px",
@@ -974,18 +748,18 @@ export default function Dash1Board({ viewSlug }) {
   const renderActivePosts = (slotKey) => {
     if (slotKey === "main") {
       return (
-        <div className="dashboard-card main-view" style={{ overflowY: "auto" }}>
+        <div className="dashboard-card main-view" style={{ overflow: "scroll", maxHeight:"33vw" }}>
           <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
           <h2>ACTIVE PENDING POSTS</h2>
           <button 
             onClick={fetchBookingsPendingJobs}
             style={{
-              background: "#1a1a1a",
-              color: "#ffffff",
-              border: "2px solid #1a1a1a",
+              background: "transparent",
+              color: "var(--k-orange-ink)",
+              border: "1px solid rgba(255, 107, 26, 0.5)",
               borderRadius: "12px",
               padding: "8px 16px",
-              fontWeight: "bold",
+              fontWeight: 600,
               cursor: "pointer",
               marginBottom: "16px",
               width: "fit-content"
@@ -996,7 +770,7 @@ export default function Dash1Board({ viewSlug }) {
           
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {fetchedJobs.length === 0 ? (
-              <p style={{ fontFamily: "Courier New", color: "#666", fontSize: "0.9rem" }}>
+              <p style={{ fontFamily: "Courier New", color: "var(--k-ink-3)", fontSize: "0.9rem" }}>
                 No active pending jobs found in your database instance.
               </p>
             ) : (
@@ -1004,11 +778,12 @@ export default function Dash1Board({ viewSlug }) {
                 <div 
                   key={job.id} 
                   style={{
-                    border: "2px solid #1a1a1a",
+                    border: "1px solid var(--k-line)",
                     borderRadius: "16px",
                     padding: "16px",
-                    background: "#ffffff",
-                    boxShadow: "4px 4px 0px #1a1a1a"
+                    background: "var(--k-raise)",
+                    color: "var(--k-ink)",
+                    boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)"
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -1019,7 +794,7 @@ export default function Dash1Board({ viewSlug }) {
                       ⚙️ {job.status || "PENDING"}
                     </span>
                   </div>
-                  <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "#333", lineHeight: "1.4" }}>
+                  <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "var(--k-ink-3)", lineHeight: "1.4" }}>
                     {job.description}
                   </p>
                 </div>
@@ -1051,10 +826,6 @@ export default function Dash1Board({ viewSlug }) {
   };
 
   const resolveAndRenderModule = (slotKey) => {
-    if (isManualMode && slotKey === "main") {
-      return renderManualJobForm();
-    }
-
     const moduleName = slots[slotKey];
     switch (moduleName) {
       case "AiChatTerminal":
@@ -1135,7 +906,7 @@ export default function Dash1Board({ viewSlug }) {
                   type="submit"
                   style={{
                     background: "#FF6B1A",
-                    color: "#FFFFFF",
+                    color: "#0D0D0D",
                     border: "none",
                     borderRadius: "6px",
                     padding: "0 12px",
@@ -1154,8 +925,8 @@ export default function Dash1Board({ viewSlug }) {
                 onClick={handleModalLiveTracking}
                 title="Snap to My Current Position"
                 style={{
-                  background: "rgba(59, 130, 246, 0.15)",
-                  border: "1px solid rgba(59, 130, 246, 0.3)",
+                  background: "rgba(255, 107, 26, 0.12)",
+                  border: "1px solid rgba(255, 107, 26, 0.4)",
                   borderRadius: "6px",
                   padding: "0 10px",
                   cursor: "pointer",
@@ -1235,14 +1006,14 @@ export default function Dash1Board({ viewSlug }) {
                 style={{
                   flex: 1,
                   padding: "8px",
-                  background: "rgba(74, 222, 128, 0.15)",
-                  border: "1px solid rgba(74, 222, 128, 0.3)",
+                  background: "#FF6B1A",
+                  border: "1px solid #FF6B1A",
                   borderRadius: "8px",
                   font: "inherit",
                   fontSize: "13px",
-                  fontWeight: "bold",
+                  fontWeight: 700,
                   cursor: "pointer",
-                  color: "#4ade80",
+                  color: "#0D0D0D",
                 }}
               >
                 CONFIRM LOCATION

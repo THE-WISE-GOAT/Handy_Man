@@ -40,10 +40,8 @@ export const createBookingsZlice = (set, get) => ({
     sidebar: "JobDescriptionWorkspace",
     bottom: "YourActivePosts",
   },
-
   fetchBookingsPendingJobs: async () => {
     try {
-      console.log("hellooooo");
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch("http://127.0.0.1:8000/jobs/status/pending", {
         method: "GET",
@@ -228,7 +226,7 @@ export const createBookingsZlice = (set, get) => ({
   },
 
   sendCustomerMessage: async (userMessage) => {
-    const { booking_chat_id, addChatMessage, swapSlots } = get(); 
+    const { booking_chat_id, addChatMessage } = get(); 
     if (!booking_chat_id) {
       console.error("❌ No active booking_chat_id found. Initialize a session first.");
       return;
@@ -281,10 +279,6 @@ export const createBookingsZlice = (set, get) => ({
           { id: crypto.randomUUID(), sender: "assistant", text: data.ai_response }
         ]
       }));
-
-      if (data.is_complete && get().slots.main !== "JobDescriptionWorkspace") {
-        swapSlots("sidebar");
-      }
     } catch (error) {
       console.error("❌ Failed to process chat turn over secure transport:", error);
     }

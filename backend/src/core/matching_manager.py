@@ -6,11 +6,12 @@ from typing import TypedDict, Any
 from openai import OpenAI
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
+from geoalchemy2 import Geography
+from geoalchemy2.elements import WKBElement
 from src.core import model
 from src.core.schema import MatchingResult, MatchDetail, WorkerMatchingResult, MatchedJobDetail
-from dotenv import load_dotenv  # 1. Add this import
+from dotenv import load_dotenv
 
-# 2. Force load the environment variables from your local config files
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -26,31 +27,64 @@ RERANK_MODEL = "meta/llama-3.1-8b-instruct"
 MAX_CANDIDATES_FOR_RERANK = 25  # keep the prompt bounded no matter how many clear threshold
 
 
+def _ensure_geography(location: Any):
+    """
+    Safely normalizes dictionaries, Pydantic objects, or GeoAlchemy elements 
+    into a valid PostGIS Geography Point with guaranteed (Longitude, Latitude) order.
+    """
+    if isinstance(location, WKBElement):
+        return location
+
+    lat, lon = None, None
+
+    # Handle Pydantic models or objects with attribute lookup
+    if hasattr(location, "latitude") and hasattr(location, "longitude"):
+        lat, lon = location.latitude, location.longitude
+    # Handle dictionary payloads
+    elif isinstance(location, dict):
+        lat = location.get("latitude") or location.get("lat")
+        lon = location.get("longitude") or location.get("lng") or location.get("lon")
+
+    if lat is not None and lon is not None:
+        # PostGIS ST_MakePoint REQUIRES Longitude (X) FIRST, Latitude (Y) SECOND
+        return func.ST_SetSRID(
+            func.ST_MakePoint(float(lon), float(lat)), 
+            4326
+        ).cast(Geography)
+
+    return location
+
+
 def _search_workers(
     db: Session,
     query_vector: list[float],
-    customer_location,
+    customer_location: Any,
     radius_meters: int,
-) -> list[tuple[model.WorkerProfile, model.User, float]]:
+) -> list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]:
     """
-    Vector search against each worker's profile-level embedding
-    (WorkerProfile.description_vector).
-
-    NOTE: WorkerExpertise (per-skill vectors) is not populated anywhere in the
-    current write path, so matching cannot depend on it. This queries the one
-    embedding that actually exists per worker today.
+    Vector search against each active worker capability (WorkerSkill.embedding).
+    Each worker capability is stored as its own row so matching selects the
+    worker's best-fitting skill rather than an averaged profile vector.
     """
-    distance_expr = model.WorkerProfile.description_vector.cosine_distance(query_vector)
+    distance_expr = model.WorkerSkill.embedding.cosine_distance(query_vector)
+    spatial_point = _ensure_geography(customer_location)
 
     stmt = (
-        select(model.WorkerProfile, model.User, distance_expr.label("distance"))
+        select(
+            model.WorkerProfile,
+            model.User,
+            model.WorkerSkill,
+            distance_expr.label("distance"),
+        )
+        .join(model.WorkerSkill, model.WorkerSkill.worker_id == model.WorkerProfile.id)
         .join(model.User, model.User.id == model.WorkerProfile.user_id)
         .where(
-            model.WorkerProfile.description_vector.isnot(None),
+            model.WorkerSkill.embedding.isnot(None),
+            model.WorkerSkill.is_active.is_(True),
             model.WorkerProfile.location.isnot(None),
             model.WorkerProfile.is_complete.is_(True),
             model.WorkerProfile.is_rejected.is_(False),
-            func.ST_DWithin(model.WorkerProfile.location, customer_location, radius_meters),
+            func.ST_DWithin(model.WorkerProfile.location, spatial_point, radius_meters),
         )
         .order_by(distance_expr.asc())
     )
@@ -67,34 +101,40 @@ def calculate_match_score(distance: float) -> float:
 
 
 def _deduplicate_by_user(
-    search_results: list[tuple[model.WorkerProfile, model.User, float]]
-) -> list[tuple[model.WorkerProfile, model.User, float]]:
+    search_results: list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]
+) -> list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]:
     """
-    Safety net, not currently load-bearing: WorkerProfile.user_id is unique in the
-    schema, so a user can only ever have one profile today. Kept in case that
-    constraint is ever relaxed — search_results is already best-distance-first,
-    so the first occurrence of a user_id is always the one to keep.
+    Deduplicates results by human user (User.id or WorkerProfile.user_id).
+    Since search_results are ordered best-distance-first (distance.asc()),
+    the first occurrence of a user preserves that person's single highest-scoring
+    match across all their profiles and skills.
     """
     seen_user_ids: set[int] = set()
-    deduped: list[tuple[model.WorkerProfile, model.User, float]] = []
+    deduped: list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]] = []
 
-    for worker, user, distance in search_results:
-        if user.id in seen_user_ids:
+    for worker, user, skill, distance in search_results:
+        user_key = getattr(user, "id", None) or getattr(worker, "user_id", None) or worker.id
+
+        if user_key in seen_user_ids:
             continue
-        seen_user_ids.add(user.id)
-        deduped.append((worker, user, distance))
+
+        seen_user_ids.add(user_key)
+        deduped.append((worker, user, skill, distance))
 
     return deduped
 
 
-def _build_candidate_summary(worker: model.WorkerProfile, score: float, rank: int) -> dict:
+def _build_candidate_summary(match: MatchDetail) -> dict:
     """Lightweight, text-only view of a candidate for the reranker prompt."""
+    worker = match["worker_profile"]
     return {
         "worker_id": worker.id,
-        "vector_rank": rank,
-        "vector_score": score,
+        "vector_rank": match["rank"],
+        "vector_score": match["score"],
         "job_category": worker.job_category,
         "category_tag": worker.category_tag,
+        "matched_skill_title": match.get("matched_skill_title"),
+        "matched_skill_description": match.get("matched_skill_description"),
         "profile_summary": worker.job_description,
     }
 
@@ -105,19 +145,8 @@ def _llm_rerank_matches(
     rich_matches: list[MatchDetail],
 ) -> list[MatchDetail]:
     """
-    Final decision step: the vector search ranks by semantic similarity, which
-    conflates "this text talks about fixing/repairing things" with "this trade
-    can actually do this job" — an electrician or a cleaner can score highly
-    against a plumbing description just from shared repair-ish vocabulary.
-
-    This step hands the vector-qualified, per-user-deduplicated candidates to an
-    LLM whose job is specifically to DROP anyone whose actual trade doesn't fit,
-    regardless of how high their vector_score was.
-
-    Fails open: any error/unparsable response falls back to the unfiltered vector
-    order, so a reranker outage never blocks matching entirely — the tradeoff is
-    that a temporary LLM failure means mismatched trades could slip through for
-    that one request rather than the whole pipeline going down.
+    Final decision step: hands the vector-qualified, per-user-deduplicated candidates to an
+    LLM to drop candidates whose trade or skill doesn't fit the actual job requirements.
     """
     if not rich_matches:
         logger.info("No candidate matches passed to LLM reranker.")
@@ -126,10 +155,7 @@ def _llm_rerank_matches(
     candidates = rich_matches[:MAX_CANDIDATES_FOR_RERANK]
     leftover = rich_matches[MAX_CANDIDATES_FOR_RERANK:]
 
-    candidate_payload = [
-        _build_candidate_summary(m["worker_profile"], m["score"], m["rank"])
-        for m in candidates
-    ]
+    candidate_payload = [_build_candidate_summary(m) for m in candidates]
 
     prompt = (
         "You are the final filter deciding which tradespeople genuinely fit a customer's job.\n\n"
@@ -139,8 +165,8 @@ def _llm_rerank_matches(
         "Each candidate has a vector_score from semantic text similarity, but that score alone is "
         "NOT reliable for trade fit — e.g. an electrician or a cleaner can score highly similar to a "
         "plumbing job just because both descriptions use words like 'fix', 'repair', or 'install'.\n\n"
-        "Only keep candidates whose actual trade (job_category / category_tag / profile_summary) can "
-        "genuinely perform this specific job. Drop anyone from a different trade, no matter how high "
+        "Only keep candidates whose actual trade and specific skills (job_category / category_tag / matched_skill_title / profile_summary) "
+        "can genuinely perform this specific job. Drop anyone from a different trade, no matter how high "
         "their vector_score is.\n\n"
         "Return ONLY a JSON array of the worker_id integers you are keeping, ordered best fit first. "
         "No text outside the JSON array."
@@ -156,7 +182,14 @@ def _llm_rerank_matches(
         raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
 
         parsed_ids = json.loads(raw_text)
-        ordered_ids = [int(x) for x in parsed_ids if isinstance(x, (int, str)) and str(x).isdigit()]
+        if isinstance(parsed_ids, dict):
+            parsed_ids = next((v for v in parsed_ids.values() if isinstance(v, list)), [])
+
+        if isinstance(parsed_ids, list):
+            ordered_ids = [int(x) for x in parsed_ids if isinstance(x, (int, str)) and str(x).isdigit()]
+        else:
+            ordered_ids = []
+
         logger.info(f"LLM reranker kept {len(ordered_ids)}/{len(candidates)} candidates: {ordered_ids}")
 
     except Exception as e:
@@ -179,9 +212,6 @@ def _llm_rerank_matches(
         logger.warning("LLM reranker kept zero candidates — falling back to unfiltered vector order.")
         return rich_matches
 
-    # Candidates beyond MAX_CANDIDATES_FOR_RERANK were never shown to the LLM at all;
-    # keep them (unfiltered) after the reranked set rather than silently dropping them.
-    # Anyone the LLM explicitly excluded is NOT re-added here — that's the whole point.
     for i, match in enumerate(leftover, start=len(reranked) + 1):
         match["rank"] = i
 
@@ -192,15 +222,15 @@ def create_matches_for_job(
     db: Session,
     job_id: int,
     query_vector: list[float],
-    customer_location,
+    customer_location: Any,
     radius_meters: int,
     job_description: str,
     job_category: str | None = None,
 ) -> MatchingResult:
     """
-    Core Entry Point: Purges stale matches, dedupes candidates down to one profile per
-    user, scores + threshold-filters, sends the survivors to the LLM reranker to drop
-    trade mismatches and make the final call, then persists and flushes the matches.
+    Core Entry Point: Purges stale matches, queries per-skill vector embeddings,
+    deduplicates down to the best skill per user, scores, filters by threshold,
+    reranks via LLM, and persists final match rows with matched_skill_id.
     """
     logger.info(
         f"[job {job_id}] starting match run — radius_meters={radius_meters}, "
@@ -212,9 +242,9 @@ def create_matches_for_job(
         model.JobWorkerMatch.job_id == job_id
     ).delete(synchronize_session=False)
 
-    # 2. Extract potential candidate profiles (ordered by distance)
+    # 2. Extract potential candidate skills (ordered by distance)
     search_results = _search_workers(db, query_vector, customer_location, radius_meters)
-    logger.info(f"[job {job_id}] _search_workers returned {len(search_results)} candidate profiles")
+    logger.info(f"[job {job_id}] _search_workers returned {len(search_results)} candidate skill matches")
 
     search_results = _deduplicate_by_user(search_results)
     logger.info(f"[job {job_id}] {len(search_results)} candidates remain after per-user dedup")
@@ -223,12 +253,12 @@ def create_matches_for_job(
     distance_by_worker_id: dict[int, float] = {}
     vector_rank = 1
 
-    for worker, user, distance in search_results:
+    for worker, user, skill, distance in search_results:
         score = calculate_match_score(float(distance))
 
         logger.info(
             f"[job {job_id}] candidate worker_id={worker.id} category={worker.job_category} "
-            f"distance={float(distance):.4f} score={score} (threshold={SCORE_THRESHOLD})"
+            f"matched_skill='{skill.title}' distance={float(distance):.4f} score={score} (threshold={SCORE_THRESHOLD})"
         )
 
         if score > SCORE_THRESHOLD:
@@ -237,7 +267,10 @@ def create_matches_for_job(
                 "user": user,
                 "score": score,
                 "rank": vector_rank,
-                "worker_chat_id": worker.worker_chat_id
+                "worker_chat_id": worker.worker_chat_id,
+                "matched_skill_id": skill.id,
+                "matched_skill_title": skill.title,
+                "matched_skill_description": skill.description,
             })
             distance_by_worker_id[worker.id] = float(distance)
             vector_rank += 1
@@ -257,13 +290,14 @@ def create_matches_for_job(
         match_row = model.JobWorkerMatch(
             job_id=job_id,
             worker_id=worker.id,
+            matched_skill_id=match.get("matched_skill_id"),
             match_score=match["score"],
             match_rank=match["rank"],
             semantic_distance=distance_by_worker_id[worker.id],
             is_active=True,
             is_interested=False,
             is_selected=False,
-            is_rejected=False
+            is_rejected=False,
         )
         new_match_records.append(match_row)
         notifiable_worker_chat_ids.append(match["worker_chat_id"])
@@ -275,19 +309,20 @@ def create_matches_for_job(
     return {
         "matches": rich_matches,
         "worker_chat_ids": notifiable_worker_chat_ids,
-        "count": len(rich_matches)
+        "count": len(rich_matches),
     }
 
 
 def create_matches_for_worker(
     db: Session,
     worker_id: int,
-    worker_location,
-    radius_meters: int = 60_000
+    worker_location: Any,
+    radius_meters: int = 60_000,
 ) -> WorkerMatchingResult:
     """
-    Reverse Job Matching Entry Point: Compares all active pending jobs against this
-    worker's single profile-level embedding.
+    Reverse Job Matching Entry Point: Compares all active pending jobs against
+    all active skill embeddings for this worker, keeping the best matching skill
+    per job.
     """
     logger.info(f"Running reverse matching pipeline for worker_id: {worker_id}")
 
@@ -296,48 +331,55 @@ def create_matches_for_worker(
         model.JobWorkerMatch.worker_id == worker_id
     ).delete(synchronize_session=False)
 
-    # 2. Fetch this worker's single profile-level embedding
-    worker_profile = db.execute(
-        select(model.WorkerProfile).where(model.WorkerProfile.id == worker_id)
-    ).scalar_one_or_none()
-
-    if worker_profile is None or worker_profile.description_vector is None:
-        logger.warning(f"Worker {worker_id} has no profile / no description_vector — skipping reverse match.")
-        return {"matched_jobs": [], "count": 0}
-
-    distance_expr = model.Job.description_vector.cosine_distance(worker_profile.description_vector)
+    # 2. Match active jobs against any active skill vector owned by this worker
+    distance_expr = model.Job.description_vector.cosine_distance(model.WorkerSkill.embedding)
+    spatial_point = _ensure_geography(worker_location)
 
     stmt = (
-        select(model.Job, distance_expr.label("distance"))
+        select(
+            model.Job,
+            model.WorkerSkill,
+            distance_expr.label("distance"),
+        )
+        .join(model.WorkerSkill, model.WorkerSkill.worker_id == worker_id)
         .where(
+            model.WorkerSkill.is_active.is_(True),
+            model.WorkerSkill.embedding.isnot(None),
             model.Job.description_vector.isnot(None),
             model.Job.location.isnot(None),
             model.Job.status == "pending",
-            func.ST_DWithin(model.Job.location, worker_location, radius_meters),
+            func.ST_DWithin(model.Job.location, spatial_point, radius_meters),
         )
         .order_by(distance_expr.asc())
     )
 
     search_results = db.execute(stmt).all()
 
+    seen_job_ids: set[int] = set()
     new_match_records = []
     matched_jobs_payload: list[MatchedJobDetail] = []
     current_rank = 1
 
-    for job, distance in search_results:
+    for job, skill, distance in search_results:
+        # Deduplicate to preserve only the best skill fit per job
+        if job.id in seen_job_ids:
+            continue
+        seen_job_ids.add(job.id)
+
         score = calculate_match_score(float(distance))
 
         if score > SCORE_THRESHOLD:
             match_row = model.JobWorkerMatch(
                 job_id=job.id,
                 worker_id=worker_id,
+                matched_skill_id=skill.id,
                 match_score=score,
                 match_rank=current_rank,
                 semantic_distance=float(distance),
                 is_active=True,
                 is_interested=False,
                 is_selected=False,
-                is_rejected=False
+                is_rejected=False,
             )
             new_match_records.append(match_row)
 
@@ -346,7 +388,8 @@ def create_matches_for_worker(
                 "title": job.title,
                 "description": job.description,
                 "score": score,
-                "rank": current_rank
+                "rank": current_rank,
+                "matched_skill_title": skill.title,
             })
             current_rank += 1
 
@@ -356,5 +399,5 @@ def create_matches_for_worker(
 
     return {
         "matched_jobs": matched_jobs_payload,
-        "count": len(matched_jobs_payload)
+        "count": len(matched_jobs_payload),
     }

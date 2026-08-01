@@ -474,9 +474,13 @@ def find_help(
     category, is_custom = _extract_primary_category(job_data.categories or [])
     
     stmt = (
-        select(model.JobWorkerMatch, model.WorkerProfile, model.User.username)
+        select(model.JobWorkerMatch, model.WorkerProfile, model.User.username, model.WorkerSkill)
         .join(model.WorkerProfile, model.WorkerProfile.id == model.JobWorkerMatch.worker_id)
         .join(model.User, model.User.id == model.WorkerProfile.user_id)
+        # OUTER: matched_skill_id is nullable (SET NULL on skill removal, and rows
+        # written before multi-vector matching have none), so an inner join would
+        # silently drop otherwise-valid matches.
+        .outerjoin(model.WorkerSkill, model.WorkerSkill.id == model.JobWorkerMatch.matched_skill_id)
         .where(
             model.JobWorkerMatch.job_id == job_data.id,
             model.JobWorkerMatch.is_active == True
@@ -499,8 +503,13 @@ def find_help(
             "category_tag": worker.category_tag,
             "job_description": worker.job_description,
             "match_score": match.match_score,
+            # The specific capability that surfaced this worker — a plumber can be
+            # here for their general plumbing baseline or for a tested speciality,
+            # and the customer should be able to tell which.
+            "matched_skill": skill.title if skill is not None else None,
+            "matched_skill_description": skill.description if skill is not None else None,
         }
-        for match, worker, username in matches
+        for match, worker, username, skill in matches
     ]
 
     return {
@@ -535,18 +544,36 @@ def validate_vectors(
     if not job_data or job_data.description_vector is None or job_data.location is None:
         raise HTTPException(status_code=400, detail="Invalid job data or missing vector.")
 
-    # 2. Grab a wider pool of workers (limit=50) to evaluate the model distribution
-    distance = model.WorkerProfile.description_vector.cosine_distance(job_data.description_vector)
-    stmt = (
-        select(model.WorkerProfile, distance.label("distance"))
+    # 2. Grab a wider pool of workers (limit=50) to evaluate the model distribution.
+    #    This mirrors matching_manager._search_workers deliberately: it scores each
+    #    worker on their single closest SKILL vector, not on the abandoned blended
+    #    profile vector, so the chart reflects what matching actually does.
+    distance = model.WorkerSkill.embedding.cosine_distance(job_data.description_vector)
+
+    best_skill = (
+        select(
+            model.WorkerSkill.worker_id.label("worker_id"),
+            distance.label("distance"),
+        )
         .where(
-            model.WorkerProfile.description_vector.isnot(None),
+            model.WorkerSkill.embedding.isnot(None),
+            model.WorkerSkill.is_active.is_(True),
+        )
+        .distinct(model.WorkerSkill.worker_id)
+        .order_by(model.WorkerSkill.worker_id, distance.asc())
+        .subquery()
+    )
+
+    stmt = (
+        select(model.WorkerProfile, best_skill.c.distance)
+        .join(best_skill, best_skill.c.worker_id == model.WorkerProfile.id)
+        .where(
             model.WorkerProfile.location.isnot(None),
             model.WorkerProfile.is_complete.is_(True),
             model.WorkerProfile.is_rejected.is_(False),
             func.ST_DWithin(model.WorkerProfile.location, job_data.location, DEFAULT_SEARCH_RADIUS_METERS),
         )
-        .order_by(distance)
+        .order_by(best_skill.c.distance.asc())
         .limit(50)
     )
     

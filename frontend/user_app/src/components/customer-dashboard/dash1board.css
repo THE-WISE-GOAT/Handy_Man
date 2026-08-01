@@ -44,11 +44,9 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  padding: 25px;
+  padding: 20px;
   box-sizing: border-box;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  padding-top: 18px;
-  padding-left: 18px;
   min-width: 0;
 }
 
@@ -62,66 +60,73 @@
   border-color: rgba(255, 107, 26, 0.3);
 }
 
+/* Emergency keeps the single reserved red — it is the one control where a
+   distinct alarm colour is worth breaking the palette for. Sizing moved off
+   the old `height: 10%` + 29px font, which stretched with the card. */
 button[name="emergency"] {
   margin-top: auto;
   align-self: center;
-  background: rgba(220, 53, 69, 0.15);
-  border-radius: 19px;
-  color: #ff6b6b;
+  background: rgba(229, 72, 77, 0.12);
+  border-radius: 8px;
+  color: #FF8A8E;
   width: 100%;
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  font-variant: inherit;
-  font-weight: inherit;
-  font-stretch: inherit;
-  font-size: 29px;
-  line-height: inherit;
-  font-family: inherit;
-  font-optical-sizing: inherit;
-  font-variation-settings: inherit;
-  font-size-adjust: inherit;
-  font-kerning: inherit;
-  font-language-override: inherit;
-  font-feature-settings: inherit;
+  border: 1px solid rgba(229, 72, 77, 0.45);
+  font-family: var(--fixfast-body, inherit);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  padding: 0.75rem 1.25rem;
   cursor: pointer;
   text-align: center;
-  height: 10%;
   transition: var(--fixfast-ease);
 }
 
 button[name="emergency"]:hover {
-  background: rgba(220, 53, 69, 0.25);
-  border-color: rgba(220, 53, 69, 0.5);
+  background: rgba(229, 72, 77, 0.2);
+  border-color: #E5484D;
 }
 
+button[name="emergency"]:focus-visible {
+  outline: 2px solid #E5484D;
+  outline-offset: 2px;
+}
+
+.light button[name="emergency"] {
+  color: #C0292E;
+}
+
+/* Post is the primary action on this card, so it takes the solid orange fill.
+   Charcoal on orange is 6.82:1; white on orange would be 2.85:1. */
 button[name="post"] {
-  margin: 5px 0px 0px;
+  margin: 8px 0 0;
   align-self: center;
-  color: #4ade80;
-  border-radius: 19px;
-  border: 1px solid rgba(74, 222, 128, 0.3);
+  background: #FF6B1A;
+  color: #0D0D0D;
+  border-radius: 8px;
+  border: 1px solid #FF6B1A;
   width: 100%;
-  font-style: inherit;
-  font-variant: inherit;
-  font-weight: inherit;
-  font-stretch: inherit;
-  font-size: 29px;
-  line-height: inherit;
-  font-family: inherit;
-  font-optical-sizing: inherit;
-  font-variation-settings: inherit;
-  font-size-adjust: inherit;
-  font-kerning: inherit;
-  font-language-override: inherit;
-  font-feature-settings: inherit;
+  font-family: var(--fixfast-body, inherit);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  padding: 0.75rem 1.25rem;
   cursor: pointer;
   text-align: center;
-  height: 10%;
+  box-shadow: 0 4px 14px rgba(255, 107, 26, 0.28);
   transition: var(--fixfast-ease);
 }
 
 button[name="post"]:hover {
-  background: rgba(74, 222, 128, 0.15);
-  border-color: rgba(74, 222, 128, 0.5);
+  background: #E85D14;
+  border-color: #E85D14;
+  box-shadow: 0 6px 18px rgba(255, 107, 26, 0.38);
+}
+
+button[name="post"]:focus-visible {
+  outline: 2px solid #FF6B1A;
+  outline-offset: 2px;
 }
 
 .main-view {
@@ -130,14 +135,12 @@ button[name="post"]:hover {
 }
 
 .main-view h2 {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-weight: 800;
-  font-size: 2rem;
-  margin-top: -12px;
-  letter-spacing: -0.05em;
+  font-family: var(--fixfast-display, 'Segoe UI', system-ui, sans-serif);
+  font-weight: 700;
+  font-size: 1.6rem;
+  letter-spacing: -0.035em;
   color: #FFFFFF;
-  margin-left: -9px;
-  margin-bottom: 0px;
+  margin: 0 0 12px;
 }
 
 .light .main-view h2 {
@@ -150,7 +153,7 @@ button[name="post"]:hover {
 
 .bottom-slot {
   min-height: 100px;
-  padding: 16px 24px;
+  padding: 16px 20px;
   justify-content: center;
 }
 
@@ -158,57 +161,65 @@ button[name="post"]:hover {
    3. INTERNAL COMMON UTILITIES
    ========================================================================== */
 .card-header {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #7A7A7A;
-  margin-bottom: 16px;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--fixfast-ink-3, #9A9A9A);
+  margin-bottom: 14px;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
 }
 
 .card-flag {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #7A7A7A;
-  letter-spacing: 0.05em;
-  margin-bottom: 4px;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--fixfast-ink-3, #9A9A9A);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
 }
 
 .badge {
-  display: inline-block;
-  padding: 10px 16px;
-  border: 1px solid var(--ind-border);
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.34rem 0.72rem;
+  border: 1px solid rgba(245, 245, 247, 0.18);
+  border-radius: 999px;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
   width: fit-content;
-  background-color: rgba(31, 31, 31, 0.6);
-  color: #F5F5F7;
+  background-color: transparent;
+  color: var(--fixfast-ink-3, #9A9A9A);
   transition: var(--fixfast-ease);
 }
 
 .badge-highlight {
-  background-color: rgba(255, 107, 26, 0.12);
+  background-color: rgba(255, 107, 26, 0.1);
   color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.3);
+  border-color: rgba(255, 107, 26, 0.4);
 }
 
 .light .badge {
-  background-color: #FFFFFF;
-  border-color: #E2E8F0;
-  color: #0D0D0D;
+  background-color: transparent;
+  border-color: rgba(13, 13, 13, 0.16);
+  color: #5B5B5B;
 }
 
 .light .badge-highlight {
-  background-color: rgba(255, 107, 26, 0.08);
-  color: #FF6B1A;
-  border-color: rgba(255, 107, 26, 0.25);
+  background-color: rgba(255, 107, 26, 0.1);
+  color: #B7440A;
+  border-color: rgba(255, 107, 26, 0.4);
 }
 
 .card-summary {
-  font-size: 0.85rem;
-  color: #7A7A7A;
-  margin: 12px 0 0 4px;
+  font-size: 0.88rem;
+  color: var(--fixfast-ink-3, #9A9A9A);
+  margin: 12px 0 0;
 }
 
 /* ==========================================================================
@@ -218,14 +229,19 @@ button[name="post"]:hover {
   flex: 1;
   width: 100%;
   min-height: 0;
+  background: transparent;
   border: none;
   resize: none;
   font-family: inherit;
-  font-size: 1.1rem;
+  font-size: 1rem;
   line-height: 1.6;
   color: #FFFFFF;
   outline: none;
-  margin-top: -4px;
+}
+
+.workspace-textarea::placeholder {
+  color: var(--fixfast-ink-3, #9A9A9A);
+  opacity: 0.75;
 }
 
 .light .workspace-textarea {
@@ -236,10 +252,10 @@ button[name="post"]:hover {
   flex: 1;
   overflow-y: auto;
   border: 1px solid var(--ind-border);
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 16px;
-  background-color: rgba(31, 31, 31, 0.4);
-  margin-bottom: 16px;
+  background-color: rgba(13, 13, 13, 0.4);
+  margin-bottom: 14px;
   max-height: 350px;
   display: flex;
   flex-direction: column;
@@ -248,44 +264,58 @@ button[name="post"]:hover {
 
 .chat-msg {
   margin: 0;
-  padding: 10px 14px;
-  border-radius: 14px;
+  padding: 0.6rem 0.85rem;
+  border-radius: 12px;
   max-width: 85%;
   word-wrap: break-word;
-  line-height: 1.45;
-  font-size: 0.95rem;
+  line-height: 1.5;
+  font-size: 0.88rem;
 }
 
 .chat-msg strong {
   display: block;
   margin-bottom: 2px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  opacity: 0.82;
 }
 
+/* The customer speaks in brand orange; the assistant stays quiet. Previously
+   these were blue (#3b82f6), which was outside the palette. */
 .chat-msg--user {
-  background: rgba(59, 130, 246, 0.15);
-  border-left: 3px solid #3b82f6;
-  color: #F5F5F7;
+  background: #FF6B1A;
+  border-left: none;
+  color: #0D0D0D;
   align-self: flex-end;
-  border-radius: 14px 4px 14px 14px;
+  border-radius: 12px 3px 12px 12px;
 }
 
 .chat-msg--assistant {
-  background: rgba(31, 31, 31, 0.4);
-  border-left: 3px solid #7A7A7A;
+  background: var(--fixfast-raise, #262626);
+  border: 1px solid var(--ind-border);
+  border-left: 3px solid rgba(245, 245, 247, 0.18);
   color: #F5F5F7;
   align-self: flex-start;
-  border-radius: 4px 14px 14px 14px;
+  border-radius: 3px 12px 12px 12px;
 }
 
 .chat-msg--system {
   background: rgba(255, 107, 26, 0.1);
   border-left: 3px solid #FF6B1A;
-  font-style: italic;
-  color: #F5F5F7;
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  font-style: normal;
+  color: #FF6B1A;
   align-self: flex-start;
-  border-radius: 4px 14px 14px 14px;
+  border-radius: 3px 12px 12px 12px;
+}
+
+/* Orange on the peach wash is already near the contrast floor; no opacity to spare. */
+.chat-msg--system strong {
+  opacity: 1;
 }
 
 .chat-form {
@@ -296,82 +326,94 @@ button[name="post"]:hover {
 .chat-form input {
   flex: 1;
   width: 100%;
-  padding: 14px 20px;
-  border: 1px solid var(--ind-border);
-  border-radius: 16px;
-  font-size: 1rem;
+  padding: 0.7rem 0.85rem;
+  border: var(--fixfast-border-strong, 1px solid rgba(245, 245, 247, 0.42));
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
   outline: none;
   box-sizing: border-box;
-  background: rgba(31, 31, 31, 0.4);
+  background: rgba(13, 13, 13, 0.4);
   color: #FFFFFF;
+  transition: var(--fixfast-ease);
 }
 
-.light .chat-form input {
-  background: #FFFFFF;
-  border-color: #E2E8F0;
-  color: #0D0D0D;
+.chat-form input::placeholder {
+  color: var(--fixfast-ink-3, #9A9A9A);
+  opacity: 0.75;
 }
 
-.light .chat-form input::placeholder {
-  color: #555555;
+.chat-form input:focus {
+  border-color: #FF6B1A;
+  box-shadow: 0 0 0 3px rgba(255, 107, 26, 0.1);
 }
 
 .chat-btn {
-  padding: 0 24px;
+  padding: 0 1.25rem;
   background-color: #FF6B1A;
-  color: #FFFFFF;
+  color: #0D0D0D;
   border: 1px solid #FF6B1A;
-  border-radius: 16px;
-  font-weight: bold;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
   cursor: pointer;
   transition: var(--fixfast-ease);
 }
 
 .chat-btn:hover {
-  background-color: #e85d14;
-  border-color: #e85d14;
+  background-color: #E85D14;
+  border-color: #E85D14;
+}
+
+.chat-btn:focus-visible {
+  outline: 2px solid #FF6B1A;
+  outline-offset: 2px;
 }
 
 .light .chat-box {
   background: #FFFFFF;
-  border-color: #E2E8F0;
+  border-color: rgba(13, 13, 13, 0.1);
 }
 
 .light .chat-msg--user {
-  background: #FFF3E0;
-  border-left: 3px solid #FF6B1A;
+  background: #FF6B1A;
+  border-left: none;
   color: #0D0D0D;
 }
 
 .light .chat-msg--assistant {
-  background: #E3F2FD;
-  border-left: 3px solid #3b82f6;
+  background: #F4F5F7;
+  border-left: 3px solid rgba(13, 13, 13, 0.16);
   color: #0D0D0D;
 }
 
 .light .chat-msg--system {
-  background: #E3F2FD;
-  border-left: 3px solid #3b82f6;
-  color: #0D0D0D;
+  background: rgba(255, 107, 26, 0.1);
+  border-left: 3px solid #FF6B1A;
+  color: #B7440A;
 }
 
 .light .chat-form input {
   background: #FFFFFF;
-  border-color: #E2E8F0;
+  border-color: rgba(13, 13, 13, 0.42);
   color: #0D0D0D;
 }
 
 .light .chat-form input::placeholder {
-  color: #555555;
+  color: #5B5B5B;
 }
 
 .title {
-  padding: 0px;
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  font-size: 30px;
-  margin-top: -8px;
-  text-shadow: 0.5px 0px 0px rgba(255, 255, 255, 0.1);
-  font-weight: 800;
-  margin-bottom: 0px;
+  padding: 0;
+  font-family: var(--fixfast-display, 'Segoe UI', system-ui, sans-serif);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  margin: 0 0 12px;
   color: #FFFFFF;
+}
+
+.light .title {
+  color: #0D0D0D;
 }

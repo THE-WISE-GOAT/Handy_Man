@@ -10,6 +10,21 @@
     --fixfast-shadow: 0 18px 42px rgba(0, 0, 0, 0.5);
     --fixfast-shadow-tight: 0 10px 24px rgba(0, 0, 0, 0.4);
     --fixfast-ease: all 0.2s ease-in-out;
+
+    /* Kamigo additions.
+       --fixfast-yellow and --dash-blue are both #FF6B1A despite their names;
+       the names are kept because they are referenced across many files. */
+    --fixfast-orange-deep: #E85D14;
+    /* #7A7A7A is 3.84:1 on #1F1F1F, under the 4.5:1 floor for body text.
+       Muted stays for borders; ink-3 is the readable version. */
+    --fixfast-ink-3: #9A9A9A;
+    --fixfast-wash: rgba(255, 107, 26, 0.10);
+    --fixfast-raise: #262626;
+    /* Form/control edges need 3:1 per WCAG SC 1.4.11; the hairline border above is ~1.7:1. */
+    --fixfast-border-strong: 1px solid rgba(245, 245, 247, 0.42);
+    --fixfast-display: "Space Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --fixfast-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --fixfast-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
 }
 
 /* Base Settings */
@@ -17,7 +32,7 @@
     min-height: 100vh;
     background: var(--fixfast-bg);
     color: var(--fixfast-white);
-    font-family: "Inter", "Segoe UI", "Roboto", system-ui, -apple-system, sans-serif;
+    font-family: var(--fixfast-body);
 }
 
 /* Global Nav System */
@@ -44,43 +59,77 @@
 }
 
 .fixfast-nav__logo {
-    width: 3rem;
-    height: 3rem;
+    width: 2.6rem;
+    height: 2.6rem;
     display: grid;
     place-items: center;
-    background: var(--fixfast-black);
-    color: var(--fixfast-yellow);
-    border-radius: 16px;
-    font-weight: 900;
-    border: var(--fixfast-border);
+    background: var(--fixfast-yellow);
+    color: #0D0D0D;
+    border-radius: 10px;
+    font-family: var(--fixfast-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1;
+    border: none;
+    box-shadow: 0 4px 14px rgba(255, 107, 26, 0.34);
+}
+
+/* Rendered by DashboardStage.jsx but previously unstyled. */
+.fixfast-nav__eyebrow {
+    font-family: var(--fixfast-mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--fixfast-ink-3);
+    font-weight: 500;
+}
+
+.fixfast-nav__title {
+    font-family: var(--fixfast-display);
+    font-size: 1.12rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    color: var(--fixfast-white);
 }
 
 .fixfast-nav__menu {
     display: flex;
     justify-content: center;
-    gap: 0.65rem;
+    gap: 0.3rem;
     flex-wrap: wrap;
 }
 
 .fixfast-nav__link {
-    min-height: 2.8rem;
-    padding: 0.5rem 2.5rem;
-    background: var(--fixfast-black);
-    border: var(--fixfast-border);
-    border-radius: 16px;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 800;
+    min-height: 2.5rem;
+    padding: 0.6rem 1.1rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-family: var(--fixfast-body);
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+    text-transform: none;
     transition: var(--fixfast-ease);
     cursor: pointer;
+    color: var(--fixfast-ink-3);
+}
+
+.fixfast-nav__link:hover {
+    background: var(--fixfast-wash);
     color: var(--fixfast-white);
 }
 
-.fixfast-nav__link.is-active,
-.fixfast-nav__link:hover {
+.fixfast-nav__link.is-active {
     background: var(--fixfast-yellow);
-    color: var(--fixfast-black);
-    transform: translateY(-1px);
+    color: #0D0D0D;
+    font-weight: 700;
+}
+
+.fixfast-nav__link:focus-visible {
+    outline: 2px solid var(--fixfast-yellow);
+    outline-offset: 2px;
 }
 
 /* Identity / Profile Slots */
@@ -95,11 +144,11 @@
     width: 14rem;
     max-width: calc(100vw - 1rem);
     display: grid;
-    gap: 0.45rem;
-    padding: 0.75rem;
+    gap: 0.3rem;
+    padding: 0.6rem;
     background: var(--fixfast-black);
     border: var(--fixfast-border);
-    border-radius: 20px;
+    border-radius: 14px;
     box-shadow: var(--fixfast-shadow);
     overflow: hidden;
     text-align: left;
@@ -109,7 +158,7 @@
     display: grid;
     gap: 0.2rem;
     min-width: 0;
-    padding: 0.1rem 0.25rem 0.55rem;
+    padding: 0.1rem 0.35rem 0.55rem;
     margin-bottom: 0.35rem;
     border-bottom: var(--fixfast-border);
 }
@@ -118,6 +167,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: var(--fixfast-display);
+    font-weight: 600;
     color: var(--fixfast-white);
 }
 
@@ -126,40 +177,47 @@
     overflow: hidden;
     text-overflow: ellipsis;
     word-break: break-all;
-    color: var(--fixfast-muted);
-    font-size: 0.8rem;
-    line-height: 1.2;
+    color: var(--fixfast-ink-3);
+    font-size: 0.78rem;
+    line-height: 1.3;
 }
 
 .fixfast-profile__menu button {
     min-width: 0;
-    padding: 0.6rem 0.75rem;
+    padding: 0.55rem 0.7rem;
     text-align: left;
-    background: var(--fixfast-bg);
-    border: var(--fixfast-border);
-    border-radius: 14px;
-    font-weight: 700;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-family: var(--fixfast-body);
+    font-size: 0.84rem;
+    font-weight: 500;
     cursor: pointer;
     transition: var(--fixfast-ease);
     color: var(--fixfast-white);
 }
 
 .fixfast-profile__menu button:hover {
-    background: var(--fixfast-yellow);
-    color: var(--fixfast-black);
-    transform: translateY(-1px);
+    background: var(--fixfast-wash);
+    color: var(--fixfast-yellow);
+}
+
+.fixfast-profile__menu button:focus-visible {
+    outline: 2px solid var(--fixfast-yellow);
+    outline-offset: -2px;
 }
 
 .fixfast-profile__trigger {
-    background: var(--fixfast-black);
-    border: var(--fixfast-border);
+    background: var(--fixfast-raise);
+    border: var(--fixfast-border-strong);
     color: var(--fixfast-white);
     border-radius: 50%;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.4rem;
+    height: 2.4rem;
     display: grid;
     place-items: center;
-    font-weight: 800;
+    font-family: var(--fixfast-display);
+    font-weight: 700;
     cursor: pointer;
     transition: var(--fixfast-ease);
 }
@@ -169,11 +227,207 @@
     color: var(--fixfast-yellow);
 }
 
+.fixfast-profile__trigger:focus-visible {
+    outline: 2px solid var(--fixfast-yellow);
+    outline-offset: 2px;
+}
+
 .fixfast-profile__avatar {
     font-size: 0.85rem;
 }
 
+/* ------------------------------------------------------------------
+   Stage + preview deck.
+   TheaterStage and PreviewDeck in DashboardStage.jsx render all of the
+   classes below, but none of them existed in any stylesheet (nor in the
+   built bundle), so these regions rendered completely unstyled.
+   ------------------------------------------------------------------ */
+.fixfast-stage {
+    position: relative;
+    overflow: hidden;
+    padding: 1.5rem 1.6rem;
+    background: var(--fixfast-black);
+    border: var(--fixfast-border);
+    border-radius: var(--fixfast-stage-radius);
+}
+
+.fixfast-stage::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--fixfast-yellow);
+}
+
+.fixfast-stage__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.fixfast-stage__eyebrow {
+    margin: 0 0 0.25rem;
+    font-family: var(--fixfast-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--fixfast-yellow);
+}
+
+.fixfast-stage__header h1 {
+    margin: 0;
+    font-family: var(--fixfast-display);
+    font-size: clamp(1.5rem, 3vw, 2.1rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+    color: var(--fixfast-white);
+}
+
+.fixfast-stage__dot {
+    flex: 0 0 auto;
+    width: 0.6rem;
+    height: 0.6rem;
+    margin-top: 0.5rem;
+    border-radius: 50%;
+    background: var(--fixfast-yellow);
+    box-shadow: 0 0 0 4px var(--fixfast-wash);
+}
+
+.fixfast-stage__content {
+    margin-top: 1.1rem;
+}
+
+.fixfast-deck {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 0.9rem;
+    margin-top: 0.9rem;
+}
+
+.fixfast-window {
+    padding: 0;
+    overflow: hidden;
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+    cursor: pointer;
+    background: var(--fixfast-bg);
+    border: var(--fixfast-border);
+    border-radius: var(--fixfast-radius);
+    transition: var(--fixfast-ease);
+}
+
+.fixfast-window:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 107, 26, 0.45);
+    box-shadow: var(--fixfast-shadow-tight);
+}
+
+.fixfast-window:focus-visible {
+    outline: 2px solid var(--fixfast-yellow);
+    outline-offset: 2px;
+}
+
+.fixfast-window__topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.7rem;
+    background: var(--fixfast-raise);
+    border-bottom: var(--fixfast-border);
+}
+
+.fixfast-window__traffic {
+    display: inline-flex;
+    gap: 0.25rem;
+    flex: 0 0 auto;
+}
+
+.fixfast-window__traffic i {
+    display: block;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: rgba(245, 245, 247, 0.24);
+}
+
+.fixfast-window__traffic i:first-child {
+    background: var(--fixfast-yellow);
+}
+
+.fixfast-window__title {
+    font-family: var(--fixfast-mono);
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--fixfast-ink-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fixfast-window__icon {
+    margin-left: auto;
+    font-size: 0.8rem;
+    opacity: 0.75;
+}
+
+.fixfast-window__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.9rem;
+    min-height: 86px;
+}
+
+.fixfast-window__fallback strong {
+    display: block;
+    font-family: var(--fixfast-display);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--fixfast-white);
+}
+
+.fixfast-window__fallback small {
+    font-size: 0.79rem;
+    color: var(--fixfast-ink-3);
+}
+
+/* is-lifting / stage-transitioning are applied by the JSX during panel swaps. */
+.fixfast-window.is-lifting {
+    border-color: var(--fixfast-yellow);
+    transform: translateY(-3px);
+}
+
+.fixfast-stage.stage-transitioning .fixfast-stage__content {
+    opacity: 0.6;
+    transition: opacity 0.2s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fixfast-window,
+    .fixfast-window:hover,
+    .fixfast-window.is-lifting {
+        transform: none;
+    }
+}
+
 /* Light Theme Overrides */
+.light {
+    /* #FF6B1A on white is 2.85:1 and fails AA, so light-mode *text* uses a
+       darkened orange (5.46:1). Fills and borders keep the true brand orange. */
+    --fixfast-orange-ink: #B7440A;
+    --fixfast-ink-3: #5B5B5B;
+    --fixfast-raise: #F4F5F7;
+    --fixfast-border-strong: 1px solid rgba(13, 13, 13, 0.42);
+}
+
 .light .fixfast-page {
     background: #F5F5F7;
     color: #0D0D0D;
@@ -185,21 +439,65 @@
 }
 
 .light .fixfast-nav__logo {
-    background: #FFFFFF;
-    border-color: rgba(0, 0, 0, 0.1);
-    color: #FF6B1A;
-}
-
-.light .fixfast-nav__link {
-    background: #FFFFFF;
-    border-color: rgba(0, 0, 0, 0.1);
+    background: #FF6B1A;
+    border-color: transparent;
     color: #0D0D0D;
 }
 
-.light .fixfast-nav__link.is-active,
+.light .fixfast-nav__title {
+    color: #0D0D0D;
+}
+
+.light .fixfast-nav__link {
+    background: transparent;
+    border-color: transparent;
+    color: #5B5B5B;
+}
+
 .light .fixfast-nav__link:hover {
+    background: var(--fixfast-wash);
+    color: #0D0D0D;
+}
+
+/* Charcoal on orange (6.82:1), not white on orange (2.85:1). */
+.light .fixfast-nav__link.is-active {
     background: #FF6B1A;
-    color: #FFFFFF;
+    color: #0D0D0D;
+}
+
+.light .fixfast-stage {
+    background: #FFFFFF;
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+.light .fixfast-stage__header h1 {
+    color: #0D0D0D;
+}
+
+.light .fixfast-stage__eyebrow {
+    color: var(--fixfast-orange-ink);
+}
+
+.light .fixfast-window {
+    background: #FFFFFF;
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+.light .fixfast-window__topbar {
+    background: #F4F5F7;
+    border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+.light .fixfast-window__traffic i {
+    background: rgba(13, 13, 13, 0.2);
+}
+
+.light .fixfast-window__traffic i:first-child {
+    background: #FF6B1A;
+}
+
+.light .fixfast-window__fallback strong {
+    color: #0D0D0D;
 }
 
 .light .fixfast-profile__menu {
@@ -213,27 +511,26 @@
 }
 
 .light .fixfast-profile__email {
-    color: #555555;
+    color: #5B5B5B;
 }
 
 .light .fixfast-profile__menu button {
-    background: #F5F5F7;
-    border-color: rgba(0, 0, 0, 0.1);
+    background: transparent;
+    border-color: transparent;
     color: #0D0D0D;
 }
 
 .light .fixfast-profile__menu button:hover {
-    background: #FF6B1A;
-    color: #FFFFFF;
+    background: var(--fixfast-wash);
+    color: var(--fixfast-orange-ink);
 }
 
 .light .fixfast-profile__trigger {
     background: #FFFFFF;
-    border-color: rgba(0, 0, 0, 0.1);
     color: #0D0D0D;
 }
 
 .light .fixfast-profile__trigger:hover {
     border-color: #FF6B1A;
-    color: #FF6B1A;
+    color: var(--fixfast-orange-ink);
 }

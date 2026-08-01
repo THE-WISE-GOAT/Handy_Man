@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kamigo — Design Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   KAMIGO DESIGN TOKENS
+   ============================================================ */
+:root{
+  --k-void:#0D0D0D;
+  --k-surface:#1F1F1F;
+  --k-surface-2:#171717;
+  --k-raise:#262626;
+  --k-orange:#FF6B1A;
+  --k-orange-deep:#E85D14;
+  /* text-safe orange: #FF6B1A only hits 2.85:1 on white, so light mode darkens it */
+  --k-orange-ink:#FF6B1A;
+  --k-link-hover:#FFB889;
+  --k-peach:#FFB889;
+  --k-peach-wash:rgba(255,107,26,.10);
+  --k-white:#FFFFFF;
+  --k-gray:#F5F5F7;
+  --k-muted:#7A7A7A;
+  --k-line:rgba(245,245,247,.10);
+  --k-line-2:rgba(245,245,247,.18);
+  /* form controls need 3:1 per SC 1.4.11 — dividers at .18 don't qualify */
+  --k-border-strong:rgba(245,245,247,.42);
+  --k-alert:#E5484D;
+
+  --k-display:"Space Grotesk","Segoe UI",system-ui,sans-serif;
+  --k-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --k-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",monospace;
+
+  --k-r-sm:8px; --k-r-md:12px; --k-r-lg:16px; --k-r-pill:999px;
+  --k-ease:180ms cubic-bezier(.4,0,.2,1);
+  --k-shadow:0 12px 32px rgba(0,0,0,.45);
+
+  --k-page:var(--k-void);
+  --k-card:var(--k-surface);
+  --k-ink:var(--k-white);
+  --k-ink-2:var(--k-gray);
+  /* #7A7A7A is only 3.84:1 on #1F1F1F — kept for borders, not for text */
+  --k-ink-3:#9A9A9A;
+  --k-inset:rgba(255,255,255,.03);
+  color-scheme:dark;
+}
+html.light{
+  --k-page:#F4F5F7;
+  --k-card:#FFFFFF;
+  --k-surface-2:#FFFFFF;
+  --k-raise:#F4F5F7;
+  --k-ink:#0D0D0D;
+  --k-ink-2:#1F1F1F;
+  --k-ink-3:#5B5B5B;
+  /* #FF6B1A is 2.85:1 on white — fails AA. Darkened to #B7440A (5.46:1)
+     for text only; fills and borders keep the true brand orange. */
+  --k-orange-ink:#B7440A;
+  /* peach on white is unreadable; hover goes darker instead of lighter */
+  --k-link-hover:#8A3208;
+  --k-line:rgba(13,13,13,.10);
+  --k-line-2:rgba(13,13,13,.16);
+  --k-border-strong:rgba(13,13,13,.42);
+  --k-inset:rgba(13,13,13,.02);
+  --k-shadow:0 10px 28px rgba(13,13,13,.10);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; padding:0 0 4rem;
+  background:var(--k-page); color:var(--k-ink);
+  font-family:var(--k-body); line-height:1.55;
+  transition:background var(--k-ease),color var(--k-ease);
+}
+.wrap{width:min(1180px,calc(100% - 2.5rem));margin:0 auto}
+
+/* section scaffolding for the preview doc itself */
+.spec{margin:3.25rem 0 0}
+.spec__label{
+  font-family:var(--k-mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--k-orange-ink);margin:0 0 .15rem;font-weight:600;
+}
+.spec__title{font-family:var(--k-display);font-size:1.32rem;font-weight:700;margin:0 0 .3rem;letter-spacing:-.02em}
+.spec__note{margin:0 0 1.1rem;color:var(--k-ink-3);font-size:.9rem;max-width:74ch}
+.demo{
+  border:1px dashed var(--k-line-2);border-radius:var(--k-r-lg);
+  padding:1.4rem;background:var(--k-inset);
+}
+
+/* ============================================================
+   NAVBAR
+   ============================================================ */
+.k-nav{
+  display:grid;grid-template-columns:auto 1fr auto;gap:1.25rem;align-items:center;
+  padding:.7rem .9rem;background:var(--k-card);
+  border:1px solid var(--k-line);border-radius:var(--k-r-lg);
+  box-shadow:var(--k-shadow);
+}
+.k-nav__brand{display:flex;align-items:center;gap:.75rem;min-width:0}
+.k-nav__logo{
+  width:2.6rem;height:2.6rem;flex:0 0 auto;display:grid;place-items:center;
+  border-radius:10px;background:var(--k-orange);color:#0D0D0D;
+  font-family:var(--k-display);font-weight:700;font-size:1.22rem;line-height:1;
+  box-shadow:0 4px 14px rgba(255,107,26,.34);
+}
+.k-nav__eyebrow{
+  font-family:var(--k-mono);font-size:.63rem;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--k-ink-3);font-weight:500;
+}
+.k-nav__title{
+  font-family:var(--k-display);font-size:1.12rem;font-weight:700;letter-spacing:-.015em;
+  color:var(--k-ink);line-height:1.15;
+}
+.k-nav__menu{display:flex;justify-content:center;gap:.3rem;flex-wrap:wrap}
+.k-nav__link{
+  appearance:none;border:1px solid transparent;background:transparent;
+  color:var(--k-ink-3);font-family:var(--k-body);font-size:.82rem;font-weight:600;
+  letter-spacing:.02em;padding:.6rem 1.1rem;border-radius:var(--k-r-pill);
+  cursor:pointer;transition:var(--k-ease);transition-property:background,color,border-color;
+}
+.k-nav__link:hover{color:var(--k-ink);background:var(--k-peach-wash)}
+.k-nav__link.is-active{background:var(--k-orange);color:#0D0D0D;font-weight:700}
+.k-nav__link:focus-visible{outline:2px solid var(--k-orange);outline-offset:2px}
+.k-avatar{
+  width:2.4rem;height:2.4rem;border-radius:50%;display:grid;place-items:center;
+  background:var(--k-raise);border:1px solid var(--k-line-2);color:var(--k-ink);
+  font-family:var(--k-display);font-weight:700;font-size:.9rem;cursor:pointer;
+  transition:var(--k-ease);transition-property:border-color,color;
+}
+.k-avatar:hover{border-color:var(--k-orange-ink);color:var(--k-orange-ink)}
+
+/* ============================================================
+   STAGE HEADER  (currently unstyled in your app)
+   ============================================================ */
+.k-stage{
+  margin-top:1rem;padding:1.5rem 1.6rem;background:var(--k-card);
+  border:1px solid var(--k-line);border-radius:var(--k-r-lg);
+  position:relative;overflow:hidden;
+}
+.k-stage::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--k-orange);
+}
+.k-stage__header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
+.k-stage__eyebrow{
+  margin:0 0 .25rem;font-family:var(--k-mono);font-size:.68rem;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--k-orange-ink);
+}
+.k-stage__header h1{
+  margin:0;font-family:var(--k-display);font-size:clamp(1.5rem,3vw,2.1rem);
+  font-weight:700;letter-spacing:-.035em;line-height:1.05;color:var(--k-ink);
+}
+.k-stage__sub{margin:.5rem 0 0;color:var(--k-ink-3);font-size:.92rem;max-width:60ch}
+.k-stage__dot{
+  width:.6rem;height:.6rem;border-radius:50%;background:var(--k-orange);flex:0 0 auto;
+  margin-top:.5rem;box-shadow:0 0 0 4px var(--k-peach-wash);
+}
+
+/* ============================================================
+   PREVIEW DECK / FLOATING WINDOWS  (currently unstyled)
+   ============================================================ */
+.k-deck{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.9rem;margin-top:.9rem}
+.k-window{
+  appearance:none;text-align:left;padding:0;cursor:pointer;overflow:hidden;
+  background:var(--k-surface-2);border:1px solid var(--k-line);border-radius:var(--k-r-md);
+  transition:var(--k-ease);transition-property:transform,border-color,box-shadow;
+  font-family:inherit;color:inherit;
+}
+.k-window:hover{transform:translateY(-3px);border-color:rgba(255,107,26,.45);box-shadow:var(--k-shadow)}
+.k-window:focus-visible{outline:2px solid var(--k-orange);outline-offset:2px}
+.k-window__topbar{
+  display:flex;align-items:center;gap:.55rem;padding:.55rem .7rem;
+  background:var(--k-raise);border-bottom:1px solid var(--k-line);
+}
+.k-window__traffic{display:inline-flex;gap:.25rem;flex:0 0 auto}
+.k-window__traffic i{width:.45rem;height:.45rem;border-radius:50%;background:var(--k-line-2);display:block}
+.k-window__traffic i:first-child{background:var(--k-orange)}
+.k-window__title{
+  font-family:var(--k-mono);font-size:.66rem;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--k-ink-3);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.k-window__icon{margin-left:auto;font-size:.8rem;opacity:.75}
+.k-window__body{padding:.9rem;min-height:86px;display:flex;flex-direction:column;gap:.4rem}
+.k-window__fallback strong{
+  display:block;font-family:var(--k-display);font-size:.95rem;font-weight:600;color:var(--k-ink);
+}
+.k-window__fallback small{color:var(--k-ink-3);font-size:.79rem}
+
+/* ============================================================
+   CARDS + STATUS RAIL  (signature element)
+   ============================================================ */
+.k-card{
+  position:relative;background:var(--k-card);border:1px solid var(--k-line);
+  border-radius:var(--k-r-md);padding:1.15rem 1.15rem 1.15rem 1.4rem;overflow:hidden;
+  transition:var(--k-ease);transition-property:transform,border-color,box-shadow;
+}
+.k-card--rail::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--k-line-2);
+}
+.k-card--rail::after{
+  content:"";position:absolute;left:0;top:0;width:3px;background:var(--k-orange);
+  height:var(--rail,0%);transition:height 320ms cubic-bezier(.4,0,.2,1);
+}
+.k-card.is-clickable{cursor:pointer}
+.k-card.is-clickable:hover{transform:translateY(-2px);border-color:rgba(255,107,26,.35);box-shadow:var(--k-shadow)}
+.k-card__flag{
+  font-family:var(--k-mono);font-size:.66rem;font-weight:500;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--k-ink-3);display:block;margin-bottom:.45rem;
+}
+.k-card__title{
+  margin:0 0 .3rem;font-family:var(--k-display);font-size:1.05rem;font-weight:600;
+  letter-spacing:-.015em;color:var(--k-ink);
+}
+.k-card__desc{margin:0;color:var(--k-ink-3);font-size:.88rem}
+.k-card__foot{
+  display:flex;align-items:center;gap:.6rem;margin-top:.85rem;padding-top:.75rem;
+  border-top:1px solid var(--k-line);
+}
+.k-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:.9rem}
+
+/* ============================================================
+   MATCH METER
+   ============================================================ */
+.k-meter{display:flex;align-items:center;gap:.6rem;margin-top:.75rem}
+.k-meter__track{display:flex;gap:3px;flex:1}
+.k-meter__seg{height:5px;flex:1;border-radius:2px;background:var(--k-line-2)}
+.k-meter__seg.is-on{background:var(--k-orange)}
+.k-meter__val{
+  font-family:var(--k-mono);font-size:.76rem;font-weight:600;color:var(--k-orange-ink);
+  min-width:3ch;text-align:right;
+}
+
+/* ============================================================
+   BADGES  — state = orange-filled vs gray-hollow
+   ============================================================ */
+.k-badge{
+  display:inline-flex;align-items:center;gap:.4rem;padding:.34rem .72rem;
+  border:1px solid var(--k-line-2);border-radius:var(--k-r-pill);
+  font-family:var(--k-mono);font-size:.7rem;font-weight:500;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--k-ink-3);background:transparent;width:fit-content;
+}
+.k-badge--live{border-color:rgba(255,107,26,.4);background:var(--k-peach-wash);color:var(--k-orange-ink)}
+.k-badge--solid{background:var(--k-orange);border-color:var(--k-orange);color:#0D0D0D;font-weight:600}
+.k-badge--alert{border-color:rgba(229,72,77,.45);background:rgba(229,72,77,.12);color:#FF8A8E}
+html.light .k-badge--alert{color:#C0292E}
+.k-badge__dot{width:.42rem;height:.42rem;border-radius:50%;background:currentColor;flex:0 0 auto}
+.k-badge--live .k-badge__dot{animation:kpulse 2s ease-in-out infinite}
+@keyframes kpulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.k-btn{
+  appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+  font-family:var(--k-body);font-size:.85rem;font-weight:600;letter-spacing:.01em;
+  padding:.7rem 1.25rem;border-radius:var(--k-r-sm);border:1px solid transparent;
+  cursor:pointer;transition:var(--k-ease);
+  transition-property:background,color,border-color,transform,box-shadow;
+}
+.k-btn:focus-visible{outline:2px solid var(--k-orange);outline-offset:2px}
+.k-btn:active{transform:translateY(1px)}
+.k-btn--primary{background:var(--k-orange);color:#0D0D0D;font-weight:700;box-shadow:0 4px 14px rgba(255,107,26,.28)}
+.k-btn--primary:hover{background:var(--k-orange-deep);box-shadow:0 6px 18px rgba(255,107,26,.38)}
+.k-btn--ghost{background:transparent;border-color:var(--k-border-strong);color:var(--k-ink-2)}
+.k-btn--ghost:hover{border-color:var(--k-orange-ink);color:var(--k-orange-ink);background:var(--k-peach-wash)}
+.k-btn--quiet{background:transparent;color:var(--k-ink-3);padding:.7rem .9rem}
+.k-btn--quiet:hover{color:var(--k-ink)}
+.k-btn--danger{background:transparent;border-color:rgba(229,72,77,.45);color:#FF8A8E}
+.k-btn--danger:hover{background:rgba(229,72,77,.14);border-color:var(--k-alert)}
+html.light .k-btn--danger{color:#C0292E}
+.k-btn[disabled]{opacity:.42;cursor:not-allowed;transform:none;box-shadow:none}
+.k-btn--block{width:100%}
+
+/* ============================================================
+   CHAT
+   ============================================================ */
+.k-chat{
+  display:flex;flex-direction:column;gap:.6rem;padding:1rem;
+  background:var(--k-surface-2);border:1px solid var(--k-line);border-radius:var(--k-r-md);
+  max-height:290px;overflow-y:auto;
+}
+.k-msg{
+  margin:0;padding:.6rem .85rem;border-radius:var(--k-r-md);max-width:82%;
+  font-size:.88rem;line-height:1.5;
+}
+.k-msg strong{
+  display:block;font-family:var(--k-mono);font-size:.62rem;letter-spacing:.13em;
+  text-transform:uppercase;margin-bottom:.2rem;opacity:.82;font-weight:600;
+}
+/* orange-on-peach-wash is already close to the floor; no opacity to spare */
+.k-msg--system strong{opacity:1}
+.k-msg--user{
+  background:var(--k-orange);color:#0D0D0D;align-self:flex-end;
+  border-radius:var(--k-r-md) 3px var(--k-r-md) var(--k-r-md);
+}
+.k-msg--assistant{
+  background:var(--k-raise);color:var(--k-ink-2);align-self:flex-start;
+  border:1px solid var(--k-line);border-radius:3px var(--k-r-md) var(--k-r-md) var(--k-r-md);
+}
+.k-msg--system{
+  background:var(--k-peach-wash);color:var(--k-orange-ink);align-self:flex-start;
+  border:1px solid rgba(255,107,26,.28);border-radius:3px var(--k-r-md) var(--k-r-md) var(--k-r-md);
+  font-family:var(--k-mono);font-size:.78rem;
+}
+.k-chatform{display:flex;gap:.5rem;margin-top:.7rem}
+
+/* ============================================================
+   FORM CONTROLS
+   ============================================================ */
+.k-field{display:flex;flex-direction:column;gap:.35rem}
+.k-label{
+  font-family:var(--k-mono);font-size:.66rem;font-weight:500;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--k-ink-3);
+}
+.k-input,.k-textarea{
+  width:100%;font-family:var(--k-body);font-size:.9rem;color:var(--k-ink);
+  background:var(--k-surface-2);border:1px solid var(--k-border-strong);
+  border-radius:var(--k-r-sm);padding:.7rem .85rem;outline:none;
+  transition:var(--k-ease);transition-property:border-color,box-shadow,background;
+}
+.k-textarea{resize:vertical;min-height:96px;line-height:1.6}
+.k-input::placeholder,.k-textarea::placeholder{color:var(--k-ink-3);opacity:.75}
+.k-input:focus,.k-textarea:focus{border-color:var(--k-orange-ink);box-shadow:0 0 0 3px var(--k-peach-wash)}
+.k-formrow{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+
+/* ============================================================
+   FILE TILES  (were white-on-dark in your app)
+   ============================================================ */
+.k-files{display:flex;gap:.5rem;overflow-x:auto;padding:.2rem 0}
+.k-file{
+  flex:0 0 auto;width:68px;height:68px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:.2rem;text-align:center;
+  background:var(--k-raise);border:1px solid var(--k-line-2);border-radius:var(--k-r-sm);
+  transition:var(--k-ease);transition-property:border-color,transform;cursor:pointer;
+}
+.k-file:hover{border-color:var(--k-orange-ink);transform:translateY(-2px)}
+.k-file__type{font-family:var(--k-mono);font-size:.6rem;font-weight:600;color:var(--k-orange-ink);letter-spacing:.06em}
+.k-file__name{
+  font-size:.62rem;color:var(--k-ink-3);max-width:100%;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;padding:0 .25rem;
+}
+
+/* ============================================================
+   DATA ROWS
+   ============================================================ */
+.k-rows{display:flex;flex-direction:column}
+.k-row{
+  display:flex;justify-content:space-between;gap:1rem;padding:.55rem 0;
+  border-bottom:1px solid var(--k-line);font-size:.85rem;
+}
+.k-row:last-child{border-bottom:0}
+.k-row__k{font-family:var(--k-mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--k-ink-3)}
+.k-row__v{color:var(--k-ink-2);text-align:right;font-weight:500}
+.k-link{
+  color:var(--k-orange-ink);font-weight:600;text-decoration:underline;
+  text-underline-offset:.18em;text-decoration-thickness:1px;cursor:pointer;
+}
+.k-link:hover{color:var(--k-link-hover)}
+
+/* swatches */
+.k-swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:.7rem}
+.k-swatch{border:1px solid var(--k-line);border-radius:var(--k-r-sm);overflow:hidden;background:var(--k-card)}
+.k-swatch__chip{height:60px}
+.k-swatch__meta{padding:.5rem .6rem}
+.k-swatch__name{font-size:.76rem;font-weight:600;color:var(--k-ink)}
+.k-swatch__hex{font-family:var(--k-mono);font-size:.68rem;color:var(--k-ink-3)}
+
+.k-toggle{
+  position:fixed;right:1.1rem;bottom:1.1rem;z-index:50;
+  background:var(--k-card);border:1px solid var(--k-line-2);color:var(--k-ink);
+  border-radius:var(--k-r-pill);padding:.65rem 1.15rem;cursor:pointer;
+  font-family:var(--k-body);font-size:.8rem;font-weight:600;box-shadow:var(--k-shadow);
+}
+.k-toggle:hover{border-color:var(--k-orange-ink);color:var(--k-orange-ink)}
+
+.masthead{padding:2.75rem 0 .5rem}
+.masthead h1{
+  font-family:var(--k-display);font-size:clamp(2.1rem,5vw,3.3rem);font-weight:700;
+  letter-spacing:-.045em;margin:.2rem 0 .5rem;line-height:1;
+}
+.masthead h1 em{font-style:normal;color:var(--k-orange-ink)}
+.masthead p{color:var(--k-ink-3);max-width:66ch;margin:0}
+
+@media(max-width:720px){
+  .k-nav{grid-template-columns:1fr auto;gap:.7rem}
+  .k-nav__menu{grid-column:1 / -1;justify-content:flex-start;overflow-x:auto}
+  .k-formrow{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="spec__label">Design preview · 29 July 2026</p>
+    <h1>Kamigo <em>design system</em></h1>
+    <p>Every component below is what I propose to apply to your customer and worker dashboards. Nothing in your repo has been changed yet. Toggle light mode at the bottom right.</p>
+  </header>
+
+  <!-- PALETTE -->
+  <section class="spec">
+    <p class="spec__label">01 · Palette</p>
+    <h2 class="spec__title">Six colors, one accent</h2>
+    <p class="spec__note">Orange is the only chromatic color in the system. Job state is encoded as <strong>orange-filled vs. gray-hollow</strong> rather than green/blue — that removes the off-brand <code>#4ade80</code> green and <code>#3b82f6</code> blue currently in your buttons and chat bubbles. One red survives, reserved strictly for the emergency toggle.</p>
+    <div class="demo">
+      <div class="k-swatches">
+        <div class="k-swatch"><div class="k-swatch__chip" style="background:#FF6B1A"></div><div class="k-swatch__meta"><div class="k-swatch__name">Signal Orange</div><div class="k-swatch__hex">#FF6B1A</div></div></div>
+        <div class="k-swatch"><div class="k-swatch__chip" style="background:#FFB889"></div><div class="k-swatch__meta"><div class="k-swatch__name">Peach</div><div class="k-swatch__hex">#FFB889</div></div></div>
+        <div class="k-swatch"><div class="k-swatch__chip" style="background:#0D0D0D"></div><div class="k-swatch__meta"><div class="k-swatch__name">Void</div><div class="k-swatch__hex">#0D0D0D</div></div></div>
+        <div class="k-swatch"><div class="k-swatch__chip" style="background:#1F1F1F"></div><div class="k-swatch__meta"><div class="k-swatch__name">Surface</div><div class="k-swatch__hex">#1F1F1F</div></div></div>
+        <div class="k-swatch"><div class="k-swatch__chip" style="background:#F5F5F7"></div><div class="k-swatch__meta"><div class="k-swatch__name">Light Gray</div><div class="k-swatch__hex">#F5F5F7</div></div></div>
+        <div class="k-swatch"><div class="k-swatch__chip" style="background:#7A7A7A"></div><div class="k-swatch__meta"><div class="k-swatch__name">Muted</div><div class="k-swatch__hex">#7A7A7A</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NAVBAR -->
+  <section class="spec">
+    <p class="spec__label">02 · Navigation</p>
+    <h2 class="spec__title">Navbar</h2>
+    <p class="spec__note">Your current nav gives every link a heavy box with <code>padding: 0.5rem 2.5rem</code> and a border, so five links read as five competing buttons. Here only the active view is filled; the rest are quiet until hovered. The brand mark and title were never styled at all — <code>.fixfast-nav__title</code> and <code>.fixfast-nav__eyebrow</code> don't exist in your CSS.</p>
+    <div class="demo">
+      <div class="k-nav">
+        <div class="k-nav__brand">
+          <div class="k-nav__logo">K</div>
+          <div>
+            <div class="k-nav__eyebrow">Customer workspace</div>
+            <div class="k-nav__title">Kamigo</div>
+          </div>
+        </div>
+        <nav class="k-nav__menu">
+          <button class="k-nav__link is-active">Bookings</button>
+          <button class="k-nav__link">Matches</button>
+          <button class="k-nav__link">Messages</button>
+          <button class="k-nav__link">Me</button>
+        </nav>
+        <button class="k-avatar" aria-label="Account menu">S</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE + DECK -->
+  <section class="spec">
+    <p class="spec__label">03 · Stage &amp; deck</p>
+    <h2 class="spec__title">The missing components</h2>
+    <p class="spec__note">Your <code>DashboardStage.jsx</code> renders <code>.fixfast-stage</code>, <code>.fixfast-deck</code> and <code>.fixfast-window</code>, but none of those classes are defined in any stylesheet — not even in the built bundle. That's why these areas look unfinished. Below is what they'd become.</p>
+    <div class="demo">
+      <div class="k-stage">
+        <div class="k-stage__header">
+          <div>
+            <p class="k-stage__eyebrow">Active dispatch</p>
+            <h1>Kitchen sink installation</h1>
+            <p class="k-stage__sub">Posted 20 minutes ago in Lalitpur. Four workers within 5&nbsp;km match this trade.</p>
+          </div>
+          <span class="k-stage__dot" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <div class="k-deck">
+        <button class="k-window">
+          <div class="k-window__topbar">
+            <span class="k-window__traffic" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="k-window__title">AI chat terminal</span>
+            <span class="k-window__icon">💬</span>
+          </div>
+          <div class="k-window__body">
+            <span class="k-badge k-badge--live"><span class="k-badge__dot"></span>Session live</span>
+            <div class="k-window__fallback"><small>12 messages captured</small></div>
+          </div>
+        </button>
+        <button class="k-window">
+          <div class="k-window__topbar">
+            <span class="k-window__traffic" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="k-window__title">Job workspace</span>
+            <span class="k-window__icon">📝</span>
+          </div>
+          <div class="k-window__body">
+            <div class="k-window__fallback"><strong>Draft ready</strong><small>486 characters</small></div>
+          </div>
+        </button>
+        <button class="k-window">
+          <div class="k-window__topbar">
+            <span class="k-window__traffic" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="k-window__title">Active posts</span>
+            <span class="k-window__icon">📡</span>
+          </div>
+          <div class="k-window__body">
+            <div class="k-window__fallback"><strong>3 in pipeline</strong><small>1 awaiting your reply</small></div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CARDS -->
+  <section class="spec">
+    <p class="spec__label">04 · Cards</p>
+    <h2 class="spec__title">Job cards with a status rail</h2>
+    <p class="spec__note">The signature element: a rail on the left edge whose fill height encodes how far the job has moved through dispatch — posted, matched, assigned, done. It carries real information rather than decorating. In your current build these cards render as <strong>white boxes with black borders on the charcoal page</strong>, which is the most jarring thing in the UI.</p>
+    <div class="demo">
+      <div class="k-grid">
+        <article class="k-card k-card--rail is-clickable" style="--rail:25%">
+          <span class="k-card__flag">Posted · 20 min ago</span>
+          <h3 class="k-card__title">Kitchen sink installation</h3>
+          <p class="k-card__desc">Under-counter basin replacement, existing plumbing in place.</p>
+          <div class="k-meter">
+            <span class="k-meter__track" aria-hidden="true">
+              <i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i>
+              <i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i>
+              <i class="k-meter__seg is-on"></i><i class="k-meter__seg"></i><i class="k-meter__seg"></i><i class="k-meter__seg"></i>
+            </span>
+            <span class="k-meter__val">71%</span>
+          </div>
+          <div class="k-card__foot">
+            <span class="k-badge"><span class="k-badge__dot"></span>Awaiting bids</span>
+            <span class="k-badge">4 nearby</span>
+          </div>
+        </article>
+
+        <article class="k-card k-card--rail is-clickable" style="--rail:60%">
+          <span class="k-card__flag">Matched · 2 hrs ago</span>
+          <h3 class="k-card__title">Ceiling fan rewiring</h3>
+          <p class="k-card__desc">Two fans, first floor. Customer supplies fittings.</p>
+          <div class="k-meter">
+            <span class="k-meter__track" aria-hidden="true">
+              <i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i>
+              <i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i>
+              <i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i><i class="k-meter__seg"></i>
+            </span>
+            <span class="k-meter__val">92%</span>
+          </div>
+          <div class="k-card__foot">
+            <span class="k-badge k-badge--live"><span class="k-badge__dot"></span>Worker en route</span>
+          </div>
+        </article>
+
+        <article class="k-card k-card--rail is-clickable" style="--rail:100%">
+          <span class="k-card__flag">Completed · yesterday</span>
+          <h3 class="k-card__title">Bathroom leak repair</h3>
+          <p class="k-card__desc">Sealed joint under the vanity, replaced trap.</p>
+          <div class="k-card__foot">
+            <span class="k-badge k-badge--solid">Paid</span>
+            <span class="k-badge">Rs 3,200</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- BUTTONS + BADGES -->
+  <section class="spec">
+    <p class="spec__label">05 · Actions</p>
+    <h2 class="spec__title">Buttons &amp; badges</h2>
+    <p class="spec__note">One primary action per view, filled orange. Everything else is a ghost or quiet button so the eye knows where to go. Your emergency and post buttons currently use <code>font-size: 29px</code> with <code>height: 10%</code>, which is why they stretch oddly — these use normal type and intrinsic height.</p>
+    <div class="demo">
+      <div style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1.1rem">
+        <button class="k-btn k-btn--primary">Post job</button>
+        <button class="k-btn k-btn--ghost">Save draft</button>
+        <button class="k-btn k-btn--quiet">Cancel</button>
+        <button class="k-btn k-btn--danger">Emergency</button>
+        <button class="k-btn k-btn--primary" disabled>Creating…</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
+        <span class="k-badge k-badge--live"><span class="k-badge__dot"></span>Live dispatch</span>
+        <span class="k-badge k-badge--solid">Assigned</span>
+        <span class="k-badge">Draft</span>
+        <span class="k-badge">Under review</span>
+        <span class="k-badge k-badge--alert">Rejected</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAT -->
+  <section class="spec">
+    <p class="spec__label">06 · Conversation</p>
+    <h2 class="spec__title">AI intake chat</h2>
+    <p class="spec__note">Your chat bubbles are currently blue for the customer and gray for the assistant, with an orange system message — three unrelated hues. Here the customer speaks in brand orange, the assistant sits quiet, and system notices are mono and tinted.</p>
+    <div class="demo">
+      <div class="k-chat">
+        <p class="k-msg k-msg--system"><strong>System</strong>Session started · 8 turns remaining</p>
+        <p class="k-msg k-msg--assistant"><strong>Kamigo</strong>What needs fixing, and where is it?</p>
+        <p class="k-msg k-msg--user"><strong>You</strong>My kitchen sink is leaking underneath. I'm in Lalitpur.</p>
+        <p class="k-msg k-msg--assistant"><strong>Kamigo</strong>Got it — a plumbing job in Lalitpur. Is the leak coming from the pipe joint or the basin itself?</p>
+      </div>
+      <div class="k-chatform">
+        <input class="k-input" placeholder="Describe the job…">
+        <button class="k-btn k-btn--primary">Send</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FORMS -->
+  <section class="spec">
+    <p class="spec__label">07 · Forms</p>
+    <h2 class="spec__title">Inputs &amp; attachments</h2>
+    <p class="spec__note">Labels are mono and small so they recede; the input itself carries the weight. Attachment tiles were <code>#f9f9f9</code> with black borders — bright white chips on a dark page. They're now surface-colored and theme-aware.</p>
+    <div class="demo">
+      <div class="k-formrow" style="margin-bottom:.9rem">
+        <div class="k-field">
+          <label class="k-label" for="d1">Job title</label>
+          <input class="k-input" id="d1" value="Kitchen sink installation">
+        </div>
+        <div class="k-field">
+          <label class="k-label" for="d2">Trade</label>
+          <input class="k-input" id="d2" placeholder="e.g. Plumbing">
+        </div>
+      </div>
+      <div class="k-field" style="margin-bottom:1rem">
+        <label class="k-label" for="d3">Description</label>
+        <textarea class="k-textarea" id="d3" placeholder="Describe the job in detail. This is what workers will see."></textarea>
+      </div>
+      <div class="k-field" style="margin-bottom:1rem">
+        <span class="k-label">Attachments</span>
+        <div class="k-files">
+          <div class="k-file"><span class="k-file__type">PDF</span><span class="k-file__name">Plan.pdf</span></div>
+          <div class="k-file"><span class="k-file__type">IMG</span><span class="k-file__name">Sink.jpg</span></div>
+          <div class="k-file"><span class="k-file__type">IMG</span><span class="k-file__name">Pipe.png</span></div>
+          <div class="k-file"><span class="k-file__type">DOC</span><span class="k-file__name">Specs.txt</span></div>
+        </div>
+      </div>
+      <div class="k-rows">
+        <div class="k-row"><span class="k-row__k">Name</span><span class="k-row__v">Sushant</span></div>
+        <div class="k-row"><span class="k-row__k">Contact</span><span class="k-row__v">+977 98XXXXXXXX</span></div>
+        <div class="k-row"><span class="k-row__k">Address</span><span class="k-row__v"><span class="k-link">Jhamsikhel, Lalitpur</span></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORKER -->
+  <section class="spec">
+    <p class="spec__label">08 · Worker side</p>
+    <h2 class="spec__title">Availability &amp; nearby work</h2>
+    <p class="spec__note">Availability is the worker's most consequential control, so it gets the filled treatment. Offline is hollow rather than red — being offline isn't an error.</p>
+    <div class="demo">
+      <div class="k-grid">
+        <article class="k-card">
+          <span class="k-card__flag">Your status</span>
+          <h3 class="k-card__title">Accepting jobs</h3>
+          <p class="k-card__desc">You're visible to customers within 8&nbsp;km of Patan.</p>
+          <div class="k-card__foot" style="border:0;padding-top:.6rem">
+            <button class="k-btn k-btn--primary">Go offline</button>
+            <span class="k-badge k-badge--live"><span class="k-badge__dot"></span>Online</span>
+          </div>
+        </article>
+        <article class="k-card k-card--rail is-clickable" style="--rail:40%">
+          <span class="k-card__flag">1.2 km away · posted 6 min ago</span>
+          <h3 class="k-card__title">Ceiling fan rewiring</h3>
+          <p class="k-card__desc">Two fans, first floor. Fittings supplied.</p>
+          <div class="k-meter">
+            <span class="k-meter__track" aria-hidden="true">
+              <i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i>
+              <i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i>
+              <i class="k-meter__seg is-on"></i><i class="k-meter__seg is-on"></i><i class="k-meter__seg"></i><i class="k-meter__seg"></i>
+            </span>
+            <span class="k-meter__val">84%</span>
+          </div>
+          <div class="k-card__foot">
+            <button class="k-btn k-btn--primary">Place bid</button>
+            <button class="k-btn k-btn--quiet">Skip</button>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<button class="k-toggle" id="themeToggle">Switch to light</button>
+
+<script>
+  const root = document.documentElement;
+  const btn  = document.getElementById('themeToggle');
+  btn.addEventListener('click', () => {
+    const light = root.classList.toggle('light');
+    root.classList.toggle('dark', !light);
+    btn.textContent = light ? 'Switch to dark' : 'Switch to light';
+  });
+</script>
+</body>
+</html>

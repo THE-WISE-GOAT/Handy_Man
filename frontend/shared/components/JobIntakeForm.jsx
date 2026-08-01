@@ -224,12 +224,12 @@ export default function JobIntakeForm({
 
         .job-intake__shell {
           width: min(100%, 960px);
-          background: linear-gradient(180deg, rgba(10, 18, 32, 0.98) 0%, rgba(15, 23, 42, 0.96) 100%);
-          border: 1px solid rgba(148, 163, 184, 0.22);
+          background: var(--k-shell);
+          border: 1px solid var(--k-line);
           border-radius: 24px;
-          box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
           padding: 28px;
-          color: #e2e8f0;
+          color: var(--k-ink);
         }
 
         .job-intake__hero {
@@ -243,9 +243,9 @@ export default function JobIntakeForm({
           font-size: 12px;
           letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: #93c5fd;
-          background: rgba(37, 99, 235, 0.14);
-          border: 1px solid rgba(96, 165, 250, 0.28);
+          color: var(--k-orange-ink);
+          background: var(--k-wash);
+          border: 1px solid rgba(255, 107, 26, 0.4);
           margin-bottom: 14px;
         }
 
@@ -253,13 +253,13 @@ export default function JobIntakeForm({
           margin: 0;
           font-size: clamp(1.8rem, 4vw, 2.6rem);
           line-height: 1.05;
-          color: #f8fafc;
+          color: var(--k-ink);
         }
 
         .job-intake__subtitle {
           margin: 12px 0 0;
           max-width: 62ch;
-          color: #cbd5e1;
+          color: var(--k-ink-3);
           line-height: 1.6;
         }
 
@@ -285,17 +285,17 @@ export default function JobIntakeForm({
 
         .job-intake__label {
           font-size: 14px;
-          font-weight: 700;
-          color: #f8fafc;
+          font-weight: 600;
+          color: var(--k-ink);
         }
 
         .job-intake__select,
         .job-intake__textarea {
           width: 100%;
           border-radius: 16px;
-          border: 1px solid rgba(148, 163, 184, 0.24);
-          background: rgba(15, 23, 42, 0.72);
-          color: #f8fafc;
+          border: 1px solid var(--k-border-strong);
+          background: var(--k-field);
+          color: var(--k-ink);
           padding: 14px 16px;
           font: inherit;
           outline: none;
@@ -310,13 +310,13 @@ export default function JobIntakeForm({
         .job-intake__select:focus,
         .job-intake__textarea:focus,
         .job-intake__radio-card input:focus-visible {
-          border-color: rgba(96, 165, 250, 0.9);
-          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+          border-color: #FF6B1A;
+          box-shadow: 0 0 0 3px rgba(255, 107, 26, 0.28);
         }
 
         .job-intake__helper {
           margin: 0;
-          color: #94a3b8;
+          color: var(--k-ink-3);
           font-size: 13px;
           line-height: 1.5;
         }
@@ -330,17 +330,17 @@ export default function JobIntakeForm({
 
         .job-intake__counter {
           flex-shrink: 0;
-          color: #cbd5e1;
+          color: var(--k-ink-3);
           font-size: 12px;
           padding: 4px 8px;
           border-radius: 999px;
-          background: rgba(30, 41, 59, 0.72);
-          border: 1px solid rgba(148, 163, 184, 0.16);
+          background: var(--k-raise);
+          border: 1px solid var(--k-border-strong);
         }
 
         .job-intake__error {
           margin: 0;
-          color: #fca5a5;
+          color: var(--k-alert-ink);
           font-size: 13px;
         }
 
@@ -355,20 +355,20 @@ export default function JobIntakeForm({
           gap: 6px;
           padding: 14px;
           border-radius: 18px;
-          border: 1px solid rgba(148, 163, 184, 0.18);
-          background: rgba(15, 23, 42, 0.72);
+          border: 1px solid var(--k-border-strong);
+          background: var(--k-field);
           cursor: pointer;
           transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
         }
 
         .job-intake__radio-card:hover {
           transform: translateY(-1px);
-          border-color: rgba(96, 165, 250, 0.45);
+          border-color: rgba(255, 107, 26, 0.45);
         }
 
         .job-intake__radio-card.is-selected {
-          border-color: rgba(96, 165, 250, 0.9);
-          background: rgba(30, 41, 59, 0.92);
+          border-color: #FF6B1A;
+          background: var(--k-wash);
         }
 
         .job-intake__radio-card input {
@@ -378,21 +378,21 @@ export default function JobIntakeForm({
         }
 
         .job-intake__radio-title {
-          font-weight: 700;
-          color: #f8fafc;
+          font-weight: 600;
+          color: var(--k-ink);
         }
 
         .job-intake__radio-description {
           font-size: 13px;
-          color: #cbd5e1;
+          color: var(--k-ink-3);
           line-height: 1.45;
         }
 
         .job-intake__preview {
           border-radius: 20px;
           padding: 18px;
-          background: rgba(2, 6, 23, 0.55);
-          border: 1px solid rgba(148, 163, 184, 0.16);
+          background: var(--k-field);
+          border: 1px solid var(--k-line);
         }
 
         .job-intake__preview-header {
@@ -409,24 +409,26 @@ export default function JobIntakeForm({
           align-items: center;
           padding: 6px 10px;
           border-radius: 999px;
-          background: rgba(14, 165, 233, 0.14);
-          border: 1px solid rgba(56, 189, 248, 0.25);
-          color: #7dd3fc;
+          background: var(--k-wash);
+          border: 1px solid rgba(255, 107, 26, 0.4);
+          color: var(--k-orange-ink);
           font-size: 12px;
-          font-weight: 700;
+          font-weight: 600;
         }
 
         .job-intake__preview-note {
-          color: #94a3b8;
+          color: var(--k-ink-3);
           font-size: 12px;
         }
 
+        /* The JSON block stays dark in both themes, the way a code block does.
+           Peach on near-black is 11.54:1. */
         .job-intake__json {
           margin: 0;
           padding: 16px;
           border-radius: 16px;
-          background: rgba(15, 23, 42, 0.92);
-          color: #dbeafe;
+          background: #0D0D0D;
+          color: #FFB889;
           overflow: auto;
           font-size: 13px;
           line-height: 1.55;
@@ -441,18 +443,19 @@ export default function JobIntakeForm({
           border: none;
           border-radius: 999px;
           padding: 14px 20px;
-          font-weight: 800;
+          font-weight: 700;
           letter-spacing: 0.02em;
-          color: #081120;
-          background: linear-gradient(135deg, #7dd3fc 0%, #93c5fd 100%);
-          box-shadow: 0 12px 30px rgba(56, 189, 248, 0.22);
+          color: #0D0D0D;
+          background: #FF6B1A;
+          box-shadow: 0 12px 30px rgba(255, 107, 26, 0.22);
           cursor: pointer;
           transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
         }
 
         .job-intake__submit:hover:not(:disabled) {
           transform: translateY(-1px);
-          box-shadow: 0 16px 36px rgba(56, 189, 248, 0.28);
+          background: #E85D14;
+          box-shadow: 0 16px 36px rgba(255, 107, 26, 0.3);
         }
 
         .job-intake__submit:disabled {
