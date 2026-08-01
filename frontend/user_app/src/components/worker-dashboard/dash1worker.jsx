@@ -1,5 +1,5 @@
 // components/worker-dashboard/dash1worker.jsx
-import React, { useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWorkerDashboardData } from "./useWorkerDashboardData";
 import "./dash1worker.css";
@@ -24,7 +24,16 @@ export default function Dash1Worker({ viewSlug }) {
     matchedJobs,
     fetchMatchedJobs,
     setActiveJob,
+    chatMessages,
+    connectWorkerChat,
+    sendHumanMessage,
+    appendMessage,
+    disconnectWorkerChat,
+    fetchChatHistory,
   } = useWorkerDashboardData();
+
+  const chatEndRef = useRef(null);
+  const [chatInput, setChatInput] = useState("");
 
   useEffect(() => {
     fetchMatchedJobs();
@@ -40,19 +49,43 @@ export default function Dash1Worker({ viewSlug }) {
     }
   }, [searchParams, matchedJobs, activeJob, setActiveJob]);
 
-  useEffect(() => {
-    if (!viewSlug) return;
+   useEffect(() => {
+     if (chatEndRef.current) {
+       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+     }
+   }, [chatMessages]);
 
-    if (workspaceSlots.main !== viewSlug) {
-      const targetSlot = Object.keys(workspaceSlots).find(
-        (key) => workspaceSlots[key] === viewSlug
-      );
+   useEffect(() => {
+     if (activeJob) {
+       const bookingChatId = activeJob.booking_chat_id || activeJob.id;
+       if (bookingChatId) {
+         connectWorkerChat(bookingChatId);
+       }
+     }
+   }, [activeJob]);
 
-      if (targetSlot) {
-        swapWorkspaceSlots(targetSlot);
-      }
-    }
-  }, [viewSlug, workspaceSlots, swapWorkspaceSlots]);
+   useEffect(() => {
+     if (activeJob) {
+       const bookingChatId = activeJob.booking_chat_id || activeJob.id;
+       if (bookingChatId) {
+         fetchChatHistory(bookingChatId);
+       }
+     }
+   }, [activeJob]);
+
+   useEffect(() => {
+     if (!viewSlug) return;
+
+     if (workspaceSlots.main !== viewSlug) {
+       const targetSlot = Object.keys(workspaceSlots).find(
+         (key) => workspaceSlots[key] === viewSlug
+       );
+
+       if (targetSlot) {
+         swapWorkspaceSlots(targetSlot);
+       }
+     }
+   }, [viewSlug, workspaceSlots, swapWorkspaceSlots]);
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/worker/workspace/${targetSlug}`);
@@ -227,48 +260,121 @@ export default function Dash1Worker({ viewSlug }) {
 
   const renderJobDetails = (slotKey) => {
     if (slotKey === "main") {
+      const handleSendChat = async (e) => {
+        e.preventDefault();
+        if (!chatInput.trim() || !activeJob) return;
+        const bookingChatId = activeJob.booking_chat_id || activeJob.id;
+        if (!bookingChatId) return;
+        try {
+          await sendHumanMessage(bookingChatId, "worker", chatInput.trim());
+          appendMessage("worker", chatInput.trim());
+          setChatInput("");
+        } catch (err) {
+          console.error("Failed to send message:", err);
+        }
+      };
+
       return (
         <div className="dashboard-card slot-main">
           <div className="card-header">
             ••• DEPLOYED ASSIGNMENT SPECIFICATIONS
           </div>
 
-          <div className="main-panel">
-            {activeJob ? (
-              <>
-                <h2>{activeJob.title || "Untitled Job"}</h2>
-                <p><strong>Job ID:</strong> {activeJob.booking_chat_id || activeJob.id || "N/A"}</p>
-                <p className="panel-desc">{activeJob.description || activeJob.job_description || "No description available."}</p>
-                <button
-                  type="button"
-                  onClick={() => expressInterest(activeJob.job_id, workerChatId)}
+          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'row', gap: '20px', minHeight: 0 }}>
+            {/* Left Panel - Job Details */}
+            <div style={{ flex: 2, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+              {activeJob ? (
+                <>
+                  <h2>{activeJob.title || "Untitled Job"}</h2>
+                  <p><strong>Job ID:</strong> {activeJob.booking_chat_id || activeJob.id || "N/A"}</p>
+                  <p className="panel-desc">{activeJob.description || activeJob.job_description || "No description available."}</p>
+                  <button
+                    type="button"
+                    onClick={() => expressInterest(activeJob.job_id, workerChatId)}
+                    style={{
+                      marginTop: '16px',
+                      padding: '10px 20px',
+                      backgroundColor: activeJob.is_interested ? '#FF6B1A' : 'transparent',
+                      color: activeJob.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)',
+                      border: activeJob.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '14px'
+                    }}
+                  >
+                    {activeJob.is_interested ? '✓ Interested' : "I'm Interested"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h2>Job Details Monitor</h2>
+                  <p className="panel-desc">
+                    Full breakdown of client structural parameters and requirements.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Right Panel - Chat Window */}
+            <div style={{ flex: 1, minWidth: '350px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--k-line)', paddingLeft: '16px', height: '100%' }}>
+              <h3 style={{ flexShrink: 0 }}>Chat</h3>
+              <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
+                {chatMessages
+                  .filter(
+                    (msg) =>
+                      msg.sender === "customer" || msg.sender === "worker"
+                  )
+                  .map((msg) => (
+                    <p key={msg.id} className={`chat-msg chat-msg--${msg.sender}`}>
+                      <strong>{msg.sender.toUpperCase()}:</strong> {msg.text}
+                    </p>
+                  ))}
+                <div ref={chatEndRef} />
+              </div>
+              <form
+                onSubmit={handleSendChat}
+                style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--k-line)', flexShrink: 0 }}
+              >
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Type a message..."
+                  disabled={!activeJob}
                   style={{
-                    marginTop: '16px',
-                    padding: '10px 20px',
-                    backgroundColor: activeJob.is_interested ? '#FF6B1A' : 'transparent',
-                    color: activeJob.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)',
-                    border: activeJob.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)',
+                    flex: 1,
+                    padding: '6px 10px',
                     borderRadius: '6px',
+                    border: '1px solid var(--k-border-strong)',
+                    background: 'var(--k-field)',
+                    color: 'var(--k-ink)',
+                    font: 'inherit',
+                    outline: 'none',
+                    fontSize: '13px'
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim() || !activeJob}
+                  style={{
+                    padding: '6px 14px',
+                    background: '#FF6B1A',
+                    color: '#0D0D0D',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: 700,
                     cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: '14px'
+                    fontSize: '13px'
                   }}
                 >
-                  {activeJob.is_interested ? '✓ Interested' : "I'm Interested"}
+                  Send
                 </button>
-              </>
-            ) : (
-              <>
-                <h2>Job Details Monitor</h2>
-
-                <p className="panel-desc">
-                  Full breakdown of client structural parameters and requirements.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      );
+               </form>
+             </div>
+           </div>
+         </div>
+       );
     }
 
     return (

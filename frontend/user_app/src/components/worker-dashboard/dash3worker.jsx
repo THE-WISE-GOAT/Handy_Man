@@ -96,7 +96,7 @@ export default function Dash3Worker({ viewSlug }) {
   // Load applicant status on mount
   useEffect(() => {
     loadApplicantStatus();
-  }, [loadApplicantStatus]);
+  }, []);
 
   // Load user base info on mount
   useEffect(() => {

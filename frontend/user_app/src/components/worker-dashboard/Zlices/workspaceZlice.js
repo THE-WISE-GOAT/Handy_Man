@@ -1,3 +1,5 @@
+import { apiClient } from "@shared/api/client";
+
 // Zlices/workspaceZlice.js
 
 export const createWorkspaceZlice = (set, get) => ({
@@ -38,10 +40,14 @@ export const createWorkspaceZlice = (set, get) => ({
 
   workerProfession: "plumber",
   socket: null,
+  chatSocket: null,
   activeJob: null,
   jobDetailModal: null,
   isInterested: false,
   matchedJobs: [],
+  chatMessages: [],
+  chatWorkerChatId: null,
+  isChatConnected: false,
 
   setActiveJob: (job) => set({ activeJob: job }),
   openJobDetailModal: (job) =>
@@ -143,22 +149,111 @@ export const createWorkspaceZlice = (set, get) => ({
             }));
           }
         }
-      } catch (error) {
+       } catch (error) {
+         set((state) => ({
+           matchedJobs: state.matchedJobs.map((job) => {
+             if (job.job_id !== jobId) return job;
+             return {
+               ...job,
+               is_interested: !newInterestState,
+               interested_count: Math.max((job.interested_count || 0) - 1, 0),
+             };
+           }),
+           isInterested: !newInterestState,
+         }));
+         console.error("❌ Failed to express interest:", error);
+       }
+     }
+   },
+
+  appendMessage: (sender, text) =>
+    set((state) => ({
+      chatMessages: [
+        ...state.chatMessages,
+        { id: crypto.randomUUID(), sender, text }
+      ]
+    })),
+
+  connectWorkerChat: async (workerChatId) => {
+    get().disconnectWorkerChat();
+    const token = localStorage.getItem("handy_man_access_token");
+    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
+    const socket = new WebSocket(
+      `${wsBaseUrl}/ws/worker/${workerChatId}?token=${token}`
+    );
+
+    socket.onopen = () => {
+      set({ isChatConnected: true, chatWorkerChatId: workerChatId });
+    };
+
+    socket.onerror = (err) =>
+      console.error("❌ Worker chat WebSocket error:", err);
+
+    socket.onclose = () =>
+      set({ isChatConnected: false, chatWorkerChatId: null });
+
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === "HUMAN_MESSAGE") {
+        const { sender, message: msgContent } = message.data;
         set((state) => ({
-          matchedJobs: state.matchedJobs.map((job) => {
-            if (job.job_id !== jobId) return job;
-            return {
-              ...job,
-              is_interested: !newInterestState,
-              interested_count: Math.max((job.interested_count || 0) - 1, 0),
-            };
-          }),
-          isInterested: !newInterestState,
+          chatMessages: [
+            ...state.chatMessages,
+            { id: crypto.randomUUID(), sender, text: msgContent }
+          ]
         }));
-        console.error("❌ Failed to express interest:", error);
       }
+    };
+
+    set({ chatSocket });
+  },
+
+  disconnectWorkerChat: () => {
+    const { chatSocket } = get();
+    if (chatSocket) {
+      chatSocket.close();
+      set({
+        chatSocket: null,
+        isChatConnected: false,
+        chatWorkerChatId: null,
+        chatMessages: [],
+      });
     }
   },
-});
+
+  sendHumanMessage: async (bookingChatId, sender, text) => {
+    try {
+      const data = await apiClient.post(
+        `/dispatch/chat/${bookingChatId}/message`,
+        { sender, message: text }
+      );
+      return data;
+    } catch (error) {
+      console.error("❌ Failed to send human message:", error);
+      throw error;
+    }
+  },
+
+    fetchChatHistory: async (bookingChatId) => {
+      try {
+        const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
+        const history = data.history || [];
+        const messages = history
+          .filter((msg) => msg.role !== "system")
+          .map((msg) => ({
+            id: crypto.randomUUID(),
+            sender: msg.role === "user" ? "customer" : "worker",
+            text: msg.content,
+          }));
+        set({ chatMessages: messages });
+      } catch (error) {
+        if (error.status === 500) {
+          console.error("❌ Chat history fetch failed (server error), skipping retry:", error.message);
+        } else {
+          console.error("❌ Failed to fetch chat history:", error);
+        }
+      }
+    },
+  });
 
 
