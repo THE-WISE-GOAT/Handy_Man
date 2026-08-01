@@ -19,7 +19,6 @@ Endpoints
 import logging
 import os
 import httpx  # Swapped requests for httpx
-import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
@@ -286,6 +285,63 @@ def dispatch_chat(
     }
 
 
+@router.post(
+    "/chat/{booking_chat_id}/message",
+    response_model=schema.HumanChatMessageOut,
+    summary="Send a human message in a booking chat and broadcast to the other party",
+)
+async def send_human_message(
+    booking_chat_id: int,
+    payload: schema.HumanChatMessageIn,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    chat_session = _get_own_session(booking_chat_id, db, current_user)
+
+    updated_history = list(chat_session.history)
+    updated_history.append(
+        {"role": payload.sender, "content": payload.message}
+    )
+    chat_session.history = updated_history
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database write failure.",
+        )
+
+    message_payload = {
+        "type": "HUMAN_MESSAGE",
+        "booking_chat_id": booking_chat_id,
+        "sender": payload.sender,
+        "message": payload.message,
+    }
+
+    if payload.sender == "customer":
+        job = db.execute(
+            select(model.Job).where(model.Job.booking_chat_id == booking_chat_id)
+        ).scalar_one_or_none()
+        if job and job.worker_id:
+            worker_session = db.execute(
+                select(model.WorkerInterviewSession).where(
+                    model.WorkerInterviewSession.user_id == job.worker_id
+                )
+            ).scalar_one_or_none()
+            if worker_session:
+                await manager.send_worker_notification(worker_session.id, message_payload)
+    elif payload.sender == "worker":
+        await manager.send_customer_notification(booking_chat_id, message_payload)
+
+    return {
+        "booking_chat_id": chat_session.id,
+        "message": payload.message,
+        "sender": payload.sender,
+    }
+
+
 @router.get(
     "/{booking_chat_id}/history",
     response_model=schema.ChatHistoryOut,
@@ -307,7 +363,7 @@ def get_history(
             ),
         }
         for msg in chat_session.history
-        if msg["role"] != "system"
+        if msg["role"] not in ("system", "user", "assistant")
     ]
 
     return {
