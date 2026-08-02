@@ -177,6 +177,10 @@ export const createWorkspaceZlice = (set, get) => ({
   connectWorkerChat: async (workerChatId) => {
     get().disconnectWorkerChat();
     const token = localStorage.getItem("handy_man_access_token");
+    if (!token) {
+      console.error("No access token found for WebSocket connection");
+      return;
+    }
     const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
     const socket = new WebSocket(
       `${wsBaseUrl}/ws/worker/${workerChatId}?token=${token}`
@@ -241,12 +245,16 @@ export const createWorkspaceZlice = (set, get) => ({
       try {
         const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
         const history = data.history || [];
-        const messages = history
-          .filter((msg) => msg.role !== "system")
+        const sanitizedHistory = history.filter((msg) => {
+          if (msg.role !== "system") return true;
+          if (msg.role === "system" && msg.content && msg.content.length < 200) return true;
+          return false;
+        });
+        const messages = sanitizedHistory
           .map((msg) => ({
             id: crypto.randomUUID(),
-            sender: msg.role === "customer" ? "customer" : "worker",
-            senderName: msg.sender_name || (msg.role === "customer" ? "Customer" : "Worker"),
+            sender: msg.role,
+            senderName: msg.sender_name || (msg.role === "customer" ? "Customer" : msg.role === "worker" ? "Worker" : "BID SYSTEM"),
             text: msg.content,
           }));
         set({ chatMessages: messages });

@@ -88,21 +88,25 @@ export const createPostingsZlice = (set, get) => ({  // ========================
     if (!jobId) return;
     try {
       const data = await apiClient.get(`/workers/jobs/${jobId}/bids`);
-      
+
       if (data.status === "success") {
         const rawBids = data.bids || [];
-        const normalizedBids = rawBids.map((bid, idx) => ({
-          id: bid.id || crypto.randomUUID(),
-          worker_chat_id: bid.worker_chat_id || bid.worker_id,
-          worker_name: bid.worker_name || bid.provider || `Worker ${bid.worker_chat_id || idx}`,
-          provider: bid.provider || bid.worker_name || `Worker ${bid.worker_chat_id || idx}`,
-          bid_amount: bid.bid_amount || bid.offer || 0,
-          amount: bid.bid_amount || bid.offer || 0,
-          offer: bid.offer || bid.bid_amount || 0,
-          message: bid.message || bid.bid_message || "",
-          status: bid.status || "Received",
-          created_at: bid.created_at,
-        }));
+        const normalizedBids = rawBids.map((bid, idx) => {
+          const workerId = bid.worker_chat_id || bid.worker_id;
+          const bidAmount = bid.bid_amount || bid.offer || bid.amount || 0;
+          return {
+            id: bid.id || crypto.randomUUID(),
+            worker_chat_id: workerId,
+            worker_name: bid.worker_name || bid.provider || `Worker ${workerId}`,
+            provider: bid.worker_name || bid.provider || `Worker ${workerId}`,
+            bid_amount: bidAmount,
+            amount: bidAmount,
+            offer: bidAmount,
+            message: bid.message || bid.proposal_text || bid.bid_message || "",
+            status: bid.status || "Received",
+            created_at: bid.created_at,
+          };
+        });
         set({ biddingsStream: normalizedBids });
       }
     } catch (error) {
@@ -376,12 +380,16 @@ export const createPostingsZlice = (set, get) => ({  // ========================
       try {
         const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
         const history = data.history || [];
-        const messages = history
-          .filter((msg) => msg.role !== "system")
+        const sanitizedHistory = history.filter((msg) => {
+          if (msg.role !== "system") return true;
+          if (msg.role === "system" && msg.content && msg.content.length < 200) return true;
+          return false;
+        });
+        const messages = sanitizedHistory
           .map((msg) => ({
             id: crypto.randomUUID(),
-            sender: msg.role === "customer" ? "customer" : "worker",
-            senderName: msg.sender_name || (msg.role === "customer" ? "Customer" : "Worker"),
+            sender: msg.role,
+            senderName: msg.sender_name || (msg.role === "customer" ? "Customer" : msg.role === "worker" ? "Worker" : "BID SYSTEM"),
             text: msg.content,
           }));
         set({ chatMessages: messages });

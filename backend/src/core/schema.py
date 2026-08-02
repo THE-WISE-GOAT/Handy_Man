@@ -256,7 +256,7 @@ class SessionStartOut(BaseModel):
 # dsupport to display the chat history response after each chat turn
 class HistoryMessage(BaseModel):
     """A single turn in the client-visible conversation."""
-    role:  Literal["user", "assistant", "customer", "worker"]
+    role:  Literal["user", "assistant", "customer", "worker", "system"]
     content: str
     sender_name: Optional[str] = None
  

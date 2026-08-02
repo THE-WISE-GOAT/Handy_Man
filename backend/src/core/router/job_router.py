@@ -322,6 +322,7 @@ async def place_bid_on_job(
     bid_amount = payload.get("bid_amount")
     bid_message = payload.get("bid_message", "")
 
+    # ── Upsert: update existing match bid ──
     if bid_amount is not None:
         match.bid_amount = float(bid_amount)
     if bid_message:
@@ -336,6 +337,24 @@ async def place_bid_on_job(
     ).scalar_one_or_none()
 
     if job and job.booking_chat_id:
+        worker_name = f"{getattr(current_user, 'firstName', None) or ''} {getattr(current_user, 'lastName', None) or ''}".strip() or current_user.username
+
+        # ── Save system message to BookingChat.history for persistence ──
+        booking_chat = db.execute(
+            select(model.BookingChat).where(model.BookingChat.id == job.booking_chat_id)
+        ).scalar_one_or_none()
+
+        if booking_chat:
+            history = list(booking_chat.history)
+            history.append({
+                "role": "system",
+                "content": f"{worker_name} placed a bid: Rs {float(bid_amount) if bid_amount is not None else 0}",
+                "sender_name": "BID SYSTEM",
+            })
+            booking_chat.history = history
+            db.commit()
+            db.refresh(booking_chat)
+
         # ── Broadcast SYSTEM_BID to the customer's WebSocket ──
         bid_payload = {
             "type": "SYSTEM_BID",
@@ -343,7 +362,7 @@ async def place_bid_on_job(
                 "job_id": job_id,
                 "bid_amount": float(match.bid_amount) if match.bid_amount else 0,
                 "worker_chat_id": worker_profile.worker_chat_id,
-                "worker_name": getattr(current_user, 'firstName', None) or current_user.username,
+                "worker_name": worker_name,
                 "bid_message": match.bid_message or "",
                 "booking_chat_id": job.booking_chat_id,
             },

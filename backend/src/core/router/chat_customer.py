@@ -538,7 +538,7 @@ def get_history(
             "sender_name": msg.get("sender_name"),
         }
         for msg in chat_session.history
-        if msg["role"] not in ("system", "user", "assistant")
+        if msg["role"] not in ("user", "assistant")
     ]
 
     return {

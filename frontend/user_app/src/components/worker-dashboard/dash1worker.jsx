@@ -31,6 +31,7 @@ export default function Dash1Worker({ viewSlug }) {
     disconnectWorkerChat,
     fetchChatHistory,
     loadApplicantStatus,
+    userProfile,
   } = useWorkerDashboardData();
 
   // ── Full-width view toggle for WorkspaceJobDetails ──
@@ -61,7 +62,8 @@ export default function Dash1Worker({ viewSlug }) {
       }
 
       // ── Instantly update local chat state on success ──
-      appendMessage("system", `Bid placed: Rs ${bidAmount}`, "BID SYSTEM");
+      const workerName = userProfile?.username || userProfile?.firstName || "Worker";
+      appendMessage("system", `${workerName} placed a bid: Rs ${bidAmount}`, "BID SYSTEM");
     } catch (error) {
       console.error("Failed to place bid:", error);
     }
@@ -69,7 +71,7 @@ export default function Dash1Worker({ viewSlug }) {
     setBidAmount("");
   };
 
-  const chatEndRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const [chatInput, setChatInput] = useState("");
 
   useEffect(() => {
@@ -88,19 +90,38 @@ export default function Dash1Worker({ viewSlug }) {
   }, [searchParams, matchedJobs, activeJob, setActiveJob]);
 
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'auto' });
-    }
-  }, [chatMessages]);
-
-  useEffect(() => {
-    if (activeJob && workerChatId) {
-      useWorkerDashboardData.getState().connectWorkerChat(workerChatId);
-    }
-  }, [activeJob, workerChatId]);
+    return () => useWorkerDashboardData.getState().disconnectWorkerChat();
+  }, []);
 
   useEffect(() => {
     if (activeJob && activeJob.booking_chat_id) {
+      useWorkerDashboardData.getState().connectWorkerChat(activeJob.booking_chat_id);
+      useWorkerDashboardData.getState().fetchChatHistory(activeJob.booking_chat_id);
+    }
+  }, [activeJob]);
+
+  useEffect(() => {
+    if (viewSlug) {
+      useWorkerDashboardData.getState().swapWorkspaceSlots(viewSlug);
+    }
+  }, [viewSlug]);
+
+  useEffect(() => {
+    if (jobDetailModal) {
+      useWorkerDashboardData.getState().openJobDetailModal(jobDetailModal);
+    }
+  }, [jobDetailModal]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [chatMessages, showBidForm]);
+
+  useEffect(() => {
+    if (activeJob && activeJob.booking_chat_id) {
+      useWorkerDashboardData.getState().connectWorkerChat(activeJob.booking_chat_id);
       useWorkerDashboardData.getState().fetchChatHistory(activeJob.booking_chat_id);
     }
   }, [activeJob]);
@@ -231,7 +252,7 @@ export default function Dash1Worker({ viewSlug }) {
                       {job.description?.slice(0, 120)}{job.description?.length > 120 ? '...' : ''}
                     </p>
                     <div style={{ display: 'flex', gap: '12px', fontSize: '0.8em', marginBottom: '8px' }}>
-                      <span style={{ color: 'var(--k-orange-ink)', fontWeight: 600 }}>Match: {Math.round(job.match_score)}%</span>
+                      <span style={{ color: 'var(--k-orange-ink)', fontWeight: 600 }}>Match: {job?.match_score != null ? `${Math.round(job.match_score)}%` : '—%'}</span>
                       <span style={{ color: 'var(--k-ink)' }}>Interested: {job.interested_count || 0}</span>
                       <span style={{ color: 'var(--k-ink-3)' }}>Status: {job.status}</span>
                     </div>
@@ -365,7 +386,7 @@ export default function Dash1Worker({ viewSlug }) {
                     )}
                   </div>
                 ))}
-              <div ref={chatEndRef} />
+              <div ref={messagesEndRef} />
             </div>
 
           <form
@@ -524,7 +545,7 @@ export default function Dash1Worker({ viewSlug }) {
         return renderJobDetails(slotKey);
 
       default:
-        return null;
+        return <div className="dashboard-card slot-{slotKey}"><div className="card-header">••• MODULE PLACEHOLDER</div><div className="preview-panel"><span className="badge">No module loaded for {slotKey} slot</span></div></div>;
     }
   };
 

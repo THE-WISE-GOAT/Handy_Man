@@ -81,6 +81,7 @@ export default function Dash2Board({ viewSlug }) {
   const navigate = useNavigate();
   const workerCardRefs = React.useRef({});
   const chatEndRef = React.useRef(null);
+  const messagesEndRef = React.useRef(null);
   const [chatInput, setChatInput] = React.useState("");
 
   // ── Full-width view toggle for ActiveBiddingsEngine ──
@@ -133,11 +134,12 @@ export default function Dash2Board({ viewSlug }) {
     }
   }, [selectedWorkerId]);
 
-   useEffect(() => {
-     if (chatEndRef.current) {
-       chatEndRef.current.scrollIntoView({ behavior: 'auto' });
-     }
-   }, [chatMessages]);
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }, [chatMessages, viewAllBids]);
 
     useEffect(() => {
       if (selectedJob && selectedJob.booking_chat_id) {
@@ -151,10 +153,9 @@ export default function Dash2Board({ viewSlug }) {
       if (selectedJob && selectedJob.id) {
         useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
       } else {
-        // On mount, fetch pending jobs which will auto-select the first job
         useCustomerDashboardData.getState().fetchPendingJobs();
       }
-    }, []);
+    }, [selectedJob]);
 
     useEffect(() => {
       if (!viewSlug) return;
@@ -240,7 +241,7 @@ export default function Dash2Board({ viewSlug }) {
                 )}
               </div>
             ))}
-          <div ref={chatEndRef} />
+          <div ref={messagesEndRef} />
         </div>
 
         <form onSubmit={handleSendChat} style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--k-line)', flexShrink: 0 }}>
@@ -341,7 +342,7 @@ export default function Dash2Board({ viewSlug }) {
                         alignItems: "center", justifyContent: "center", overflow: "hidden"
                       }}>
                         <span style={{ color: "#FF6B1A", fontWeight: 700, fontSize: "12px" }}>
-                          {(workerId || "W").toString().slice(0, 1).toUpperCase()}
+                          {workerName ? workerName.charAt(0).toUpperCase() : 'W'}
                         </span>
                       </div>
                       <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--k-ink)" }}>
@@ -354,9 +355,14 @@ export default function Dash2Board({ viewSlug }) {
                       <span style={{ color: "#FF6B1A", textDecoration: "underline", cursor: "not-allowed" }}>
                         Ratings &amp; Reviews
                       </span>
-                      <span style={{ color: "#FF6B1A", textDecoration: "underline", cursor: "not-allowed" }}>
+                      <a
+                        href="http://localhost:5173/customer/postings/GeospatialLiveMap"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#FF6B1A", textDecoration: "underline", cursor: "pointer" }}
+                      >
                         View on Maps
-                      </span>
+                      </a>
                     </div>
 
                     {/* Bid amount */}
