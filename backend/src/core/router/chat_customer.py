@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_SEARCH_RADIUS_METERS = 600_000  # 60 km — hard cutoff
 
 
-# ── Helper ───────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _get_own_session(
     booking_chat_id: int,
@@ -66,6 +66,141 @@ def _get_own_session(
             detail="Chat session not found.",
         )
     return session
+
+
+def _get_booking_or_worker_access(
+    booking_chat_id: int,
+    db: Session,
+    current_user: model.User,
+) -> model.BookingChat | None:
+    """Fetch a BookingChat accessible by the customer who owns it, the worker
+    directly assigned via Job.worker_id, or a worker matched via JobWorkerMatch."""
+    session = db.execute(
+        select(model.BookingChat).where(
+            model.BookingChat.id == booking_chat_id,
+        )
+    ).scalar_one_or_none()
+
+    if not session:
+        return None
+
+    if session.user_id == current_user.id:
+        return session
+
+    # Direct assignment via Job.worker_id (FK to users.id)
+    job = db.execute(
+        select(model.Job).where(
+            model.Job.booking_chat_id == booking_chat_id,
+            model.Job.worker_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+    if job:
+        return session
+
+    # Matched worker via JobWorkerMatch — find the Job linked to this BookingChat
+    matched_job = db.execute(
+        select(model.Job).where(model.Job.booking_chat_id == booking_chat_id)
+    ).scalar_one_or_none()
+
+    if matched_job:
+        worker_profile = db.execute(
+            select(model.WorkerProfile).where(
+                model.WorkerProfile.user_id == current_user.id
+            )
+        ).scalar_one_or_none()
+
+        if worker_profile:
+            match = db.execute(
+                select(model.JobWorkerMatch).where(
+                    model.JobWorkerMatch.job_id == matched_job.id,
+                    model.JobWorkerMatch.worker_id == worker_profile.id,
+                    model.JobWorkerMatch.is_active == True,
+                )
+            ).scalar_one_or_none()
+
+            if match:
+                return session
+
+    return None
+
+
+def _user_display_name(user: model.User) -> str:
+    """Build a human-readable display name from the user model."""
+    parts = [user.firstName, user.lastName]
+    name = " ".join(p for p in parts if p).strip()
+    return name or user.username or "User"
+
+
+def _resolve_booking_chat(
+    booking_chat_id: int,
+    db: Session,
+    current_user: model.User,
+) -> model.BookingChat | None:
+    """Resolve a BookingChat by ID.
+
+    The ``booking_chat_id`` path parameter may actually be a ``Job.id`` when
+    the frontend passes a job id instead of a booking chat id.  When that
+    happens and no BookingChat exists for the ID, we look up the Job and
+    auto-create a BookingChat linked to it so human-to-human messaging can
+    proceed.
+    """
+    session = _get_booking_or_worker_access(booking_chat_id, db, current_user)
+    if session is not None:
+        return session
+
+    # No BookingChat with that ID — try interpreting it as a Job.id
+    job = db.execute(
+        select(model.Job).where(model.Job.id == booking_chat_id)
+    ).scalar_one_or_none()
+
+    if not job:
+        return None
+
+    # Verify the current user is the customer who owns the job, the
+    # directly assigned worker, or a worker matched via JobWorkerMatch.
+    is_owner = job.customer_id == current_user.id
+    is_assigned_worker = (
+        job.worker_id is not None and job.worker_id == current_user.id
+    )
+
+    # Check JobWorkerMatch as well (matching system uses JoinWorkerMatch,
+    # not direct Job.worker_id, for initial assignments).
+    is_matched_worker = False
+    if not is_assigned_worker:
+        worker_profile = db.execute(
+            select(model.WorkerProfile).where(
+                model.WorkerProfile.user_id == current_user.id
+            )
+        ).scalar_one_or_none()
+        if worker_profile:
+            match = db.execute(
+                select(model.JobWorkerMatch).where(
+                    model.JobWorkerMatch.job_id == job.id,
+                    model.JobWorkerMatch.worker_id == worker_profile.id,
+                    model.JobWorkerMatch.is_active == True,
+                )
+            ).scalar_one_or_none()
+            if match:
+                is_matched_worker = True
+
+    if not is_owner and not is_assigned_worker and not is_matched_worker:
+        return None
+
+    # Auto-create a BookingChat linked to the Job
+    new_chat = model.BookingChat(
+        user_id=job.customer_id,
+        history=[],
+        is_complete=False,
+        is_job_request=False,
+    )
+    db.add(new_chat)
+    db.flush()
+
+    job.booking_chat_id = new_chat.id
+    db.flush()
+
+    return new_chat
 
 
 async def _get_address_from_coords(lat: float, lng: float) -> str:
@@ -296,11 +431,19 @@ async def send_human_message(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    chat_session = _get_own_session(booking_chat_id, db, current_user)
+    chat_session = _resolve_booking_chat(booking_chat_id, db, current_user)
+
+    if chat_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat session not found.",
+        )
+
+    sender_name = _user_display_name(current_user)
 
     updated_history = list(chat_session.history)
     updated_history.append(
-        {"role": payload.sender, "content": payload.message}
+        {"role": payload.sender, "content": payload.message, "sender_name": sender_name}
     )
     chat_session.history = updated_history
 
@@ -315,30 +458,51 @@ async def send_human_message(
 
     message_payload = {
         "type": "HUMAN_MESSAGE",
-        "booking_chat_id": booking_chat_id,
-        "sender": payload.sender,
-        "message": payload.message,
+        "data": {
+            "booking_chat_id": chat_session.id,
+            "sender": payload.sender,
+            "sender_name": sender_name,
+            "message": payload.message,
+        }
     }
 
     if payload.sender == "customer":
         job = db.execute(
-            select(model.Job).where(model.Job.booking_chat_id == booking_chat_id)
+            select(model.Job).where(model.Job.booking_chat_id == chat_session.id)
         ).scalar_one_or_none()
-        if job and job.worker_id:
-            worker_session = db.execute(
-                select(model.WorkerInterviewSession).where(
-                    model.WorkerInterviewSession.user_id == job.worker_id
+        if job:
+            # Notify directly assigned worker (Job.worker_id → WorkerInterviewSession.user_id)
+            if job.worker_id:
+                worker_session = db.execute(
+                    select(model.WorkerInterviewSession).where(
+                        model.WorkerInterviewSession.user_id == job.worker_id
+                    )
+                ).scalar_one_or_none()
+                if worker_session:
+                    await manager.send_worker_notification(worker_session.id, message_payload)
+
+            # Notify workers matched via JobWorkerMatch (match.worker_id → WorkerProfile.id
+            # → WorkerProfile.worker_chat_id → WebSocket connection key)
+            matched_profiles = db.execute(
+                select(model.WorkerProfile).join(
+                    model.JobWorkerMatch,
+                    model.JobWorkerMatch.worker_id == model.WorkerProfile.id,
+                ).where(
+                    model.JobWorkerMatch.job_id == job.id,
+                    model.JobWorkerMatch.is_active == True,
                 )
-            ).scalar_one_or_none()
-            if worker_session:
-                await manager.send_worker_notification(worker_session.id, message_payload)
+            ).scalars().all()
+            for profile in matched_profiles:
+                if profile.worker_chat_id:
+                    await manager.send_worker_notification(profile.worker_chat_id, message_payload)
     elif payload.sender == "worker":
-        await manager.send_customer_notification(booking_chat_id, message_payload)
+        await manager.send_customer_notification(chat_session.id, message_payload)
 
     return {
         "booking_chat_id": chat_session.id,
         "message": payload.message,
         "sender": payload.sender,
+        "sender_name": sender_name,
     }
 
 
@@ -352,7 +516,17 @@ def get_history(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    chat_session = _get_own_session(booking_chat_id, db, current_user)
+    chat_session = _resolve_booking_chat(booking_chat_id, db, current_user)
+
+    if chat_session is None:
+        return {
+            "booking_chat_id": booking_chat_id,
+            "history": [],
+            "is_complete": False,
+            "turns_used": 0,
+            "turns_remaining": MAX_TURNS,
+        }
+
     visible_history = [
         {
             "role": msg["role"],
@@ -361,6 +535,7 @@ def get_history(
                 if msg["role"] == "assistant"
                 else msg["content"]
             ),
+            "sender_name": msg.get("sender_name"),
         }
         for msg in chat_session.history
         if msg["role"] not in ("system", "user", "assistant")
@@ -482,9 +657,12 @@ async def complete_customer_chat(  # Converted to async def
         raise HTTPException(status_code=500, detail="Failed to safely compile and record marketplace matches.")
 
     job_payload = {
-        "booking_chat_id": booking_chat_id, 
-        "title": payload.title, 
-        "description": job_desc
+        "type": "NEW_JOB_NOTIFICATION",
+        "data": {
+            "booking_chat_id": booking_chat_id,
+            "title": payload.title,
+            "description": job_desc,
+        }
     }
     
     # Broadcast asynchronously without blocking the main event loop
