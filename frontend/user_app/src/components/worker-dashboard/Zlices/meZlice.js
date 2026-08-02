@@ -467,7 +467,7 @@ export const createMeZlice = (set, get) => ({
         applicationSubmitted: true,
       });
 
-      await get().loadApplicantStatus();
+      await get().loadApplicantStatus(); //await get().loadApplicantStatus(true);
     } catch (error) {
       console.error("Failed to complete application process:", error);
     } finally {
@@ -573,6 +573,12 @@ export const createMeZlice = (set, get) => ({
   },
 
   loadApplicantStatus: async () => {
+  // // Fetch applicant status on load — runs once per session
+  // _statusCheckInProgress: false,
+  // _statusChecked: false,
+  // loadApplicantStatus: async (force = false) => {
+  //   if (!force && (get()._statusCheckInProgress || get()._statusChecked)) return;
+  //   set({ _statusCheckInProgress: true });
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch("http://127.0.0.1:8000/worker-onboarding/my-status", {
@@ -595,8 +601,9 @@ export const createMeZlice = (set, get) => ({
         });
 
         if (data.worker_chat_id) {
-          get().fetchChatHistory(data.worker_chat_id);
-          get().fetchWorkerSkills();
+          get().fetchChatHistory(data.worker_chat_id); //1
+          get().fetchWorkerSkills(); //2 vs
+          //get().fetchWorkerInterviewHistory(data.worker_chat_id);
         }
 
         if (
@@ -637,10 +644,13 @@ export const createMeZlice = (set, get) => ({
       }
     } catch (error) {
       console.error("Failed to load applicant status:", error);
+     } finally {
+      set({ _statusCheckInProgress: false, _statusChecked: true });
     }
   },
 
   fetchChatHistory: async (workerChatId) => {
+  //fetchWorkerInterviewHistory: async (workerChatId) => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(

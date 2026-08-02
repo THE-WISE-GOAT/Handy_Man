@@ -168,3 +168,42 @@
   border-color: rgba(13, 13, 13, 0.2);
   background: #F4F5F7;
 }
+
+/* ── Human Chat UI ──────────────────────────────────────────── */
+.chat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  padding-bottom: 10px;
+  border-radius: 8px;
+  background: var(--k-raise);
+  max-height: 400px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.chat-msg {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  max-width: 80%;
+  word-break: break-word;
+}
+
+.chat-msg--customer {
+  align-self: flex-end;
+  background: var(--k-orange-ink);
+  color: #0D0D0D;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-msg--worker {
+  align-self: flex-start;
+  background: var(--k-wash);
+  color: var(--k-ink);
+  border-bottom-left-radius: 2px;
+}

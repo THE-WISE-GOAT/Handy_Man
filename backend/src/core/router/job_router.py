@@ -1,5 +1,6 @@
 # routers/job_router.py
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from sqlalchemy import select, func, case
 from sqlalchemy.orm import Session
 from src.core import model, schema, job_manager, matching_manager
 from src.database.database import get_db
@@ -49,6 +50,25 @@ async def _broadcast_notifications(worker_chat_ids: list[int], job_payload: dict
 #     lng = payload.location.longitude
 #     lat = payload.location.latitude
 #     wkt_point = f"POINT({lng} {lat})"
+async def _broadcast_customer_bid(booking_chat_id: int, bid_payload: dict):
+    """Send a SYSTEM_BID notification to the customer's WebSocket connection."""
+    from src.core.manager import manager
+    try:
+        await manager.send_customer_notification(booking_chat_id, bid_payload)
+    except Exception as ws_err:
+        logger.warning(f"Failed SYSTEM_BID broadcast to booking {booking_chat_id}: {ws_err}")
+
+
+@router.post("", status_code=status.HTTP_201_CREATED, summary="Create a job directly without AI chat")
+async def create_job_direct_endpoint(
+    payload: schema.CreateJobIn,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    lng = payload.location.longitude
+    lat = payload.location.latitude
+    wkt_point = f"POINT({lng} {lat})"
 
 #     job_desc = payload.description.strip()
 #     if not job_desc:
@@ -147,7 +167,9 @@ def get_jobs_by_status_endpoint(
             "address_text": row.address_text,
             "latitude": row.latitude,
             "longitude": row.longitude,
-            "updated_at": row.updated_at
+            "updated_at": row.updated_at,
+            "matched_count": row.matched_count or 0,
+            "interested_count": row.interested_count or 0,
         }
         for row in results
     ]
@@ -165,3 +187,206 @@ def delete_job_endpoint(
         raise HTTPException(status_code=404, detail="Job not found or unauthorized")
     
     return {"status": "success", "message": "Job deleted successfully"}
+
+
+interest_subquery = (
+    select(
+        model.JobWorkerMatch.job_id,
+        func.count(model.JobWorkerMatch.id).label("interested_count"),
+    )
+    .where(
+        model.JobWorkerMatch.is_active == True,
+        model.JobWorkerMatch.is_interested == True,
+    )
+    .group_by(model.JobWorkerMatch.job_id)
+    .subquery()
+)
+
+
+@router.get("/for-worker", summary="Fetch all active matched jobs for the authenticated worker")
+def get_worker_matched_jobs(
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user)
+):
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        return {"status": "success", "jobs": []}
+
+    stmt = (
+        select(model.JobWorkerMatch, model.Job, func.coalesce(interest_subquery.c.interested_count, 0))
+        .join(model.Job, model.JobWorkerMatch.job_id == model.Job.id)
+        .outerjoin(interest_subquery, model.Job.id == interest_subquery.c.job_id)
+        .where(
+            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.is_active == True,
+            model.JobWorkerMatch.is_rejected == False,
+        )
+        .order_by(model.JobWorkerMatch.created_at.desc())
+    )
+
+    results = db.execute(stmt).all()
+
+    jobs = [
+        {
+            "job_id": job.id,
+            "booking_chat_id": job.booking_chat_id,
+            "title": job.title,
+            "description": job.description,
+            "budget": None,
+            "location": job.address_text,
+            "match_score": match.match_score,
+            "match_rank": match.match_rank,
+            "created_at": match.created_at,
+            "status": job.status,
+            "is_interested": match.is_interested,
+            "interested_count": int(interest_count),
+        }
+        for match, job, interest_count in results
+    ]
+
+    return {"status": "success", "jobs": jobs}
+
+
+@router.post("/{job_id}/interest", summary="Worker expresses interest in a job")
+def express_interest_in_job(
+    job_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+
+    match = db.execute(
+        select(model.JobWorkerMatch).where(
+            model.JobWorkerMatch.job_id == job_id,
+            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.is_active == True,
+        )
+    ).scalar_one_or_none()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="No active match found for this job")
+
+    requested_interest = payload.get("interested", True)
+    match.is_interested = bool(requested_interest)
+    db.commit()
+    db.refresh(match)
+
+    interested_count = db.execute(
+        select(func.count(model.JobWorkerMatch.id)).where(
+            model.JobWorkerMatch.job_id == job_id,
+            model.JobWorkerMatch.is_active == True,
+            model.JobWorkerMatch.is_interested == True,
+        )
+    ).scalar_one()
+
+    return {
+        "status": "success",
+        "job_id": job_id,
+        "is_interested": match.is_interested,
+        "interested_count": int(interested_count or 0),
+    }
+
+
+@router.post("/{job_id}/bid", summary="Worker places a bid on a job")
+async def place_bid_on_job(
+    job_id: int,
+    payload: dict,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    """Record (or update) the worker's bid amount and proposal text."""
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+
+    match = db.execute(
+        select(model.JobWorkerMatch).where(
+            model.JobWorkerMatch.job_id == job_id,
+            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.is_active == True,
+        )
+    ).scalar_one_or_none()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="No active match found for this job")
+
+    bid_amount = payload.get("bid_amount")
+    bid_message = payload.get("bid_message", "")
+
+    # ── Upsert: update existing match bid ──
+    if bid_amount is not None:
+        match.bid_amount = float(bid_amount)
+    if bid_message:
+        match.bid_message = bid_message
+
+    db.commit()
+    db.refresh(match)
+
+    # ── Fetch the Job to get booking_chat_id ──
+    job = db.execute(
+        select(model.Job).where(model.Job.id == job_id)
+    ).scalar_one_or_none()
+
+    if job and job.booking_chat_id:
+        worker_name = f"{getattr(current_user, 'firstName', None) or ''} {getattr(current_user, 'lastName', None) or ''}".strip() or current_user.username
+
+        # ── Save system message to BookingChat.history for persistence ──
+        booking_chat = db.execute(
+            select(model.BookingChat).where(model.BookingChat.id == job.booking_chat_id)
+        ).scalar_one_or_none()
+
+        if booking_chat:
+            history = list(booking_chat.history)
+            history.append({
+                "role": "system",
+                "content": f"{worker_name} placed a bid: Rs {float(bid_amount) if bid_amount is not None else 0}",
+                "sender_name": "BID SYSTEM",
+            })
+            booking_chat.history = history
+            db.commit()
+            db.refresh(booking_chat)
+
+        # ── Broadcast SYSTEM_BID to the customer's WebSocket ──
+        bid_payload = {
+            "type": "SYSTEM_BID",
+            "data": {
+                "job_id": job_id,
+                "bid_amount": float(match.bid_amount) if match.bid_amount else 0,
+                "worker_chat_id": worker_profile.worker_chat_id,
+                "worker_name": worker_name,
+                "bid_message": match.bid_message or "",
+                "booking_chat_id": job.booking_chat_id,
+            },
+        }
+        background_tasks.add_task(
+            _broadcast_customer_bid,
+            job.booking_chat_id,
+            bid_payload,
+        )
+
+    return {
+        "status": "success",
+        "job_id": job_id,
+        "bid_amount": match.bid_amount,
+        "bid_message": match.bid_message,
+        "booking_chat_id": job.booking_chat_id if job else None,
+    }

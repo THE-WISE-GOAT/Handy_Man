@@ -216,7 +216,45 @@ class ChatMessageIn(BaseModel):
         if not stripped:
             raise ValueError("message cannot be empty or whitespace-only")
         return stripped  # normalised once, here — not re-stripped downstream
- 
+
+
+class HumanChatMessageIn(BaseModel):
+    """Payload for human-to-human chat messages."""
+    sender: str = Field(
+        ...,
+        description="Either 'customer' or 'worker' indicating the sender role.",
+    )
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=2000,
+        description="The message text content.",
+    )
+
+    @field_validator("sender")
+    @classmethod
+    def sender_must_be_valid(cls, v: str) -> str:
+        if v not in ("customer", "worker"):
+            raise ValueError("sender must be either 'customer' or 'worker'")
+        return v
+
+    @field_validator("message")
+    @classmethod
+    def message_must_have_content(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("message cannot be empty or whitespace-only")
+        return stripped
+
+
+class HumanChatMessageOut(BaseModel):
+    """Returned after a human-to-human chat message is sent."""
+    booking_chat_id: int
+    message: str
+    sender: str
+    sender_name: Optional[str] = None
+
+
 # use to display session start response
 class SessionStartOut(BaseModel):
     """Returned when a new session is created (POST /dispatch/session)."""
@@ -227,8 +265,9 @@ class SessionStartOut(BaseModel):
 # dsupport to display the chat history response after each chat turn
 class HistoryMessage(BaseModel):
     """A single turn in the client-visible conversation."""
-    role:  Literal["user", "assistant"]
+    role:  Literal["user", "assistant", "customer", "worker", "system"]
     content: str
+    sender_name: Optional[str] = None
  
 # display the all chat history response 
 class ChatHistoryOut(BaseModel):
@@ -364,11 +403,10 @@ class WorkerMatchOut(BaseModel):
     job_category: str
     category_tag: str
     job_description: str
-    match_score: float  # 1.0 = near-identical meaning, 0 = unrelated, negative = opposite
-    # Which of the worker's capabilities won this match. None for matches recorded
-    # before per-skill matching, or if the skill has since been removed.
+    match_score: float
     matched_skill: Optional[str] = None
     matched_skill_description: Optional[str] = None
+    is_interested: bool = False
 
 class FindHelpOut(BaseModel):
     matched_by_category: bool          # True if the category filter was actually used

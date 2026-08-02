@@ -6,8 +6,11 @@ import "./dash1board.css";
 export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
+<<<<<<< HEAD
 
   // 🗺️ MAP STATES
+=======
+>>>>>>> origin/And
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState("");
@@ -49,12 +52,18 @@ export default function Dash1Board({ viewSlug }) {
     startNewSession,
     sendCustomerMessage,
     turns_remaining,
+<<<<<<< HEAD
     ai_response,
     current_tags,
     categories,
     is_complete,
     createJobDirect,
     isSubmitting,
+=======
+    is_complete,
+    current_tags,
+    categories,
+>>>>>>> origin/And
   } = useCustomerDashboardData();
 
   const scrollRef = useRef(null);
@@ -76,8 +85,8 @@ export default function Dash1Board({ viewSlug }) {
   ];
 
   useEffect(() => {
-    startNewSession();
-  }, [startNewSession]);
+    useCustomerDashboardData.getState().startNewSession();
+  }, []);
 
   useEffect(() => {
     if (!viewSlug) return;
@@ -342,12 +351,19 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
           </span>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <h2 style={{ margin: 0 }}>AI CHAT TERMINAL</h2>
+<<<<<<< HEAD
             <button
               type="button"
               onClick={() => {
                 navigate("/customer/bookings/JobDescriptionWorkspace");
               }}
               style={{
+=======
+             <button
+               type="button"
+               onClick={() => navigate('/customer/bookings/JobDescriptionWorkspace')}
+               style={{
+>>>>>>> origin/And
                 background: "#FF6B1A",
                 color: "#0D0D0D",
                 border: "none",
@@ -418,8 +434,11 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
     );
   };
 
+<<<<<<< HEAD
  
 
+=======
+>>>>>>> origin/And
   const renderJobDescription = (slotKey) => {
     if (slotKey === "main") {
       return (

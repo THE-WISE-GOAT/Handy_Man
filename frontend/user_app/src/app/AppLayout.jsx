@@ -33,20 +33,47 @@ export default function AppLayout({ role = "customer" }) {
       setIsWorkerApplicant(false);
       return;
     }
-
     let active = true;
+
+    let storedToken;
+    try {
+      storedToken = localStorage.getItem("handy_man_access_token");
+    } catch {
+      storedToken = null;
+    }
+    if (!storedToken) {
+      setIsWorkerApplicant(false);
+      setCheckingApplicant(false);
+      return;
+    }
+
     setCheckingApplicant(true);
     // Default to restricted (applicant mode) until the backend confirms otherwise.
     // This is a fail-closed approach: if the endpoint is missing or errors,
     // the worker stays in restricted mode rather than gaining full access.
     setIsWorkerApplicant(true);
 
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (active && !settled) {
+        setCheckingApplicant(false);
+        setIsWorkerApplicant(false);
+      }
+    }, 15000);
+
     apiClient
       .get("/worker-onboarding/my-status")
       .then((data) => {
-        if (active) setIsWorkerApplicant(!data.is_complete);
+        settled = true;
+        if (active) {
+          const isVerified =
+            data.is_complete === true ||
+            typeof data.stage === "string" && data.stage.toLowerCase() === "approved";
+          setIsWorkerApplicant(!isVerified);
+        }
       })
       .catch((error) => {
+        settled = true;
         if (active) {
           console.error("[AppLayout] Applicant status check failed:", error);
           if (error.status === 404) {
@@ -58,10 +85,14 @@ export default function AppLayout({ role = "customer" }) {
         }
       })
       .finally(() => {
-        if (active) setCheckingApplicant(false);
+        settled = true;
+        if (active) {
+          clearTimeout(timeout);
+          setCheckingApplicant(false);
+        }
       });
-    return () => { active = false; };
-  }, [role]);
+    return () => { active = false; clearTimeout(timeout); };
+  }, []);
 
   const filteredWorkerNavItems = isWorkerApplicant
     ? WORKER_NAV_ITEMS.filter((item) => item.id === "me" || item.id === "Me")

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerDashboardData } from './useCustomerDashboardData';
 import './dash2board.css';
@@ -80,33 +80,50 @@ const Card = ({ slug, title, position, onSelect, children }) => {
 export default function Dash2Board({ viewSlug }) {
   const navigate = useNavigate();
   const workerCardRefs = React.useRef({});
-  
-  const {
-    postingsSlots,
-    swapPostingsSlots,
-    biddingsStream,
-    pendingJobs,
-    selectedJob,
-    setSelectedJob,
-    fetchPendingJobs,
-    
-    matchedWorkersMap,
+  const chatEndRef = React.useRef(null);
+  const messagesEndRef = React.useRef(null);
+  const [chatInput, setChatInput] = React.useState("");
+
+  // ── Full-width view toggle for ActiveBiddingsEngine ──
+  const [viewAllBids, setViewAllBids] = useState(false);
+  const [bookMultiple, setBookMultiple] = useState(false);
+  const [selectedBidIds, setSelectedBidIds] = useState([]);
+
+  // ── Centered modal state ──
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showRatingsModal, setShowRatingsModal] = useState(false);
+  const [selectedWorkersForReview, setSelectedWorkersForReview] = useState([]);
+
+   const {
+     postingsSlots,
+     swapPostingsSlots,
+     biddingsStream,
+     pendingJobs,
+     selectedJob,
+     setSelectedJob,
+     fetchPendingJobs,
+     chatMessages,
+     connectCustomerChat,
+     sendHumanMessage,
+     appendMessage,
+     disconnectCustomerChat,
+     matchedWorkersMap,
     workerLocations,          
     toggleWorkerInterest,     
-
     selectedWorkerId,
-    setSelectedWorkerId
+    setSelectedWorkerId,
+    fetchChatHistory,
   } = useCustomerDashboardData();
 
   useEffect(() => {
-    fetchPendingJobs();
-  }, [fetchPendingJobs]);
+    useCustomerDashboardData.getState().fetchPendingJobs();
+  }, []);
 
   useEffect(() => {
-    const handleFocus = () => { fetchPendingJobs(); };
+    const handleFocus = () => { useCustomerDashboardData.getState().fetchPendingJobs(); };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [fetchPendingJobs]);
+  }, []);
 
   useEffect(() => {
     if (selectedWorkerId && workerCardRefs.current[selectedWorkerId]) {
@@ -117,50 +134,316 @@ export default function Dash2Board({ viewSlug }) {
     }
   }, [selectedWorkerId]);
 
-  useEffect(() => {
-    if (!viewSlug) return;
-    if (postingsSlots.main !== viewSlug) {
-      const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
-      if (targetSlot) swapPostingsSlots(targetSlot);
-    }
-  }, [viewSlug, postingsSlots, swapPostingsSlots]);
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }, [chatMessages, viewAllBids]);
+
+    useEffect(() => {
+      if (selectedJob && selectedJob.booking_chat_id) {
+        useCustomerDashboardData.getState().connectCustomerChat(selectedJob.booking_chat_id);
+        useCustomerDashboardData.getState().fetchChatHistory(selectedJob.booking_chat_id);
+      }
+    }, [selectedJob]);
+
+    // ── Fetch historical bids for the selected job on mount and when selectedJob changes ──
+    useEffect(() => {
+      if (selectedJob && selectedJob.id) {
+        useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
+      } else {
+        useCustomerDashboardData.getState().fetchPendingJobs();
+      }
+    }, [selectedJob]);
+
+    useEffect(() => {
+      if (!viewSlug) return;
+      if (postingsSlots.main !== viewSlug) {
+        const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
+        if (targetSlot) swapPostingsSlots(targetSlot);
+      }
+    }, [viewSlug, postingsSlots, swapPostingsSlots]);
+
+    useEffect(() => {
+      return () => useCustomerDashboardData.getState().disconnectCustomerChat();
+    }, []);
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/customer/postings/${targetSlug}`);
   };
 
-  const renderBiddingsEngine = (position) => (
-    <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position} onSelect={handleModuleSelect}>
-      {position === "main" ? (
-        <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <h2 style={{ flexShrink: 0 }}>ACTIVE BIDDINGS ENGINE</h2>
-          <h3 style={{ color: "var(--k-ink-3)", flexShrink: 0 }}>
-            Bids for job: {selectedJob ? selectedJob.title : "No Job Selected"}
-          </h3>
-          <div className="bids-box" style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginTop: '10px' }}>
-            {biddingsStream.map(bid => (
-              <div key={bid.id} className="bid-row">
-                <span><strong>{bid.provider}</strong>: {bid.offer}</span>
-                <span className="status-badge">{bid.status}</span>
+  const renderBiddingsEngine = (position) => {
+    const handleSendChat = async (e) => {
+      e.preventDefault();
+      if (!chatInput.trim() || !selectedJob) return;
+      const bookingChatId = selectedJob.booking_chat_id;
+      if (!bookingChatId) return;
+      try {
+        await sendHumanMessage(bookingChatId, "customer", chatInput.trim());
+        appendMessage("customer", chatInput.trim());
+        setChatInput("");
+      } catch (err) {
+        console.error("Failed to send message:", err);
+      }
+    };
+
+    // ── Chat View: Full-width chat with "View All bids" button ──
+    const renderChatView = () => (
+      <div style={{ width: "100%", height: "100%", display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", flexShrink: 0, marginBottom: "8px" }}>
+          <button
+            onClick={() => { setViewAllBids(true); setBookMultiple(false); setSelectedBidIds([]); }}
+            style={{
+              padding: "4px 14px", background: "#FF6B1A", color: "#0D0D0D",
+              border: "none", borderRadius: "20px", fontWeight: 600,
+              fontSize: "13px", cursor: "pointer"
+            }}
+          >
+            View All bids
+          </button>
+        </div>
+
+        <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
+          {chatMessages
+            .filter((msg) => msg.sender === "customer" || msg.sender === "worker" || msg.sender === "system")
+            .map((msg) => (
+              <div key={msg.id}>
+                {msg.sender === "system" ? (
+                  <div style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
+                    <div style={{
+                      maxWidth: "80%", padding: "4px 16px", fontSize: "0.85rem",
+                      fontWeight: 600, color: "#FF6B1A", background: "rgba(255,107,26,0.1)",
+                      borderRadius: "9999px", textAlign: "center"
+                    }}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ) : msg.sender === "customer" ? (
+                  <div style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
+                    <div style={{
+                      maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
+                      background: "#FF6B1A", borderRadius: "28px 4px 28px 28px"
+                    }}>
+                      <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
+                    <div style={{
+                      maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
+                      background: "var(--k-raise)", borderRadius: "4px 28px 28px 28px",
+                      border: "1px solid var(--k-line)"
+                    }}>
+                      <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
-          </div>
+          <div ref={messagesEndRef} />
         </div>
-      ) : (
-        <div className="preview-panel">
-          {position === "sidebar" ? (
-             <>
-             <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
-             <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
-             <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
-           </>
-          ) : (
-            <span className="badge">Footer Slot: Bids for {selectedJob?.title || "N/A"}</span>
+
+        <form onSubmit={handleSendChat} style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--k-line)', flexShrink: 0 }}>
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder="Type a message..."
+            disabled={!selectedJob}
+            style={{
+              flex: 1, padding: '6px 10px', borderRadius: '6px',
+              border: '1px solid var(--k-border-strong)',
+              background: 'var(--k-field)', color: 'var(--k-ink)',
+              font: 'inherit', outline: 'none', fontSize: '13px'
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!chatInput.trim() || !selectedJob}
+            style={{
+              padding: '6px 14px', background: '#FF6B1A', color: '#0D0D0D',
+              border: 'none', borderRadius: '6px', fontWeight: 700,
+              cursor: 'pointer', fontSize: '13px'
+            }}
+          >
+            Send
+          </button>
+        </form>
+      </div>
+    );
+
+    // ── Bids View: Full-width bids list ──
+    const renderBidsView = () => {
+      const checkboxStyle = { width: "16px", height: "16px", accentColor: "#FF6B1A", cursor: "pointer" };
+
+      return (
+        <div style={{ width: "100%", height: "100%", display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          {/* Top Header Bar */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            flexShrink: 0, marginBottom: "12px"
+          }}>
+            <button
+              onClick={handleViewChat}
+              style={{
+                padding: "4px 14px", background: "#FF6B1A", color: "#0D0D0D",
+                border: "none", borderRadius: "20px", fontWeight: 600,
+                fontSize: "13px", cursor: "pointer"
+              }}
+            >
+              View Chat
+            </button>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+              <input
+                type="checkbox"
+                checked={bookMultiple}
+                onChange={(e) => { setBookMultiple(e.target.checked); setSelectedBidIds([]); }}
+                style={checkboxStyle}
+              />
+              Book Multiple Workers
+            </label>
+          </div>
+
+          {/* Bids List */}
+          <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "8px 0" }}>
+            {bidsForSelectedJob.length === 0 ? (
+              <p style={{ color: "var(--k-ink-3)", fontSize: "13px", padding: "16px" }}>No bids received yet.</p>
+            ) : (
+              bidsForSelectedJob.map((bid) => {
+                const isSelected = selectedBidIds.includes(bid.id);
+                const workerId = bid.worker_chat_id || bid.worker_id;
+                const workerName = bid.worker_name || bid.provider || `Worker ${workerId}`;
+                const bidAmount = bid.bid_amount || bid.offer || bid.amount || 0;
+                return (
+                  <div
+                    key={bid.id}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "10px 12px", borderRadius: "8px",
+                      border: isSelected ? "1px solid #FF6B1A" : "1px solid var(--k-line)",
+                      background: isSelected ? "var(--k-wash)" : "var(--k-raise)",
+                      marginBottom: "8px"
+                    }}
+                  >
+                    {/* Far left: checkbox + avatar + name */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      {bookMultiple && (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleBidSelection(bid.id)}
+                          style={checkboxStyle}
+                        />
+                      )}
+                      <div style={{
+                        width: "32px", height: "32px", borderRadius: "50%",
+                        background: "rgba(255, 107, 26, 0.2)", display: "flex",
+                        alignItems: "center", justifyContent: "center", overflow: "hidden"
+                      }}>
+                        <span style={{ color: "#FF6B1A", fontWeight: 700, fontSize: "12px" }}>
+                          {workerName ? workerName.charAt(0).toUpperCase() : 'W'}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--k-ink)" }}>
+                        {workerName}
+                      </span>
+                    </div>
+
+                    {/* Middle links - static text, no handlers for now */}
+                    <div style={{ display: "flex", gap: "16px", fontSize: "12px" }}>
+                      <span style={{ color: "#FF6B1A", textDecoration: "underline", cursor: "not-allowed" }}>
+                        Ratings &amp; Reviews
+                      </span>
+                      <a
+                        href="http://localhost:5173/customer/postings/GeospatialLiveMap"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#FF6B1A", textDecoration: "underline", cursor: "pointer" }}
+                      >
+                        View on Maps
+                      </a>
+                    </div>
+
+                    {/* Bid amount */}
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#FF6B1A", margin: "0 16px" }}>
+                      Rs {bidAmount}
+                    </span>
+
+                    {/* Book button (hidden in multi-book mode) */}
+                    {!bookMultiple && (
+                      <button
+                        onClick={() => handleBookClick(bid)}
+                        style={{
+                          padding: "6px 12px", background: "#FF6B1A", color: "#0D0D0D",
+                          border: "none", borderRadius: "6px", fontWeight: 700,
+                          cursor: "pointer", fontSize: "12px"
+                        }}
+                      >
+                        book &gt;
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Multi-book bottom bar */}
+          {bookMultiple && (
+            <div style={{
+              padding: "12px 16px", display: "flex", alignItems: "center",
+              justifyContent: "space-between",
+              borderTop: "1px solid var(--k-line)", flexShrink: 0
+            }}>
+              <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--k-ink)" }}>
+                {selectedBidIds.length} selected
+              </span>
+              <button
+                onClick={handleMultiBook}
+                disabled={selectedBidIds.length === 0}
+                style={{
+                  padding: "8px 16px", background: "#FF6B1A", color: "#0D0D0D",
+                  border: "none", borderRadius: "6px", fontWeight: 700, cursor: "pointer"
+                }}
+              >
+                book &gt;
+              </button>
+            </div>
           )}
         </div>
-      )}
-    </Card>
-  );
+      );
+    };
+
+    if (position === "main") {
+      return (
+        <div className="dashboard-card slot-main">
+          <div className="card-header">
+            ••• COMPETITIVE MARKETPLACE METRICS
+          </div>
+
+          {/* Full-width container — toggles between Chat and Bids */}
+          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {viewAllBids ? renderBidsView() : renderChatView()}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position} onSelect={handleModuleSelect}>
+        {position === "sidebar" ? (
+          <>
+            <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
+            <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
+            <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
+          </>
+        ) : (
+          <span className="badge">Footer Slot: Bids for {selectedJob?.title || "N/A"}</span>
+        )}
+      </Card>
+    );
+  };
 
   const renderLiveMap = (position) => {
     // 🛠️ ARCHITECTURAL FIX: Consumes seamlessly flattened store coordinates safely
@@ -213,14 +496,15 @@ export default function Dash2Board({ viewSlug }) {
                 )}
 
                 {/* 2. Worker Location Markers */}
-                {currentWorkers.map((worker, index) => {
-                  const locInfo = workerLocations[worker.worker_chat_id];
-                  if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
-                  
-                  const workerPos = [locInfo.latitude, locInfo.longitude];
-                  const rank = index + 1;
-                  const isTopThree = rank <= 3;
-                  const iconToUse = isTopThree ? goldenWorkerIcon : (locInfo.is_interested ? blinkingWorkerIcon : staticWorkerIcon);
+                 {currentWorkers.map((worker, index) => {
+                   const locInfo = workerLocations[worker.worker_chat_id];
+                   if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
+                   
+                   const workerPos = [locInfo.latitude, locInfo.longitude];
+                   const rank = index + 1;
+                   const isTopThree = rank <= 3;
+                   const isInterested = worker.is_interested || locInfo.is_interested;
+                   const iconToUse = isTopThree ? goldenWorkerIcon : (isInterested ? blinkingWorkerIcon : staticWorkerIcon);
 
                   return (
                     <Marker 
@@ -349,6 +633,18 @@ export default function Dash2Board({ viewSlug }) {
                               🏆 Rank #{rank}
                             </span>
                           )}
+                          {worker.is_interested && (
+                            <span style={{
+                              backgroundColor: '#28a745',
+                              color: '#fff',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontWeight: 700,
+                              fontSize: '0.75em'
+                            }}>
+                              Interested
+                            </span>
+                          )}
                         </div>
                         <span style={{ fontSize: '0.85em', color: 'var(--k-ink-3)', border: '1px solid var(--k-border-strong)', padding: '2px 6px', borderRadius: '4px' }}>
                           ID: {worker.worker_chat_id}
@@ -467,9 +763,31 @@ export default function Dash2Board({ viewSlug }) {
                       </div>
                     </div>
 
-                    <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
-                    <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
-                  </div>
+                      <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
+                      <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedJob(job);
+                            navigate('/customer/postings/ActiveBiddingsEngine');
+                          }}
+                          style={{
+                            padding: '8px 20px',
+                            background: '#FF6B1A',
+                            color: '#0D0D0D',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                          }}
+                        >
+                          Chat
+                        </button>
+                      </div>
+                    </div>
                 );
               })
             )}
@@ -491,7 +809,7 @@ export default function Dash2Board({ viewSlug }) {
     </Card>
   );
 
-  const resolveModuleBySlot = (slotKey) => {
+   const resolveModuleBySlot = (slotKey) => {
     switch (postingsSlots[slotKey]) {
       case "ActiveBiddingsEngine": return renderBiddingsEngine(slotKey);
       case "GeospatialLiveMap":    return renderLiveMap(slotKey);
@@ -501,12 +819,276 @@ export default function Dash2Board({ viewSlug }) {
     }
   };
 
+  // ── Bids popup handlers ──
+  const bidsForSelectedJob = biddingsStream || [];
+  const selectedBidItems = bidsForSelectedJob.filter((bid) =>
+    selectedBidIds.includes(bid.id)
+  );
+  const totalCharge = selectedBidItems.reduce(
+    (sum, bid) => sum + (bid.bid_amount || bid.offer || bid.amount || 0), 0
+  );
+
+  const handleViewChat = () => {
+    setViewAllBids(false);
+  };
+
+  const handleToggleBidSelection = (bidId) => {
+    setSelectedBidIds((prev) =>
+      prev.includes(bidId)
+        ? prev.filter((id) => id !== bidId)
+        : [...prev, bidId]
+    );
+  };
+
+  const handleBookClick = (bid) => {
+    setSelectedBidIds([bid.id]);
+    setShowBookingModal(true);
+    setViewAllBids(false);
+  };
+
+  const handleMultiBook = () => {
+    if (selectedBidIds.length > 0) {
+      setShowBookingModal(true);
+      setViewAllBids(false);
+    }
+  };
+
+  const handleProceedToPayment = async () => {
+    setShowBookingModal(false);
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      await fetch(`http://127.0.0.1:8000/jobs/${selectedJob.id}/book`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ selected_bid_ids: selectedBidIds }),
+      });
+    } catch (error) {
+      console.error("Failed to book worker(s):", error);
+    }
+  };
+
+  const handleRatingsClick = (worker) => {
+    const allWorkers = matchedWorkersMap[selectedJob?.id] || [];
+    if (bookMultiple && selectedBidIds.length > 0) {
+      const selectedWorkers = bidsForSelectedJob
+        .filter((bid) => selectedBidIds.includes(bid.id))
+        .map((bid) => ({
+          ...allWorkers.find((w) => w.worker_chat_id === bid.worker_chat_id),
+          _highlighted: true,
+        }));
+      setSelectedWorkersForReview(selectedWorkers);
+    } else {
+      const targetWorker =
+        allWorkers.find((w) => w.worker_chat_id === worker.worker_chat_id) || worker;
+      setSelectedWorkersForReview([{ ...targetWorker, _highlighted: true }]);
+    }
+    setShowRatingsModal(true);
+  };
+
+  const handleMapsClick = (worker) => {
+    setViewAllBids(false);
+    workerCardRefs.current[worker.worker_chat_id]?.scrollIntoView({
+      behavior: "auto", block: "center"
+    });
+  };
+
+  const handleMapsClickMulti = () => {
+    setViewAllBids(false);
+    const selectedIds = bidsForSelectedJob
+      .filter((bid) => selectedBidIds.includes(bid.id))
+      .map((bid) => bid.worker_chat_id);
+    navigate('/customer/postings/RatingsReviewLogs');
+  };
+
+  // ── Inlined Centered Modals ──
+
+  const renderBookingModal = () => {
+    if (!showBookingModal) return null;
+    const modalStyle = {
+      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, padding: "16px"
+    };
+    const contentStyle = {
+      position: "relative", width: "100%", maxWidth: "640px", background: "var(--k-raise)",
+      color: "var(--k-ink)", border: "1px solid var(--k-line)", borderRadius: "16px",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.5)", maxHeight: "90vh", overflowY: "auto", padding: "24px"
+    };
+    const closeBtnStyle = {
+      position: "absolute", top: "12px", right: "16px", background: "none", border: "none",
+      color: "var(--k-ink-3)", fontSize: "24px", cursor: "pointer", lineHeight: 1
+    };
+    const handleBackdropClick = (e) => { if (e.target === e.currentTarget) setShowBookingModal(false); };
+
+    return (
+      <div style={modalStyle} onClick={handleBackdropClick}>
+        <div style={contentStyle}>
+          <button onClick={() => setShowBookingModal(false)} style={closeBtnStyle}>×</button>
+
+          <h3 style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "var(--k-orange-ink)" }}>
+            Job Title:
+          </h3>
+          <p style={{ margin: "4px 0 12px", fontSize: "20px", fontWeight: 700 }}>
+            {selectedJob?.title || "Untitled Job"}
+          </p>
+
+          <h4 style={{ margin: "16px 0 8px", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "var(--k-orange-ink)" }}>
+            Job Description:
+          </h4>
+          <p style={{ margin: "4px 0 20px", fontSize: "13px", color: "var(--k-ink-3)", lineHeight: "1.5" }}>
+            {selectedJob?.description || selectedJob?.job_description || "No description available."}
+          </p>
+
+          <h4 style={{ margin: "0 0 12px", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "var(--k-ink-3)" }}>
+            Selected Workers &amp; Bids:
+          </h4>
+          <div style={{ marginBottom: "20px" }}>
+            {selectedBidItems.length === 0 ? (
+              <p style={{ fontSize: "13px", color: "var(--k-ink-3)" }}>No workers selected.</p>
+            ) : (
+              selectedBidItems.map((item, idx) => {
+                const workerName = item.worker_name || item.provider || `Worker ${item.worker_chat_id}`;
+                const bidAmount = item.bid_amount || item.offer || item.amount || 0;
+                return (
+                  <div key={item.id || idx} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "10px 12px", border: "1px solid var(--k-line)", borderRadius: "8px", marginBottom: "8px"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{
+                        width: "28px", height: "28px", borderRadius: "50%",
+                        background: "rgba(255, 107, 26, 0.2)", display: "flex",
+                        alignItems: "center", justifyContent: "center", overflow: "hidden"
+                      }}>
+                        <span style={{ color: "#FF6B1A", fontWeight: 700, fontSize: "11px" }}>
+                          {(workerName || "W").slice(0, 1).toUpperCase()}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--k-ink)" }}>
+                        {workerName}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#FF6B1A" }}>
+                      Rs {bidAmount}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+            <span style={{ fontSize: "13px", color: "var(--k-ink-3)" }}>Total Charge:</span>
+            <span style={{ fontSize: "24px", fontWeight: 700, color: "#FF6B1A" }}>
+              Rs {totalCharge}
+            </span>
+          </div>
+
+          <button
+            onClick={handleProceedToPayment}
+            style={{
+              width: "100%", padding: "12px", background: "#FF6B1A", color: "#0D0D0D",
+              border: "none", borderRadius: "12px", fontWeight: 700, fontSize: "16px", cursor: "pointer"
+            }}
+          >
+            Proceed to Payment Opt
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderRatingsModal = () => {
+    if (!showRatingsModal) return null;
+    const modalStyle = {
+      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, padding: "16px"
+    };
+    const contentStyle = {
+      position: "relative", width: "100%", maxWidth: "640px", background: "var(--k-raise)",
+      color: "var(--k-ink)", border: "1px solid var(--k-line)", borderRadius: "16px",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.5)", maxHeight: "90vh", overflowY: "auto", padding: "24px"
+    };
+    const closeBtnStyle = {
+      position: "absolute", top: "12px", right: "16px", background: "none", border: "none",
+      color: "var(--k-ink-3)", fontSize: "24px", cursor: "pointer", lineHeight: 1
+    };
+    const handleBackdropClick = (e) => { if (e.target === e.currentTarget) setShowRatingsModal(false); };
+
+    return (
+      <div style={modalStyle} onClick={handleBackdropClick}>
+        <div style={contentStyle}>
+          <button onClick={() => setShowRatingsModal(false)} style={closeBtnStyle}>×</button>
+
+          <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 600 }}>Ratings &amp; Reviews</h3>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {selectedWorkersForReview.length === 0 ? (
+              <>
+                <p style={{ color: "var(--k-ink-3)", fontSize: "13px" }}>No worker profiles to review.</p>
+                <button
+                  onClick={() => setShowRatingsModal(false)}
+                  style={{
+                    padding: "8px 16px", background: "#FF6B1A", color: "#0D0D0D",
+                    border: "none", borderRadius: "20px", fontWeight: 600, fontSize: "13px", cursor: "pointer"
+                  }}
+                >
+                  Close
+                </button>
+              </>
+            ) : (
+              selectedWorkersForReview.map((worker) => {
+                const isSelected = worker._highlighted;
+                return (
+                  <div key={worker.worker_chat_id || worker.id} style={{
+                    padding: "12px", borderRadius: "10px", cursor: "pointer",
+                    border: isSelected ? "1px solid #FF6B1A" : "1px solid var(--k-line)",
+                    background: isSelected ? "var(--k-wash)" : "var(--ind-surface)"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                      <div style={{
+                        width: "36px", height: "36px", borderRadius: "50%",
+                        background: "rgba(255, 107, 26, 0.2)", display: "flex",
+                        alignItems: "center", justifyContent: "center", overflow: "hidden"
+                      }}>
+                        <span style={{ color: "#FF6B1A", fontWeight: 700, fontSize: "14px" }}>
+                          {(worker.username || worker.worker_name || "W").slice(0, 1).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <strong style={{ display: "block", color: "var(--k-ink)" }}>
+                          {worker.username || worker.worker_name || `Worker ${worker.worker_chat_id}`}
+                        </strong>
+                        <span style={{ fontSize: "11px", color: "var(--k-ink-3)" }}>
+                          ★ {worker.rating || "—"}/5
+                        </span>
+                      </div>
+                    </div>
+                    <p style={{ margin: "0 0 8px", fontSize: "12px", color: "var(--k-ink-3)", lineHeight: "1.4", fontStyle: "italic" }}>
+                      {worker.review_snippet || "No review yet."}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="dashboard-grid-4pane">
       <div className="grid-main">{resolveModuleBySlot("main")}</div>
       <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
       <div className="grid-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
       <div className="grid-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
+
+      {/* ── Centered Modals ── */}
+      {renderBookingModal()}
+      {renderRatingsModal()}
     </div>
   );
 }
