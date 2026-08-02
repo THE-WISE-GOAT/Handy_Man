@@ -33,6 +33,42 @@ export default function Dash1Worker({ viewSlug }) {
     loadApplicantStatus,
   } = useWorkerDashboardData();
 
+  // ── Full-width view toggle for WorkspaceJobDetails ──
+  const [showBidForm, setShowBidForm] = useState(false);
+  const [bidAmount, setBidAmount] = useState("");
+
+   const handleBidPlaced = async () => {
+    if (!bidAmount || !activeJob) return;
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      const response = await fetch(
+        `http://127.0.0.1:8000/jobs/${activeJob.job_id}/bid`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            bid_amount: parseFloat(bidAmount),
+            bid_message: "",
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // ── Instantly update local chat state on success ──
+      appendMessage("system", `Bid placed: Rs ${bidAmount}`, "BID SYSTEM");
+    } catch (error) {
+      console.error("Failed to place bid:", error);
+    }
+    setShowBidForm(false);
+    setBidAmount("");
+  };
+
   const chatEndRef = useRef(null);
   const [chatInput, setChatInput] = useState("");
 
@@ -274,107 +310,176 @@ export default function Dash1Worker({ viewSlug }) {
         }
       };
 
+      // ── Chat View (full-width) ──
+      const renderChatView = () => (
+        <div style={{ width: "100%", height: "100%", display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", flexShrink: 0, marginBottom: "8px" }}>
+            <button
+              onClick={() => setShowBidForm(true)}
+              style={{
+                padding: "4px 14px", background: "#FF6B1A", color: "#0D0D0D",
+                border: "none", borderRadius: "20px", fontWeight: 600,
+                fontSize: "13px", cursor: "pointer"
+              }}
+            >
+              Bid
+            </button>
+          </div>
+
+            <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
+              {chatMessages
+                .filter(
+                  (msg) => msg.sender === "customer" || msg.sender === "worker" || msg.sender === "system"
+                )
+                .map((msg) => (
+                  <div key={msg.id}>
+                    {msg.sender === "system" ? (
+                      <div style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
+                        <div style={{
+                          maxWidth: "80%", padding: "4px 16px", fontSize: "0.85rem",
+                          fontWeight: 600, color: "#FF6B1A", background: "rgba(255,107,26,0.1)",
+                          borderRadius: "9999px", textAlign: "center"
+                        }}>
+                          {msg.text}
+                        </div>
+                      </div>
+                    ) : msg.sender === "worker" ? (
+                      <div style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
+                        <div style={{
+                          maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
+                          background: "#FF6B1A", borderRadius: "28px 4px 28px 28px"
+                        }}>
+                          <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
+                        <div style={{
+                          maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
+                          background: "var(--k-raise)", borderRadius: "4px 28px 28px 28px",
+                          border: "1px solid var(--k-line)"
+                        }}>
+                          <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              <div ref={chatEndRef} />
+            </div>
+
+          <form
+            onSubmit={handleSendChat}
+            style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--k-line)', flexShrink: 0 }}
+          >
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Type a message..."
+              disabled={!activeJob}
+              style={{
+                flex: 1,
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid var(--k-border-strong)',
+                background: 'var(--k-field)',
+                color: 'var(--k-ink)',
+                font: 'inherit',
+                outline: 'none',
+                fontSize: '13px'
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!chatInput.trim() || !activeJob}
+              style={{
+                padding: '6px 14px',
+                background: '#FF6B1A',
+                color: '#0D0D0D',
+                border: 'none',
+                borderRadius: '6px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontSize: '13px'
+              }}
+            >
+              Send
+            </button>
+          </form>
+        </div>
+      );
+
+      // ── Bid Placement View (full-width) ──
+      const renderBidView = () => (
+        <div style={{ width: "100%", height: "100%", display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          {/* Back to Chat header */}
+          <div style={{ flexShrink: 0, marginBottom: "16px" }}>
+            <button
+              onClick={() => setShowBidForm(false)}
+              style={{
+                padding: "4px 14px", background: "transparent", color: "var(--k-ink-3)",
+                border: "1px solid var(--k-line)", borderRadius: "20px", fontWeight: 600,
+                fontSize: "13px", cursor: "pointer"
+              }}
+            >
+              Back to Chat
+            </button>
+          </div>
+
+          {/* Job details */}
+          <h2 style={{ flexShrink: 0, margin: "0 0 8px" }}>{activeJob?.title || "Untitled Job"}</h2>
+          <p style={{ flexShrink: 0, margin: "0 0 20px", fontSize: "13px", color: "var(--k-ink-3)", lineHeight: "1.5" }}>
+            {activeJob?.description || activeJob?.job_description || "No description available."}
+          </p>
+
+          {/* Bid amount input */}
+          <label style={{ display: "block", fontSize: "13px", fontWeight: 500, color: "var(--k-ink-3)", marginBottom: "8px", flexShrink: 0 }}>
+            Enter your bid amount
+          </label>
+          <input
+            type="number"
+            value={bidAmount}
+            onChange={(e) => setBidAmount(e.target.value)}
+            placeholder="Rs 0.00"
+            min="0"
+            step="1"
+            style={{
+              width: "100%", padding: "12px 16px", fontSize: "18px", fontWeight: 700,
+              color: "var(--k-ink)", background: "var(--k-raise)",
+              border: "2px solid #FF6B1A", borderRadius: "12px", outline: "none",
+              marginBottom: "20px", flexShrink: 0
+            }}
+          />
+
+          <div style={{ flex: 1 }} />
+
+          <button
+            onClick={handleBidPlaced}
+            disabled={!bidAmount}
+            style={{
+              width: "100%", padding: "12px", background: "#FF6B1A", color: "#0D0D0D",
+              border: "none", borderRadius: "12px", fontWeight: 700, fontSize: "16px", cursor: "pointer",
+              flexShrink: 0
+            }}
+          >
+            Submit Bid
+          </button>
+        </div>
+      );
+
       return (
         <div className="dashboard-card slot-main">
           <div className="card-header">
             ••• DEPLOYED ASSIGNMENT SPECIFICATIONS
           </div>
 
-          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'row', gap: '20px', minHeight: 0 }}>
-            {/* Left Panel - Job Details */}
-            <div style={{ flex: 2, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-              {activeJob ? (
-                <>
-                  <h2>{activeJob.title || "Untitled Job"}</h2>
-                  <p><strong>Job ID:</strong> {activeJob.booking_chat_id || activeJob.id || "N/A"}</p>
-                  <p className="panel-desc">{activeJob.description || activeJob.job_description || "No description available."}</p>
-                  <button
-                    type="button"
-                    onClick={() => expressInterest(activeJob.job_id, workerChatId)}
-                    style={{
-                      marginTop: '16px',
-                      padding: '10px 20px',
-                      backgroundColor: activeJob.is_interested ? '#FF6B1A' : 'transparent',
-                      color: activeJob.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)',
-                      border: activeJob.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                      fontSize: '14px'
-                    }}
-                  >
-                    {activeJob.is_interested ? '✓ Interested' : "I'm Interested"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <h2>Job Details Monitor</h2>
-                  <p className="panel-desc">
-                    Full breakdown of client structural parameters and requirements.
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* Right Panel - Chat Window */}
-            <div style={{ flex: 1, minWidth: '350px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--k-line)', paddingLeft: '16px', height: '100%' }}>
-              <h3 style={{ flexShrink: 0 }}>Chat</h3>
-              <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
-                {chatMessages
-                  .filter(
-                    (msg) =>
-                      msg.sender === "customer" || msg.sender === "worker"
-                  )
-                  .map((msg) => (
-                    <p key={msg.id} className={`chat-msg chat-msg--${msg.sender}`}>
-                      <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
-                    </p>
-                  ))}
-                <div ref={chatEndRef} />
-              </div>
-              <form
-                onSubmit={handleSendChat}
-                style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--k-line)', flexShrink: 0 }}
-              >
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Type a message..."
-                  disabled={!activeJob}
-                  style={{
-                    flex: 1,
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--k-border-strong)',
-                    background: 'var(--k-field)',
-                    color: 'var(--k-ink)',
-                    font: 'inherit',
-                    outline: 'none',
-                    fontSize: '13px'
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={!chatInput.trim() || !activeJob}
-                  style={{
-                    padding: '6px 14px',
-                    background: '#FF6B1A',
-                    color: '#0D0D0D',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    fontSize: '13px'
-                  }}
-                >
-                  Send
-                </button>
-               </form>
-             </div>
-           </div>
-         </div>
-       );
+          {/* Full-width container — toggles between Chat and Bid views */}
+          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {showBidForm ? renderBidView() : renderChatView()}
+          </div>
+        </div>
+      );
     }
 
     return (
@@ -568,7 +673,7 @@ export default function Dash1Worker({ viewSlug }) {
             </button>
           </div>
         </div>
-      )}
+       )}
     </div>
   );
 }
