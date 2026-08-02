@@ -9,7 +9,7 @@ export default function Dash3Worker({ viewSlug }) {
   const [activeModule, setActiveModule] = useState("interview");
 
   const {
-    // onboarding state
+    // Onboarding state
     applicantStage,
     isApplicantComplete,
     isApplicantRejected,
@@ -24,7 +24,7 @@ export default function Dash3Worker({ viewSlug }) {
     isSubmittingApplication,
     applicationSubmitted,
 
-    // chat state
+    // Chat state
     chatMessages,
     aiResponse,
     isAiGenerating,
@@ -34,7 +34,15 @@ export default function Dash3Worker({ viewSlug }) {
     turnsRemaining,
     scenarioQuestion,
 
-    // map state
+    // Skills & Category state
+    workerSkills,
+    isAddingSkill,
+    startAddSkill,
+    startAddCategory,
+    cancelAddSession,
+    fetchWorkerSkills,
+
+    // Map state
     isMapOpen,
     mapReady,
     modalSearchQuery,
@@ -42,7 +50,7 @@ export default function Dash3Worker({ viewSlug }) {
     modalLng,
     modalAddrText,
 
-    // editable profile state
+    // Editable profile state
     editableProfile,
     isSavingProfile,
     profileSaveMessage,
@@ -50,7 +58,7 @@ export default function Dash3Worker({ viewSlug }) {
     setIsSavingProfile,
     setProfileSaveMessage,
 
-    // user base info state
+    // User base info state
     userProfile,
     isEditingUserInfo,
     isSavingUserInfo,
@@ -60,7 +68,7 @@ export default function Dash3Worker({ viewSlug }) {
     setIsSavingUserInfo,
     setUserInfoSaveMessage,
 
-    // actions
+    // Actions
     setPhoneNumber,
     setAddressText,
     setLatitude,
@@ -127,7 +135,7 @@ export default function Dash3Worker({ viewSlug }) {
   }, [viewSlug]);
 
   // ====================================================
-  // MAP ASSET LOADER (reused from customer dashboard)
+  // MAP ASSET LOADER
   // ====================================================
   useEffect(() => {
     if (isMapOpen) {
@@ -165,7 +173,7 @@ export default function Dash3Worker({ viewSlug }) {
   }, [isMapOpen]);
 
   // ====================================================
-  // MAP ENGINE (reused from customer dashboard)
+  // MAP ENGINE
   // ====================================================
   useEffect(() => {
     if (!mapReady || !mapContainerRef.current || !window.L) return;
@@ -293,10 +301,6 @@ export default function Dash3Worker({ viewSlug }) {
     );
   };
 
-  const handleModuleSelect = (targetSlug) => {
-    navigate(`/worker/me/${targetSlug}`);
-  };
-
   // ====================================================
   // CHAT HANDLERS
   // ====================================================
@@ -307,9 +311,6 @@ export default function Dash3Worker({ viewSlug }) {
     setChatInput("");
   };
 
-  // ====================================================
-  // SUBMIT HANDLER
-  // ====================================================
   const handleSubmitApplication = async () => {
     await submitApplication();
   };
@@ -322,65 +323,7 @@ export default function Dash3Worker({ viewSlug }) {
   };
 
   // ====================================================
-  // PROFILE EDIT HANDLERS
-  // ====================================================
-  const handleProfileChange = (field, value) => {
-    setEditableProfile((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleSaveProfile = async () => {
-    await updateWorkerProfile();
-  };
-
-  // ====================================================
-  // RENDER: Under Review / Rejected State
-  // ====================================================
-  const renderStatusView = () => {
-    if ((applicationSubmitted || applicantStage === "pending_admin_review") && !isApplicantRejected) {
-      return (
-        <div className="dashboard-card slot-main">
-          <div className="card-header">••• APPLICATION STATUS</div>
-          <div className="main-panel">
-            <h2>Under Review</h2>
-            <p className="panel-desc">
-              Your application has been submitted and is currently under admin review.
-              You will be notified once a decision is made.
-            </p>
-            <div className="status-badge status-badge--review">
-              Pending Admin Approval
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (isApplicantRejected) {
-      return (
-        <div className="dashboard-card slot-main">
-          <div className="card-header">••• APPLICATION STATUS</div>
-          <div className="main-panel">
-            <h2>Application Not Approved</h2>
-            <p className="panel-desc">
-              Your application was not approved at this time.
-            </p>
-            {rejectionReason && (
-              <div className="rejection-reason-box">
-                <strong>Reason:</strong> {rejectionReason}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  // ====================================================
-  // RENDER: AI Chat Terminal
+  // RENDER: AI Chat Terminal / Post-Application Sketch UI
   // ====================================================
   const renderChatTerminal = ({ isActive }) => {
     if (!isActive) {
@@ -390,57 +333,183 @@ export default function Dash3Worker({ viewSlug }) {
           <div className="main-panel">
             <p className="panel-desc">Click to open the AI interview terminal</p>
             <span className="badge">
-              {chatMessages.length > 1 ? `${chatMessages.length} messages` : "Not started"}
+              {isAddingSkill ? "Specialty Session" : chatMessages.length > 1 ? `${chatMessages.length} messages` : "Not started"}
             </span>
-
           </div>
-
-
         </div>
       );
     }
 
-    if (renderStatusView()) return renderStatusView();
+    // STATE 1: ACTIVE SPECIALTY / ADD-SKILL CHAT SESSION
+    if (isAddingSkill) {
+      return (
+        <div className="dashboard-card slot-main">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", gap: "8px", flexWrap: "wrap" }}>
+            <div className="card-header" style={{ marginBottom: 0 }}>
+              ••• AI INTERVIEW TERMINAL <span className="badge badge-highlight" style={{ marginLeft: "8px" }}>SPECIALTY INTERVIEW</span>
+            </div>
+            
+            <button
+              type="button"
+              onClick={cancelAddSession}
+              style={{
+                background: "rgba(255, 77, 77, 0.15)",
+                color: "#FF4D4D",
+                border: "1px solid rgba(255, 77, 77, 0.4)",
+                borderRadius: "8px",
+                padding: "6px 14px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "12px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px"
+              }}
+            >
+              ✕ CANCEL INTERVIEW
+            </button>
+          </div>
 
+          <div className="main-panel chat-terminal-panel">
+            <div className="chat-box" style={{ minHeight: "340px", maxHeight: "450px" }}>
+              {chatMessages.map((m) => (
+                <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
+                  <strong>{m.sender.toUpperCase()}:</strong> {m.text}
+                </p>
+              ))}
+              {isAiGenerating && (
+                <p className="chat-msg chat-msg--assistant">
+                  <strong>ASSISTANT:</strong> <em>typing...</em>
+                </p>
+              )}
+            </div>
+            <form onSubmit={handleSendChat} className="chat-form">
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Type your response to the specialty assessment..."
+                disabled={isAiGenerating}
+              />
+              <button
+                type="submit"
+                className="chat-btn"
+                disabled={isAiGenerating || !chatInput.trim()}
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // STATE 2: POST-APPLICATION SUBMITTED VIEW (THE SKETCH DESIGN)
+    if (applicationSubmitted || applicantStage === "pending_admin_review" || isApplicantComplete) {
+      const jobCategory = extractedProfile?.job_category || editableProfile?.job_category || "Plumber";
+      
+    const skillsList = workerSkills && workerSkills.length > 0 
+      ? workerSkills.map(s => (typeof s === "object" ? (s.title || s.name || s.skill_name) : s))
+      : (extractedProfile?.specialities?.length > 0 ? extractedProfile.specialities : (editableProfile?.specialities || ["Speciality 1", "Speciality 2", "Speciality 3", "Speciality 4"]));
+      
+      return (
+        <div className="dashboard-card slot-main">
+          <div className="card-header">••• AI INTERVIEW TERMINAL</div>
+          <div className="main-panel" style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "16px" }}>
+            
+            {/* INNER CONTAINER (MATCHING SKETCH) */}
+            <div style={{
+              border: "1px solid var(--ind-border, rgba(255,255,255,0.15))",
+              borderRadius: "12px",
+              padding: "20px",
+              background: "var(--ind-surface-alpha-40, rgba(255,255,255,0.03))",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px"
+            }}>
+              <div style={{ fontSize: "16px", fontWeight: "600" }}>
+                <span style={{ color: "var(--text-secondary, #aaa)" }}>Job Category : </span> 
+                <span style={{ color: "var(--ind-white, #fff)", textTransform: "lowercase", fontWeight: "bold" }}>{jobCategory}</span>
+              </div>
+
+              <div style={{ fontSize: "14px" }}>
+                <span style={{ color: "var(--text-secondary, #aaa)", display: "block", marginBottom: "8px" }}>Specialities :</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {skillsList.map((spec, i) => (
+                    <span key={i} style={{
+                      background: "rgba(255, 107, 26, 0.15)",
+                      color: "#FF6B1A",
+                      border: "1px solid rgba(255, 107, 26, 0.3)",
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      fontWeight: 500
+                    }}>
+                      {spec}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginTop: "4px" }}>
+                <button
+                  type="button"
+                  onClick={startAddSkill}
+                  disabled={isAiGenerating}
+                  style={{
+                    background: "#FF6B1A",
+                    color: "#0D0D0D",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "10px 18px",
+                    fontWeight: 700,
+                    cursor: isAiGenerating ? "not-allowed" : "pointer",
+                    fontSize: "13px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  + Add More Specialities by taking an interview
+                </button>
+              </div>
+            </div>
+
+            {/* LOWER BUTTON (MATCHING SKETCH) */}
+            <div>
+              <button
+                type="button"
+                onClick={startAddCategory}
+                disabled={isAiGenerating}
+                style={{
+                  background: "transparent",
+                  color: "var(--ind-white, #fff)",
+                  border: "1px dashed var(--ind-border, rgba(255,255,255,0.25))",
+                  borderRadius: "8px",
+                  padding: "10px 18px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                + Add New Job Category
+              </button>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    // STATE 3: INITIAL ONBOARDING INTERVIEW (Before initial application is submitted)
     const hasActiveChat = chatMessages.length > 1 || isChatComplete || isAiGenerating;
 
     return (
       <div className="dashboard-card slot-main">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-        <div className="card-header">•••AI INTERVIEW TERMINAL</div>        
-            <button
-              type="button"
-              onClick={() => {
-                
-              }}
-              style={{
-                background: "#FF6B1A",
-                color: "#0D0D0D",
-                border: "none",
-                borderRadius: "8px",
-                padding: "8px 14px",
-                fontWeight: 700,
-                cursor: "pointer",
-                fontSize: "12px",
-                transition: "transform 120ms ease, opacity 120ms ease",
-                display: 'none'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = 0.85;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = 1;
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = "scale(0.95)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >ADD CATEGORY</button>
+        <div className="card-header">••• AI INTERVIEW TERMINAL</div>
 
-        </div>
-        
         <div className="main-panel chat-terminal-panel">
           {!hasActiveChat && !applicationSubmitted ? (
             <div className="start-interview-prompt">
@@ -462,7 +531,7 @@ export default function Dash3Worker({ viewSlug }) {
               {turnsRemaining !== undefined && (
                 <span className="turns-badge">TURNS LEFT: {turnsRemaining}</span>
               )}
-              <div className="chat-box" style={{ minHeight:"80%", maxHeight:'' }}>
+              <div className="chat-box" style={{ minHeight: "340px", maxHeight: "450px" }}>
                 {chatMessages.map((m) => (
                   <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
                     <strong>{m.sender.toUpperCase()}:</strong> {m.text}
@@ -518,7 +587,6 @@ export default function Dash3Worker({ viewSlug }) {
       <div className="dashboard-card slot-main">
         <div className="card-header">••• EXTRACTION & SUBMISSION</div>
         <div className="main-panel sidebar-content">
-          {/* Live Extraction Module */}
           <div className="extraction-panel">
             <h3>Live Extraction</h3>
             {extractedProfile ? (
@@ -565,7 +633,6 @@ export default function Dash3Worker({ viewSlug }) {
             )}
           </div>
 
-          {/* Location Module */}
           <div className="location-panel">
             <h3>Location & Contact</h3>
             <div className="location-form">
@@ -598,7 +665,6 @@ export default function Dash3Worker({ viewSlug }) {
             </div>
           </div>
 
-          {/* Submit Button */}
           {!applicationSubmitted && !isApplicantRejected && (
             <button
               type="button"
@@ -735,15 +801,6 @@ export default function Dash3Worker({ viewSlug }) {
                     onChange={(e) => setUserProfile((prev) => ({ ...prev, username: e.target.value }))}
                   />
                 </div>
-                <div className="profile-field">
-                  <label>New Password {userProfile.password ? "(leave blank to keep current)" : ""}</label>
-                  <input
-                    type="password"
-                    value={userProfile.password || ""}
-                    onChange={(e) => setUserProfile((prev) => ({ ...prev, password: e.target.value }))}
-                    placeholder="Enter new password"
-                  />
-                </div>
 
                 <div className="profile-actions">
                   <button
@@ -762,6 +819,58 @@ export default function Dash3Worker({ viewSlug }) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ========== SKILLS & SPECIALITIES SECTION ========== */}
+          <div className="profile-section profile-section--worker">
+            <div className="profile-section-header">
+              <h3>Verified Skills & Specialties</h3>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => {
+                    setActiveModule("interview");
+                    startAddSkill();
+                  }}
+                  title="Add new specialty"
+                  style={{ fontSize: "12px", padding: "4px 8px" }}
+                >
+                  + Specialty
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => {
+                    setActiveModule("interview");
+                    startAddCategory();
+                  }}
+                  title="Add new trade category"
+                  style={{ fontSize: "12px", padding: "4px 8px" }}
+                >
+                  + Category
+                </button>
+              </div>
+            </div>
+
+            <div className="profile-read-only-grid">
+              <div className="profile-detail-row" style={{ gridColumn: "1 / -1" }}>
+                <span className="profile-detail-label">Active Skills:</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px" }}>
+                  {workerSkills && workerSkills.length > 0 ? (
+                    workerSkills.map((skill, index) => (
+                      <span key={skill.id || index} className="badge badge-highlight">
+                        {typeof skill === "object" ? (skill.title || skill.name || skill.skill_name) : skill}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="profile-detail-value profile-detail-value--empty">
+                      No additional skills added yet. Click "+ Specialty" to perform an AI skill assessment.
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* ========== WORKER SPECIFIC DETAILS (READ-ONLY) ========== */}
@@ -830,7 +939,6 @@ export default function Dash3Worker({ viewSlug }) {
     { key: "status", label: "Interview Status" },
   ];
 
-  const activeModuleConfig = modules.find((m) => m.key === activeModule);
   const inactiveModules = modules.filter((m) => m.key !== activeModule);
 
   const renderActiveModule = () => {
@@ -864,27 +972,27 @@ export default function Dash3Worker({ viewSlug }) {
   };
 
   // ====================================================
-  // MAP MODAL (reused from customer dashboard)
+  // MAP MODAL
   // ====================================================
   const renderMapModal = () => {
     if (!isMapOpen) return null;
 
     return (
+      <div
+        style={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+          backgroundColor: "rgba(0, 0, 0, 0.6)", zIndex: 99999, display: "flex",
+          alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
+        }}
+      >
         <div
           style={{
-            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-            backgroundColor: "rgba(0, 0, 0, 0.6)", zIndex: 99999, display: "flex",
-            alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
+            background: "var(--ind-surface)", border: "1px solid var(--ind-border)", borderRadius: "16px",
+            boxShadow: "var(--ind-shadow-tight)", width: "450px", maxWidth: "90%",
+            padding: "20px", display: "flex", flexDirection: "column", gap: "12px",
+            fontFamily: "inherit"
           }}
         >
-          <div
-            style={{
-              background: "var(--ind-surface)", border: "1px solid var(--ind-border)", borderRadius: "16px",
-              boxShadow: "var(--ind-shadow-tight)", width: "450px", maxWidth: "90%",
-              padding: "20px", display: "flex", flexDirection: "column", gap: "12px",
-              fontFamily: "inherit"
-            }}
-          >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
             <span style={{ fontWeight: "bold", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>
               🗺️ CHOOSE DELIVERY PIN (NEPAL)
@@ -920,13 +1028,11 @@ export default function Dash3Worker({ viewSlug }) {
               type="button"
               onClick={handleModalLiveTracking}
               title="Snap to My Current Position"
-                style={{
-                  background: "var(--k-wash)", border: "1px solid rgba(255, 107, 26, 0.4)", borderRadius: "6px",
-                  padding: "0 10px", cursor: "pointer", fontSize: "14px", display: "flex",
-                  alignItems: "center", justifyContent: "center"
-                }}
-              onMouseDown={(e) => e.currentTarget.style.transform = "translate(1px, 1px)"}
-              onMouseUp={(e) => e.currentTarget.style.transform = "none"}
+              style={{
+                background: "var(--k-wash)", border: "1px solid rgba(255, 107, 26, 0.4)", borderRadius: "6px",
+                padding: "0 10px", cursor: "pointer", fontSize: "14px", display: "flex",
+                alignItems: "center", justifyContent: "center"
+              }}
             >
               📍
             </button>
@@ -951,13 +1057,11 @@ export default function Dash3Worker({ viewSlug }) {
             <button
               type="button"
               onClick={() => setIsMapOpen(false)}
-                style={{
-                  flex: 1, padding: "8px", background: "var(--ind-surface-alpha-40)", border: "1px solid var(--ind-border)",
-                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer", color: "var(--text-secondary)"
-                }}
-              onMouseDown={(e) => e.currentTarget.style.transform = "translate(2px, 2px)"}
-              onMouseUp={(e) => e.currentTarget.style.transform = "none"}
+              style={{
+                flex: 1, padding: "8px", background: "var(--ind-surface-alpha-40)", border: "1px solid var(--ind-border)",
+                borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
+                cursor: "pointer", color: "var(--text-secondary)"
+              }}
             >
               CANCEL
             </button>
@@ -965,13 +1069,11 @@ export default function Dash3Worker({ viewSlug }) {
             <button
               type="button"
               onClick={confirmMapLocation}
-                style={{
-                  flex: 1, padding: "8px", background: "#FF6B1A", border: "1px solid #FF6B1A",
-                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: 700,
-                  cursor: "pointer", color: "#0D0D0D"
-                }}
-              onMouseDown={(e) => e.currentTarget.style.transform = "translate(2px, 2px)"}
-              onMouseUp={(e) => e.currentTarget.style.transform = "none"}
+              style={{
+                flex: 1, padding: "8px", background: "#FF6B1A", border: "1px solid #FF6B1A",
+                borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: 700,
+                cursor: "pointer", color: "#0D0D0D"
+              }}
             >
               CONFIRM LOCATION
             </button>
