@@ -215,6 +215,7 @@ def get_worker_matched_jobs(
     jobs = [
         {
             "job_id": job.id,
+            "booking_chat_id": job.booking_chat_id,
             "title": job.title,
             "description": job.description,
             "budget": None,
