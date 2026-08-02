@@ -42,7 +42,6 @@ export const createBookingsZlice = (set, get) => ({  userAddrText: "Bhaktapur, N
   },
   fetchBookingsPendingJobs: async () => {
     try {
-<<<<<<< HEAD
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch("http://127.0.0.1:8000/jobs/status/pending", {
         method: "GET",
@@ -50,10 +49,6 @@ export const createBookingsZlice = (set, get) => ({  userAddrText: "Bhaktapur, N
           "Authorization": `Bearer ${token}`
         }
       });
-=======
-      console.log("hellooooo");
-      const data = await apiClient.get("/jobs/status/pending");
->>>>>>> origin/And
 
       if (data.status === "success") {
         set({ fetchedJobs: data.tasks });
