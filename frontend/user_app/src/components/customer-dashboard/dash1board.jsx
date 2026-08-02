@@ -6,6 +6,7 @@ import "./dash1board.css";
 export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
+  const fileInputRef = useRef(null);
 
   // 🗺️ MAP STATES
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -55,6 +56,11 @@ export default function Dash1Board({ viewSlug }) {
     is_complete,
     createJobDirect,
     isSubmitting,
+    // 📁 ATTACHMENTS STATE & ACTIONS FROM ZUSTAND
+    attachments,
+    isUploadingAttachment,
+    uploadAttachment,
+    removeAttachment,
   } = useCustomerDashboardData();
 
   const scrollRef = useRef(null);
@@ -62,18 +68,18 @@ export default function Dash1Board({ viewSlug }) {
   const startX = useRef(0);
   const scrollLeftState = useRef(0);
 
-  const attachments = [
-    { id: 1, name: "Plan.pdf", type: "PDF" },
-    { id: 2, name: "Invoice.jpg", type: "IMG" },
-    { id: 3, name: "Wiring.png", type: "IMG" },
-    { id: 4, name: "Specs.txt", type: "DOC" },
-    { id: 5, name: "Setup.log", type: "LOG" },
-    { id: 6, name: "Plan.pdf", type: "PDF" },
-    { id: 7, name: "Invoice.jpg", type: "IMG" },
-    { id: 8, name: "Wiring.png", type: "IMG" },
-    { id: 9, name: "Specs.txt", type: "DOC" },
-    { id: 10, name: "Setup.log", type: "LOG" },
-  ];
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await uploadAttachment(file);
+    } catch (err) {
+      alert("Failed to upload image. Please check Cloudinary config.");
+    } finally {
+      e.target.value = ""; // Reset input after upload attempt
+    }
+  };
 
   useEffect(() => {
     startNewSession();
@@ -107,14 +113,13 @@ export default function Dash1Board({ viewSlug }) {
     return () => scrollContainer.removeEventListener("wheel", handleWheel);
   }, [slots.main]);
 
-const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false);
+  const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false);
 
   useEffect(() => {
     if (is_complete && !hasNavigatedForCompletion) {
       setHasNavigatedForCompletion(true);
       navigate("/customer/bookings/JobDescriptionWorkspace");
     } else if (!is_complete && hasNavigatedForCompletion) {
-      // Reset the flag when a new chat session starts and is_complete goes back to false
       setHasNavigatedForCompletion(false);
     }
   }, [is_complete, hasNavigatedForCompletion, navigate]);
@@ -315,7 +320,6 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
     navigate(`/customer/bookings/${targetSlug}`);
   };
 
-  // Safe wrapper execution to refresh list instantly upon new creations
   const handleCreateJobFinalize = async () => {
     await createJob();
     fetchBookingsPendingJobs();
@@ -418,8 +422,6 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
     );
   };
 
- 
-
   const renderJobDescription = (slotKey) => {
     if (slotKey === "main") {
       return (
@@ -434,6 +436,15 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
             minWidth: 0,
           }}
         >
+          {/* Hidden file input for Cloudinary upload */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            style={{ display: "none" }}
+          />
+
           {/* ⬅️ LEFT SIDE COLUMN */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
             <span className="card-flag" style={{ marginTop: "-14px" }}>EDIT OR CREATE JOB POSTING</span>
@@ -546,10 +557,44 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                   scrollRef.current.scrollLeft = scrollLeftState.current - walk;
                 }}
               >
-                {attachments.map((file) => (
+                {/* ➕ ADD ATTACHMENT CARD */}
+                <div
+                  onClick={() => !isUploadingAttachment && fileInputRef.current?.click()}
+                  style={{
+                    display: "inline-flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: "65px",
+                    maxWidth: "65px",
+                    height: "65px",
+                    border: "1px dashed #FF6B1A",
+                    borderRadius: "8px",
+                    background: "rgba(255, 107, 26, 0.08)",
+                    color: "#FF6B1A",
+                    cursor: isUploadingAttachment ? "not-allowed" : "pointer",
+                    fontSize: "11px",
+                    padding: "4px",
+                    boxSizing: "border-box",
+                    flexShrink: 0,
+                  }}
+                >
+                  {isUploadingAttachment ? (
+                    <span style={{ fontSize: "10px", fontWeight: "bold" }}>...</span>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: "18px", fontWeight: "bold", lineHeight: 1 }}>+</span>
+                      <span style={{ fontSize: "9px", marginTop: "2px", fontWeight: 600 }}>ADD FILE</span>
+                    </>
+                  )}
+                </div>
+
+                {/* 🖼️ DYNAMIC ATTACHMENTS LIST FROM ZUSTAND */}
+                {attachments.map((file, idx) => (
                   <div
-                    key={file.id}
+                    key={idx}
                     style={{
+                      position: "relative",
                       display: "inline-flex",
                       flexDirection: "column",
                       alignItems: "center",
@@ -564,10 +609,53 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                       fontSize: "11px",
                       padding: "4px",
                       boxSizing: "border-box",
+                      flexShrink: 0,
                     }}
                   >
-                    <span style={{ fontWeight: 700, color: "var(--k-orange-ink)" }}>[{file.type}]</span>
-                    <span style={{ fontSize: "9px", textOverflow: "ellipsis", overflow: "hidden", width: "100%", textAlign: "center" }}>
+                    {/* Delete Attachment Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeAttachment(idx);
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: "2px",
+                        right: "2px",
+                        background: "rgba(255, 0, 0, 0.2)",
+                        color: "#ff4d4d",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "14px",
+                        height: "14px",
+                        fontSize: "10px",
+                        lineHeight: "1",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0,
+                      }}
+                      title="Remove attachment"
+                    >
+                      ×
+                    </button>
+
+                    <span style={{ fontWeight: 700, color: "var(--k-orange-ink)" }}>
+                      [{file.type || "FILE"}]
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        textOverflow: "ellipsis",
+                        overflow: "hidden",
+                        width: "100%",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={file.name}
+                    >
                       {file.name}
                     </span>
                   </div>
@@ -692,6 +780,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
             <button
               type="button"
               onClick={handleCreateJobFinalize}
+              disabled={isSubmitting}
               className="title"
               dir="rtl"
               name="post"
@@ -702,24 +791,25 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                 borderRadius: "8px",
                 padding: "10px 18px",
                 fontWeight: "bold",
-                cursor: "pointer",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
                 fontSize: "13px",
                 transition: "transform 120ms ease, opacity 120ms ease",
+                opacity: isSubmitting ? 0.6 : 1,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = 0.85;
+                if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = 1;
+                if (!isSubmitting) e.currentTarget.style.opacity = 1;
               }}
               onMouseDown={(e) => {
-                e.currentTarget.style.transform = "scale(0.95)";
+                if (!isSubmitting) e.currentTarget.style.transform = "scale(0.95)";
               }}
               onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
+                if (!isSubmitting) e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              {"<-"} Post Job
+              {isSubmitting ? "Posting..." : "<- Post Job"}
             </button>
           </div>
         </div>
@@ -748,10 +838,10 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
   const renderActivePosts = (slotKey) => {
     if (slotKey === "main") {
       return (
-        <div className="dashboard-card main-view" style={{ overflow: "scroll", maxHeight:"33vw" }}>
+        <div className="dashboard-card main-view" style={{ overflow: "scroll", maxHeight: "33vw" }}>
           <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
           <h2>ACTIVE PENDING POSTS</h2>
-          <button 
+          <button
             onClick={fetchBookingsPendingJobs}
             style={{
               background: "transparent",
@@ -762,12 +852,12 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
               fontWeight: 600,
               cursor: "pointer",
               marginBottom: "16px",
-              width: "fit-content"
+              width: "fit-content",
             }}
           >
             🔄 REFRESH LIVE PIPELINE
           </button>
-          
+
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {fetchedJobs.length === 0 ? (
               <p style={{ fontFamily: "Courier New", color: "var(--k-ink-3)", fontSize: "0.9rem" }}>
@@ -775,15 +865,15 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
               </p>
             ) : (
               fetchedJobs.map((job) => (
-                <div 
-                  key={job.id} 
+                <div
+                  key={job.id}
                   style={{
                     border: "1px solid var(--k-line)",
                     borderRadius: "16px",
                     padding: "16px",
                     background: "var(--k-raise)",
                     color: "var(--k-ink)",
-                    boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)"
+                    boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)",
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -899,7 +989,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                     font: "inherit",
                     fontSize: "11px",
                     background: "var(--ind-surface-alpha-40)",
-                    color: "var(--ind-white)"
+                    color: "var(--ind-white)",
                   }}
                 />
                 <button
@@ -913,7 +1003,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                     font: "inherit",
                     fontSize: "11px",
                     fontWeight: "bold",
-                    cursor: "pointer"
+                    cursor: "pointer",
                   }}
                 >
                   FIND
@@ -971,8 +1061,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                   wordBreak: "break-word",
                 }}
               >
-                {modalAddrText ||
-                  "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
+                {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
               </div>
             </div>
 
@@ -990,7 +1079,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                   fontSize: "13px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  color: "var(--text-secondary)"
+                  color: "var(--text-secondary)",
                 }}
               >
                 CANCEL
