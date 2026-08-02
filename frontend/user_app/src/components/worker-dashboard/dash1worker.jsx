@@ -73,6 +73,33 @@ export default function Dash1Worker({ viewSlug }) {
 
   const messagesEndRef = useRef(null);
   const [chatInput, setChatInput] = useState("");
+  const [isBidMode, setIsBidMode] = useState(false);
+
+  const submitInlineBid = async (amount) => {
+    if (!activeJob) return;
+    const token = localStorage.getItem("handy_man_access_token");
+    const response = await fetch(
+      `http://127.0.0.1:8000/jobs/${activeJob.job_id}/bid`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          bid_amount: parseFloat(amount),
+          bid_message: "",
+        }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const workerName = userProfile?.firstName || userProfile?.lastName
+      ? `${userProfile?.firstName || ""} ${userProfile?.lastName || ""}`.trim()
+      : userProfile?.username || "Worker";
+    appendMessage("system", `${workerName} placed a bid: Rs ${amount}`, "BID SYSTEM");
+  };
 
   useEffect(() => {
     useWorkerDashboardData.getState().loadApplicantStatus();
@@ -320,6 +347,29 @@ export default function Dash1Worker({ viewSlug }) {
       const handleSendChat = async (e) => {
         e.preventDefault();
         if (!chatInput.trim() || !activeJob) return;
+
+        let bidAmount = null;
+
+        if (isBidMode) {
+          bidAmount = Number(chatInput);
+        } else if (chatInput.startsWith("$$$")) {
+          const extracted = chatInput.substring(3).replace(/[^0-9]/g, "");
+          if (extracted.length > 0) {
+            bidAmount = Number(extracted);
+          }
+        }
+
+        if (bidAmount !== null && bidAmount > 0) {
+          try {
+            await submitInlineBid(bidAmount);
+            setChatInput("");
+            if (isBidMode) setIsBidMode(false);
+          } catch (err) {
+            console.error("Failed to submit inline bid:", err);
+          }
+          return;
+        }
+
         const bookingChatId = activeJob.booking_chat_id;
         if (!bookingChatId) return;
         try {
@@ -394,10 +444,16 @@ export default function Dash1Worker({ viewSlug }) {
             style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--k-line)', flexShrink: 0 }}
           >
             <input
-              type="text"
+              type={isBidMode ? "number" : "text"}
               value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Type a message..."
+              onChange={(e) => {
+                let val = e.target.value;
+                if (isBidMode) {
+                  val = val.replace(/[^0-9]/g, "");
+                }
+                setChatInput(val);
+              }}
+              placeholder={isBidMode ? "Enter bid amount..." : "Type a message..."}
               disabled={!activeJob}
               style={{
                 flex: 1,
@@ -428,6 +484,22 @@ export default function Dash1Worker({ viewSlug }) {
               Send
             </button>
           </form>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '12px', color: 'var(--k-ink-3)' }}>
+            <input
+              type="checkbox"
+              id="bidModeToggle"
+              checked={isBidMode}
+              onChange={(e) => {
+                setIsBidMode(e.target.checked);
+                if (e.target.checked) setChatInput("");
+              }}
+              style={{ cursor: 'pointer', accentColor: '#FF6B1A' }}
+            />
+            <label htmlFor="bidModeToggle" style={{ cursor: 'pointer' }}>
+              type $$$amount to set bid.
+            </label>
+          </div>
         </div>
       );
 
