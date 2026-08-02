@@ -40,6 +40,15 @@ async def _broadcast_notifications(worker_chat_ids: list[int], job_payload: dict
             logger.warning(f"Failed live alert broadcast to worker {worker_chat_id}: {ws_err}")
 
 
+async def _broadcast_customer_bid(booking_chat_id: int, bid_payload: dict):
+    """Send a SYSTEM_BID notification to the customer's WebSocket connection."""
+    from src.core.manager import manager
+    try:
+        await manager.send_customer_notification(booking_chat_id, bid_payload)
+    except Exception as ws_err:
+        logger.warning(f"Failed SYSTEM_BID broadcast to booking {booking_chat_id}: {ws_err}")
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, summary="Create a job directly without AI chat")
 async def create_job_direct_endpoint(
     payload: schema.CreateJobIn,
@@ -278,4 +287,77 @@ def express_interest_in_job(
         "job_id": job_id,
         "is_interested": match.is_interested,
         "interested_count": int(interested_count or 0),
+    }
+
+
+@router.post("/{job_id}/bid", summary="Worker places a bid on a job")
+async def place_bid_on_job(
+    job_id: int,
+    payload: dict,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    """Record (or update) the worker's bid amount and proposal text."""
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+
+    match = db.execute(
+        select(model.JobWorkerMatch).where(
+            model.JobWorkerMatch.job_id == job_id,
+            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.is_active == True,
+        )
+    ).scalar_one_or_none()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="No active match found for this job")
+
+    bid_amount = payload.get("bid_amount")
+    bid_message = payload.get("bid_message", "")
+
+    if bid_amount is not None:
+        match.bid_amount = float(bid_amount)
+    if bid_message:
+        match.bid_message = bid_message
+
+    db.commit()
+    db.refresh(match)
+
+    # ── Fetch the Job to get booking_chat_id ──
+    job = db.execute(
+        select(model.Job).where(model.Job.id == job_id)
+    ).scalar_one_or_none()
+
+    if job and job.booking_chat_id:
+        # ── Broadcast SYSTEM_BID to the customer's WebSocket ──
+        bid_payload = {
+            "type": "SYSTEM_BID",
+            "data": {
+                "job_id": job_id,
+                "bid_amount": float(match.bid_amount) if match.bid_amount else 0,
+                "worker_chat_id": worker_profile.worker_chat_id,
+                "worker_name": getattr(current_user, 'firstName', None) or current_user.username,
+                "bid_message": match.bid_message or "",
+                "booking_chat_id": job.booking_chat_id,
+            },
+        }
+        background_tasks.add_task(
+            _broadcast_customer_bid,
+            job.booking_chat_id,
+            bid_payload,
+        )
+
+    return {
+        "status": "success",
+        "job_id": job_id,
+        "bid_amount": match.bid_amount,
+        "bid_message": match.bid_message,
+        "booking_chat_id": job.booking_chat_id if job else None,
     }
