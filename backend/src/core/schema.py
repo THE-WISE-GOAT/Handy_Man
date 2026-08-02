@@ -243,6 +243,7 @@ class HumanChatMessageOut(BaseModel):
     booking_chat_id: int
     message: str
     sender: str
+    sender_name: Optional[str] = None
 
 
 # use to display session start response
@@ -257,6 +258,7 @@ class HistoryMessage(BaseModel):
     """A single turn in the client-visible conversation."""
     role:  Literal["user", "assistant", "customer", "worker"]
     content: str
+    sender_name: Optional[str] = None
  
 # display the all chat history response 
 class ChatHistoryOut(BaseModel):
