@@ -28,7 +28,7 @@ async def worker_websocket_endpoint(
     session_record = db.execute(
         select(model.WorkerInterviewSession).where(
             model.WorkerInterviewSession.id == worker_chat_id,
-            model.WorkerInterviewSession.user_id == int(token_data.id)
+            model.WorkerInterviewSession.user_id == int(token_data.user_id)
         )
     ).scalar_one_or_none()
 
@@ -64,7 +64,7 @@ async def worker_websocket_endpoint_short(
     session_record = db.execute(
         select(model.WorkerInterviewSession).where(
             model.WorkerInterviewSession.id == worker_chat_id,
-            model.WorkerInterviewSession.user_id == int(token_data.id),
+            model.WorkerInterviewSession.user_id == int(token_data.user_id),
         )
     ).scalar_one_or_none()
 
@@ -100,7 +100,7 @@ async def customer_websocket_endpoint(
     booking_session = db.execute(
         select(model.BookingChat).where(
             model.BookingChat.id == booking_chat_id,
-            model.BookingChat.user_id == int(token_data.id)
+            model.BookingChat.user_id == int(token_data.user_id)
         )
     ).scalar_one_or_none()
 
