@@ -1562,3 +1562,89 @@ async def _handle_add_skill_scenario_answer(
         "skill_title": sub_skill,
         "scenario_score": score,
     }
+    
+    
+    
+    
+# ___________________________ To  find job post by the worker_________________
+@router.get(
+    "/match/worker/find-jobs",
+    response_model=schema.WorkerMatchedJobsOut,
+    summary="Fetch pre-calculated matching customer jobs for the authenticated worker from DB",
+)
+def find_jobs_for_worker(
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    worker_profiles = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalars().all()
+
+    if not worker_profiles:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active worker profile associated with this account.",
+        )
+
+    worker_ids = [wp.id for wp in worker_profiles]
+
+    # REMOVED the for-loop that calls create_matches_for_worker!
+    # Just query what is already in the database.
+
+    stmt = (
+        select(model.JobWorkerMatch, model.Job, model.WorkerSkill)
+        .join(model.Job, model.Job.id == model.JobWorkerMatch.job_id)
+        .outerjoin(
+            model.WorkerSkill,
+            model.WorkerSkill.id == model.JobWorkerMatch.matched_skill_id,
+        )
+        .where(
+            model.JobWorkerMatch.worker_id.in_(worker_ids),
+            model.JobWorkerMatch.is_active == True,
+            # Ensure this matches whatever status your customer jobs actually have!
+            # If your jobs aren't "pending", change this.
+            model.Job.status.ilike("pending"), 
+        )
+        .order_by(model.JobWorkerMatch.match_rank.asc())
+    )
+
+    matches = db.execute(stmt).all()
+
+    # 4. Deduplicate by job_id while keeping track of which profile matched
+    seen_job_ids = set()
+    jobs = []
+    
+    for match, job, skill in matches:
+        if job.id in seen_job_ids:
+            continue
+        seen_job_ids.add(job.id)
+
+        # Extract category strings
+        extracted_categories = [
+            cat["category"] for cat in (job.categories or []) 
+            if isinstance(cat, dict) and "category" in cat
+        ]
+
+        jobs.append({
+            "job_id": job.id,
+            "booking_chat_id": job.booking_chat_id,
+            "title": getattr(job, "title", None) or "General Task",
+            "description": job.description,
+            "categories": extracted_categories, 
+            "matched_worker_id": match.worker_id,  # <-- Tells UI if profile 19 or 21 matched this job!
+            "match_score": match.match_score,
+            "match_rank": match.match_rank,
+            "matched_skill": skill.title if skill is not None else None,
+            "matched_skill_description": (
+                skill.description if skill is not None else None
+            ),
+        })
+
+    return {
+        "worker_id": worker_ids[0],  # Satisfies Pydantic schema expectation
+        "worker_ids": worker_ids,    # Multi-profile list [19, 21]
+        "count": len(jobs),
+        "jobs": jobs,
+    }
