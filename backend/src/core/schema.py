@@ -1,4 +1,3 @@
-# this page is for the validation of data that is sent to database
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
