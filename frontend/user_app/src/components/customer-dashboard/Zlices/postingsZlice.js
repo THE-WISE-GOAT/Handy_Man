@@ -90,7 +90,20 @@ export const createPostingsZlice = (set, get) => ({  // ========================
       const data = await apiClient.get(`/workers/jobs/${jobId}/bids`);
       
       if (data.status === "success") {
-        set({ biddingsStream: data.bids || [] });
+        const rawBids = data.bids || [];
+        const normalizedBids = rawBids.map((bid, idx) => ({
+          id: bid.id || crypto.randomUUID(),
+          worker_chat_id: bid.worker_chat_id || bid.worker_id,
+          worker_name: bid.worker_name || bid.provider || `Worker ${bid.worker_chat_id || idx}`,
+          provider: bid.provider || bid.worker_name || `Worker ${bid.worker_chat_id || idx}`,
+          bid_amount: bid.bid_amount || bid.offer || 0,
+          amount: bid.bid_amount || bid.offer || 0,
+          offer: bid.offer || bid.bid_amount || 0,
+          message: bid.message || bid.bid_message || "",
+          status: bid.status || "Received",
+          created_at: bid.created_at,
+        }));
+        set({ biddingsStream: normalizedBids });
       }
     } catch (error) {
       console.error(`❌ Failed to fetch bids for Job ${jobId}:`, error);
@@ -188,7 +201,11 @@ export const createPostingsZlice = (set, get) => ({  // ========================
   setSelectedJob: (job) => {
     set({ selectedJob: job, selectedWorkerId: null });
     if (job && job.id) {
-      get().fetchJobBids(job.id); 
+      get().fetchJobBids(job.id);
+      if (job.booking_chat_id) {
+        const token = localStorage.getItem("handy_man_access_token");
+        get().connectCustomerDispatch(job.booking_chat_id, token);
+      }
     }
   },
 
@@ -231,11 +248,23 @@ export const createPostingsZlice = (set, get) => ({  // ========================
         }));
       }
 
-      if (message.type === "NEW_BID") {
+       if (message.type === "NEW_BID") {
         const { job_id, bid } = message.data;
-        set((state) => ({
-          biddingsStream: [...state.biddingsStream, { ...bid, id: crypto.randomUUID(), status: "Incoming" }]
-        }));
+        set((state) => {
+          const newBid = { ...bid, id: crypto.randomUUID(), status: "Incoming" };
+          const workerName = bid.worker_name || `Worker ${bid.worker_chat_id}`;
+          const bidAmount = bid.bid_amount || bid.amount || 0;
+          const newState = {
+            biddingsStream: [...state.biddingsStream, newBid]
+          };
+          return newState;
+        });
+        // Broadcast bid to client chat stream as a system message
+        get().appendMessage(
+          "system",
+          `${bid.worker_name || "Worker"} bids Rs ${bid.bid_amount || bid.amount || 0}`,
+          "BID SYSTEM"
+        );
       }
     };
 
@@ -276,6 +305,44 @@ export const createPostingsZlice = (set, get) => ({  // ========================
           chatMessages: [
             ...state.chatMessages,
             { id: crypto.randomUUID(), sender, senderName: sender_name, text: msgContent }
+          ]
+        }));
+      }
+
+      // ── SYSTEM_BID: broadcast from backend when worker places a bid ──
+      if (message.type === "SYSTEM_BID") {
+        const { bid_amount, worker_chat_id, worker_name } = message.data;
+        const bidAmount = bid_amount || 0;
+        const workerName = worker_name || `Worker ${worker_chat_id}`;
+        
+        // Add system message to chat stream
+        set((state) => ({
+          chatMessages: [
+            ...state.chatMessages,
+            {
+              id: crypto.randomUUID(),
+              sender: "system",
+              senderName: "BID SYSTEM",
+              text: `${workerName} placed a bid: Rs ${bidAmount}`
+            }
+          ]
+        }));
+
+        // Add to biddingsStream for the "View All Bids" screen
+        set((state) => ({
+          biddingsStream: [
+            ...state.biddingsStream,
+            {
+              id: crypto.randomUUID(),
+              worker_chat_id,
+              worker_name: workerName,
+              provider: workerName,
+              bid_amount: bidAmount,
+              amount: bidAmount,
+              offer: bidAmount,
+              message: message.data.bid_message || "",
+              status: "Incoming"
+            }
           ]
         }));
       }
