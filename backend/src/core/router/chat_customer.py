@@ -28,6 +28,7 @@ from src.core.oauth2 import get_current_user
 from src.core import model, schema, job_manager, matching_manager
 from src.core.manager import manager
 import math
+from fastapi.concurrency import run_in_threadpool
 
 from src.ai.customer_chat_analyser_nvidia import (
     _nvidia_client,
@@ -345,11 +346,46 @@ def get_booking_summary(
     }
 
 
+async def _refine_job_description_with_ai(raw_description: str) -> str:
+    """
+    Acts as a secondary intelligence layer to sanitize and optimize 
+    customer inputs for better vector embedding matching.
+    """
+    prompt = f"""
+    You are a backend data processor for a service marketplace. Your only job is to clean up a customer's raw task description so it can be accurately converted into a semantic database vector.
+    
+    Rewrite the customer's text into a single, clear, and reliable paragraph describing the physical work required.
+
+    STRICT RULES:
+    1. DO NOT write a formal job posting or job description.
+    2. DO NOT use headers, bullet points, or titles (e.g., no "Job Title:", "Key Responsibilities:").
+    3. DO NOT hallucinate or add extra requirements (no "communication skills", "valid license", etc.).
+    4. ONLY clarify the exact task, duration, location, and items mentioned by the customer.
+    5. Output NOTHING except the single, cleaned paragraph.
+    
+    Raw Customer Text: {raw_description}
+    """
+    
+    try:
+        response = await run_in_threadpool(
+            lambda: _nvidia_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1, # Dropped to 0.1 to make the AI extremely literal and robotic
+                max_tokens=150   # Lowered to physically prevent it from generating long bulleted lists
+            )
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"AI description refinement failed: {e}. Falling back to raw text.")
+        return raw_description
+    
+    
 @router.post(
     "/{booking_chat_id}/complete",
     summary="Complete the AI chat, write core records, invoke engine matching, and alert workers",
 )
-async def complete_customer_chat(  # Converted to async def
+async def complete_customer_chat( 
     booking_chat_id: int, 
     payload: schema.CompleteChatIn, 
     background_tasks: BackgroundTasks,
@@ -364,30 +400,45 @@ async def complete_customer_chat(  # Converted to async def
 
     chat_session = _get_own_session(booking_chat_id, db, current_user)
     
-    job_desc = payload.edited_description.strip()
-    if not job_desc:
-        job_desc = f"{payload.title}: {payload.contact_name or ''}".strip()
+    # 1. Get the raw text from the frontend submission
+    raw_job_desc = payload.edited_description.strip()
+    if not raw_job_desc:
+        raw_job_desc = f"{payload.title}: {payload.contact_name or ''}".strip()
     
-    if not chat_session.is_complete and not job_desc:
+    if not chat_session.is_complete and not raw_job_desc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot process summary. The AI chat session is not complete yet. Please provide a job description."
         )
 
-    # Await the external network calls
-    embedding_vector = await _fetch_nvidia_embedding(job_desc)
+    # ══════════════════════════════════════════════════════════════════════════
+    # 2. CONDITIONAL AI REFINEMENT (The Diff Check)
+    # ══════════════════════════════════════════════════════════════════════════
+    original_ai_desc = (chat_session.problem_description or "").strip()
+    
+    # Check if this is a manual entry (no original AI desc) OR if the user edited the text
+    if not original_ai_desc or raw_job_desc != original_ai_desc:
+        logger.info(f"[Booking {booking_chat_id}] Description modified or manual. Running AI refinement.")
+        final_job_desc = await _refine_job_description_with_ai(raw_job_desc)
+    else:
+        logger.info(f"[Booking {booking_chat_id}] Description matches original AI summary. Skipping refinement.")
+        final_job_desc = raw_job_desc
+    # ══════════════════════════════════════════════════════════════════════════
+
+    # 3. Use the final description for vectorization and saving
+    embedding_vector = await _fetch_nvidia_embedding(final_job_desc)
     address_text = await _get_address_from_coords(lat, lng)
         
     customer_fields = {
         "is_complete": getattr(chat_session, "is_complete", False),
         "is_job_request": getattr(chat_session, "is_job_request", False),
         "categories": getattr(chat_session, "categories", []), 
-        "problem_description": job_desc
+        "problem_description": final_job_desc 
     }
 
     job_fields = {
         "title": payload.title,
-        "description": job_desc,
+        "description": final_job_desc, 
         "status": payload.status,
         "is_job_request": getattr(chat_session, "is_job_request", True),
         "categories": getattr(chat_session, "categories", []),
@@ -417,7 +468,7 @@ async def complete_customer_chat(  # Converted to async def
             query_vector=embedding_vector,
             customer_location=wkt_point,
             radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
-            job_description=job_desc,
+            job_description=final_job_desc, 
         )
         db.commit()
     except Exception as engine_err:
@@ -428,7 +479,15 @@ async def complete_customer_chat(  # Converted to async def
     job_payload = {
         "booking_chat_id": booking_chat_id, 
         "title": payload.title, 
-        "description": job_desc
+        "description": final_job_desc 
+    }
+    
+    if worker_chat_ids := matching_result.get("worker_chat_ids", []):
+        background_tasks.add_task(_broadcast_notifications, worker_chat_ids, job_payload)
+
+    return {
+        "status": "success", 
+        "message": f"Job registered. Established {matching_result.get('count', 0)} matches successfully."
     }
     
     # Broadcast asynchronously without blocking the main event loop
