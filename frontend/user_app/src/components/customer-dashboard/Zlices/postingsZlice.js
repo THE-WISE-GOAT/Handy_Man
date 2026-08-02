@@ -242,11 +242,11 @@ export const createPostingsZlice = (set, get) => ({  // ========================
     set({ customerSocket: socket });
   },
 
-  appendMessage: (sender, text) =>
+  appendMessage: (sender, text, senderName = "You") =>
     set((state) => ({
       chatMessages: [
         ...state.chatMessages,
-        { id: crypto.randomUUID(), sender, text }
+        { id: crypto.randomUUID(), sender, senderName, text }
       ]
     })),
 
@@ -271,11 +271,11 @@ export const createPostingsZlice = (set, get) => ({  // ========================
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
       if (message.type === "HUMAN_MESSAGE") {
-        const { sender, message: msgContent } = message.data;
+        const { sender, sender_name, message: msgContent } = message.data;
         set((state) => ({
           chatMessages: [
             ...state.chatMessages,
-            { id: crypto.randomUUID(), sender, text: msgContent }
+            { id: crypto.randomUUID(), sender, senderName: sender_name, text: msgContent }
           ]
         }));
       }
@@ -313,7 +313,8 @@ export const createPostingsZlice = (set, get) => ({  // ========================
           .filter((msg) => msg.role !== "system")
           .map((msg) => ({
             id: crypto.randomUUID(),
-            sender: msg.role === "user" ? "customer" : "worker",
+            sender: msg.role === "customer" ? "customer" : "worker",
+            senderName: msg.sender_name || (msg.role === "customer" ? "Customer" : "Worker"),
             text: msg.content,
           }));
         set({ chatMessages: messages });
