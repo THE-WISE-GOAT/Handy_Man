@@ -30,14 +30,16 @@ export default function Dash1Worker({ viewSlug }) {
     appendMessage,
     disconnectWorkerChat,
     fetchChatHistory,
+    loadApplicantStatus,
   } = useWorkerDashboardData();
 
   const chatEndRef = useRef(null);
   const [chatInput, setChatInput] = useState("");
 
   useEffect(() => {
-    fetchMatchedJobs();
-  }, [fetchMatchedJobs]);
+    useWorkerDashboardData.getState().loadApplicantStatus();
+    useWorkerDashboardData.getState().fetchMatchedJobs();
+  }, []);
 
   useEffect(() => {
     const jobIdParam = searchParams.get("jobId");
@@ -49,43 +51,41 @@ export default function Dash1Worker({ viewSlug }) {
     }
   }, [searchParams, matchedJobs, activeJob, setActiveJob]);
 
-   useEffect(() => {
-     if (chatEndRef.current) {
-       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-     }
-   }, [chatMessages]);
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'auto' });
+    }
+  }, [chatMessages]);
 
-   useEffect(() => {
-     if (activeJob) {
-       const bookingChatId = activeJob.booking_chat_id || activeJob.id;
-       if (bookingChatId) {
-         connectWorkerChat(bookingChatId);
-       }
-     }
-   }, [activeJob]);
+  useEffect(() => {
+    if (activeJob && workerChatId) {
+      useWorkerDashboardData.getState().connectWorkerChat(workerChatId);
+    }
+  }, [activeJob, workerChatId]);
 
-   useEffect(() => {
-     if (activeJob) {
-       const bookingChatId = activeJob.booking_chat_id || activeJob.id;
-       if (bookingChatId) {
-         fetchChatHistory(bookingChatId);
-       }
-     }
-   }, [activeJob]);
+  useEffect(() => {
+    if (activeJob && activeJob.booking_chat_id) {
+      useWorkerDashboardData.getState().fetchChatHistory(activeJob.booking_chat_id);
+    }
+  }, [activeJob]);
 
-   useEffect(() => {
-     if (!viewSlug) return;
+  useEffect(() => {
+    if (!viewSlug) return;
 
-     if (workspaceSlots.main !== viewSlug) {
-       const targetSlot = Object.keys(workspaceSlots).find(
-         (key) => workspaceSlots[key] === viewSlug
-       );
+    if (workspaceSlots.main !== viewSlug) {
+      const targetSlot = Object.keys(workspaceSlots).find(
+        (key) => workspaceSlots[key] === viewSlug,
+      );
 
-       if (targetSlot) {
-         swapWorkspaceSlots(targetSlot);
-       }
-     }
-   }, [viewSlug, workspaceSlots, swapWorkspaceSlots]);
+      if (targetSlot) {
+        swapWorkspaceSlots(targetSlot);
+      }
+    }
+  }, [viewSlug, workspaceSlots, swapWorkspaceSlots]);
+
+  useEffect(() => {
+    return () => useWorkerDashboardData.getState().disconnectWorkerChat();
+  }, []);
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/worker/workspace/${targetSlug}`);
@@ -263,7 +263,7 @@ export default function Dash1Worker({ viewSlug }) {
       const handleSendChat = async (e) => {
         e.preventDefault();
         if (!chatInput.trim() || !activeJob) return;
-        const bookingChatId = activeJob.booking_chat_id || activeJob.id;
+        const bookingChatId = activeJob.booking_chat_id;
         if (!bookingChatId) return;
         try {
           await sendHumanMessage(bookingChatId, "worker", chatInput.trim());
@@ -327,7 +327,7 @@ export default function Dash1Worker({ viewSlug }) {
                   )
                   .map((msg) => (
                     <p key={msg.id} className={`chat-msg chat-msg--${msg.sender}`}>
-                      <strong>{msg.sender.toUpperCase()}:</strong> {msg.text}
+                      <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
                     </p>
                   ))}
                 <div ref={chatEndRef} />
