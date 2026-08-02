@@ -900,6 +900,7 @@ def list_worker_skills(
                 "scenario_score": s.scenario_score,
                 "is_active": s.is_active,
                 "has_vector": s.embedding is not None,
+                "stage": s.stage
             }
             for s in skills
         ],
