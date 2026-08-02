@@ -204,7 +204,7 @@
 
 .chat-msg--worker {
   align-self: flex-end;
-  background: var(--k-orange);
+  background: var(--k-orange-ink);
   color: #0D0D0D;
   border-bottom-right-radius: 2px;
 }
