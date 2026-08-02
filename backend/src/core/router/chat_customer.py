@@ -495,6 +495,14 @@ async def send_human_message(
             for profile in matched_profiles:
                 if profile.worker_chat_id:
                     await manager.send_worker_notification(profile.worker_chat_id, message_payload)
+
+            # Also send directly to the booking_chat_id connection key — the worker
+            # frontend registers its WebSocket under this key (not WorkerInterviewSession.id
+            # or WorkerProfile.worker_chat_id), so without this the customer's message
+            # never reaches the worker via WebSocket.
+            await manager.send_worker_notification(
+                chat_session.id, message_payload
+            )
     elif payload.sender == "worker":
         await manager.send_customer_notification(chat_session.id, message_payload)
 
