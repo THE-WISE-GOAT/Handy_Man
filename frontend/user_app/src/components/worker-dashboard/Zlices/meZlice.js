@@ -43,7 +43,7 @@ export const createMeZlice = (set, get) => ({
   applicationSubmitted: false,
 
   // ==========================================
-  // 2. CHAT STATE (reused customer pattern)
+  // 2. CHAT STATE
   // ==========================================
   chatMessages: [
     {
@@ -61,7 +61,13 @@ export const createMeZlice = (set, get) => ({
   scenarioQuestion: null,
 
   // ==========================================
-  // 3. MAP STATE (reused customer pattern)
+  // 2.5 SKILLS & CATEGORY STATE
+  // ==========================================
+  workerSkills: [],
+  isAddingSkill: false, // Tracks if user is in an active specialty interview
+
+  // ==========================================
+  // 3. MAP STATE
   // ==========================================
   isMapOpen: false,
   mapReady: false,
@@ -103,7 +109,7 @@ export const createMeZlice = (set, get) => ({
   userInfoSaveMessage: null,
 
   // ==========================================
-  // 6. ACTIONS
+  // 6. ACTIONS & SETTERS
   // ==========================================
 
   setApplicantStage: (stage) => set({ applicantStage: stage }),
@@ -153,7 +159,91 @@ export const createMeZlice = (set, get) => ({
       ],
     })),
 
-  // Start a new worker interview session
+  // ====================================================
+  // SKILLS & CATEGORY ENDPOINTS
+  // ====================================================
+
+  // GET /{worker_chat_id}/skills
+  fetchWorkerSkills: async () => {
+    const { workerChatId } = get();
+    if (!workerChatId) return;
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      const res = await fetch(`http://127.0.0.1:8000/worker-interview/${workerChatId}/skills`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        set({ workerSkills: data.skills || [] });
+      }
+    } catch (error) {
+      console.error("Failed to fetch skills:", error);
+    }
+  },
+
+  // POST /{worker_chat_id}/add-skill
+  startAddSkill: async () => {
+    const { workerChatId, meSlots } = get();
+    if (!workerChatId) return;
+    try {
+      set({ isAiGenerating: true, isAddingSkill: true });
+
+      // Bring interview panel to main slot if not already
+      if (meSlots.main !== "MeInterview") {
+        const slots = { ...meSlots };
+        const slotKeyWithInterview = Object.keys(slots).find(k => slots[k] === "MeInterview");
+        if (slotKeyWithInterview) {
+          slots[slotKeyWithInterview] = slots.main;
+        }
+        slots.main = "MeInterview";
+        set({ meSlots: slots });
+      }
+
+      const token = localStorage.getItem("handy_man_access_token");
+      const res = await fetch(`http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        set({
+          chatMessages: [
+            { id: crypto.randomUUID(), sender: "assistant", text: data.ai_response }
+          ],
+          applicantStage: data.stage,
+          isChatComplete: false,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to start add-skill session:", error);
+      set({ isAddingSkill: false });
+    } finally {
+      set({ isAiGenerating: false });
+    }
+  },
+
+  // PLACEHOLDER: Add New Category Button (Backend not implemented yet)
+  startAddCategory: () => {
+    console.log("Add new category clicked: Placeholder action.");
+    // Unmanaged in backend currently, left intentionally empty.
+  },
+
+  // CANCEL SESSION: Exits specialty interview chat and restores main UI view
+  cancelAddSession: () => {
+    set({
+      isAddingSkill: false,
+      chatMessages: [
+        { id: crypto.randomUUID(), sender: "system", text: "Interview session canceled." }
+      ],
+      isChatComplete: true,
+    });
+  },
+
+  // ==========================================
+  // CORE CHAT / INTERVIEW ACTIONS
+  // ==========================================
+
   startWorkerInterview: async () => {
     set({ isAiGenerating: true });
     try {
@@ -175,8 +265,8 @@ export const createMeZlice = (set, get) => ({
         workerChatId: data.worker_chat_id,
         aiResponse: data.ai_response,
         applicantStage: data.stage,
-        isChatComplete: data.is_complete,
-        isChatRejected: data.is_rejected,
+        isChatComplete: data.is_complete || false,
+        isChatRejected: data.is_rejected || false,
         turnsRemaining: data.turns_remaining || 5,
         turnsUsed: 0,
         scenarioQuestion: data.scenario_question || null,
@@ -200,9 +290,9 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // Send a message in the worker interview
+  // ROUTER: Checks isAddingSkill to choose appropriate chat endpoint
   sendWorkerMessage: async (userMessage) => {
-    const { workerChatId, addChatMessage } = get();
+    const { workerChatId, addChatMessage, isAddingSkill } = get();
 
     if (!workerChatId) {
       console.error("No active worker_chat_id. Initialize a session first.");
@@ -214,43 +304,78 @@ export const createMeZlice = (set, get) => ({
 
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/worker-interview/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          worker_chat_id: parseInt(workerChatId),
-          message: userMessage,
-        }),
-      });
 
-      if (!response.ok) {
-        throw new Error(`Chat turn rejected: ${response.status}`);
-      }
+      if (isAddingSkill) {
+        // ENDPOINT: POST /{worker_chat_id}/add-skill/chat
+        const response = await fetch(`http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ message: userMessage }),
+        });
 
-      const data = await response.json();
+        if (!response.ok) throw new Error(`Add-skill turn failed: ${response.status}`);
 
-      set({
-        aiResponse: data.ai_response,
-        applicantStage: data.stage,
-        isChatComplete: data.is_complete,
-        isChatRejected: data.is_rejected,
-        scenarioQuestion: data.scenario_question || null,
-        turnsUsed: data.turns_used,
-        turnsRemaining: data.turns_remaining,
-      });
+        const data = await response.json();
 
-      set((state) => ({
-        chatMessages: [
-          ...state.chatMessages,
-          { id: crypto.randomUUID(), sender: "assistant", text: data.ai_response },
-        ],
-      }));
+        set({
+          aiResponse: data.ai_response,
+          applicantStage: data.stage,
+          scenarioQuestion: data.scenario_question || null,
+        });
 
-      if (data.is_complete) {
-        get().fetchWorkerSummary();
+        set((state) => ({
+          chatMessages: [
+            ...state.chatMessages,
+            { id: crypto.randomUUID(), sender: "assistant", text: data.ai_response },
+          ],
+        }));
+
+        if (data.stage === "skill_complete" || data.stage === "skill_declined") {
+          await get().fetchWorkerSkills();
+          set({ isAddingSkill: false });
+        }
+
+      } else {
+        // ENDPOINT: POST /worker-interview/chat (Initial category interview)
+        const response = await fetch("http://127.0.0.1:8000/worker-interview/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            worker_chat_id: parseInt(workerChatId),
+            message: userMessage,
+          }),
+        });
+
+        if (!response.ok) throw new Error(`Chat turn rejected: ${response.status}`);
+
+        const data = await response.json();
+
+        set({
+          aiResponse: data.ai_response,
+          applicantStage: data.stage,
+          isChatComplete: data.is_complete,
+          isChatRejected: data.is_rejected,
+          scenarioQuestion: data.scenario_question || null,
+          turnsUsed: data.turns_used,
+          turnsRemaining: data.turns_remaining,
+        });
+
+        set((state) => ({
+          chatMessages: [
+            ...state.chatMessages,
+            { id: crypto.randomUUID(), sender: "assistant", text: data.ai_response },
+          ],
+        }));
+
+        if (data.is_complete) {
+          get().fetchWorkerSummary();
+        }
       }
     } catch (error) {
       console.error("Failed to process chat turn:", error);
@@ -259,7 +384,6 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // Fetch worker interview summary (profile extraction)
   fetchWorkerSummary: async () => {
     const { workerChatId } = get();
     if (!workerChatId) return;
@@ -305,9 +429,6 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // ====================================================
-  // 🛠️ ARCHITECTURAL UPDATE: Hit the correct completion/extraction endpoint!
-  // ====================================================
   submitApplication: async () => {
     const { workerChatId, phoneNumber, addressText, latitude, longitude } = get();
 
@@ -320,9 +441,6 @@ export const createMeZlice = (set, get) => ({
 
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      
-      // Hitting complete instead of raw submit ensures that the profile extractor,
-      // Nvidia vector embeds, and DB properties populate correctly.
       const response = await fetch(`http://127.0.0.1:8000/worker-interview/${workerChatId}/complete`, {
         method: "POST",
         headers: {
@@ -342,14 +460,13 @@ export const createMeZlice = (set, get) => ({
         throw new Error(`Completion / submit pipeline failed: ${response.status}`);
       }
 
-      const data = await response.json();
+      await response.json();
       
       set({
-        applicantStage: "pending_admin_review", // Pushes UI state forward
+        applicantStage: "pending_admin_review",
         applicationSubmitted: true,
       });
 
-      // Refresh applicant and map statuses
       await get().loadApplicantStatus();
     } catch (error) {
       console.error("Failed to complete application process:", error);
@@ -358,7 +475,6 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // Update worker profile (PATCH)
   updateWorkerProfile: async () => {
     const { workerId, editableProfile } = get();
 
@@ -397,7 +513,6 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // Fetch current user base info
   loadUserProfile: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
@@ -424,7 +539,6 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // Update user base info (PUT /users/me)
   updateUserProfile: async () => {
     const { userProfile } = get();
 
@@ -458,7 +572,6 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // Fetch applicant status on load
   loadApplicantStatus: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
@@ -483,12 +596,9 @@ export const createMeZlice = (set, get) => ({
 
         if (data.worker_chat_id) {
           get().fetchChatHistory(data.worker_chat_id);
+          get().fetchWorkerSkills();
         }
 
-        // Populate the worker profile state from the persisted WorkerProfile
-        // so the dashboard no longer shows empty/"None" details after the
-        // application is approved. Prefer the saved WorkerProfile columns;
-        // fall back to any previously extracted interview profile.
         if (
           data.job_category ||
           data.specialities?.length ||
@@ -530,7 +640,6 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // Fetch existing chat history for a worker_chat_id
   fetchChatHistory: async (workerChatId) => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
