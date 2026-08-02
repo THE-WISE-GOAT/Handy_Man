@@ -71,8 +71,8 @@ export default function Dash1Board({ viewSlug }) {
   ];
 
   useEffect(() => {
-    startNewSession();
-  }, [startNewSession]);
+    useCustomerDashboardData.getState().startNewSession();
+  }, []);
 
   useEffect(() => {
     if (!viewSlug) return;
