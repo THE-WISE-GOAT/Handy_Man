@@ -105,14 +105,14 @@ export default function Dash2Board({ viewSlug }) {
   } = useCustomerDashboardData();
 
   useEffect(() => {
-    fetchPendingJobs();
-  }, [fetchPendingJobs]);
+    useCustomerDashboardData.getState().fetchPendingJobs();
+  }, []);
 
   useEffect(() => {
-    const handleFocus = () => { fetchPendingJobs(); };
+    const handleFocus = () => { useCustomerDashboardData.getState().fetchPendingJobs(); };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [fetchPendingJobs]);
+  }, []);
 
   useEffect(() => {
     if (selectedWorkerId && workerCardRefs.current[selectedWorkerId]) {
@@ -125,26 +125,28 @@ export default function Dash2Board({ viewSlug }) {
 
    useEffect(() => {
      if (chatEndRef.current) {
-       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+       chatEndRef.current.scrollIntoView({ behavior: 'auto' });
      }
    }, [chatMessages]);
 
-   useEffect(() => {
-     if (selectedJob) {
-       const bookingChatId = selectedJob.booking_chat_id || selectedJob.id;
-       if (bookingChatId) {
-         fetchChatHistory(bookingChatId);
-       }
-     }
-   }, [selectedJob]);
+    useEffect(() => {
+      if (selectedJob && selectedJob.booking_chat_id) {
+        useCustomerDashboardData.getState().connectCustomerChat(selectedJob.booking_chat_id);
+        useCustomerDashboardData.getState().fetchChatHistory(selectedJob.booking_chat_id);
+      }
+    }, [selectedJob]);
 
-   useEffect(() => {
-     if (!viewSlug) return;
-     if (postingsSlots.main !== viewSlug) {
-       const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
-       if (targetSlot) swapPostingsSlots(targetSlot);
-     }
-   }, [viewSlug, postingsSlots, swapPostingsSlots]);
+    useEffect(() => {
+      if (!viewSlug) return;
+      if (postingsSlots.main !== viewSlug) {
+        const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
+        if (targetSlot) swapPostingsSlots(targetSlot);
+      }
+    }, [viewSlug, postingsSlots, swapPostingsSlots]);
+
+    useEffect(() => {
+      return () => useCustomerDashboardData.getState().disconnectCustomerChat();
+    }, []);
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/customer/postings/${targetSlug}`);
@@ -154,7 +156,7 @@ export default function Dash2Board({ viewSlug }) {
     const handleSendChat = async (e) => {
       e.preventDefault();
       if (!chatInput.trim() || !selectedJob) return;
-      const bookingChatId = selectedJob.booking_chat_id || selectedJob.id;
+      const bookingChatId = selectedJob.booking_chat_id;
       if (!bookingChatId) return;
       try {
         await sendHumanMessage(bookingChatId, "customer", chatInput.trim());
@@ -196,7 +198,7 @@ export default function Dash2Board({ viewSlug }) {
                 )
                 .map((msg) => (
                   <p key={msg.id} className={`chat-msg chat-msg--${msg.sender}`}>
-                    <strong>{msg.sender.toUpperCase()}:</strong> {msg.text}
+                    <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
                   </p>
                 ))}
               <div ref={chatEndRef} />
