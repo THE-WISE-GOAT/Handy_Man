@@ -8,33 +8,31 @@ from src.core.oauth2 import get_current_user
 from src.core import model
 from geoalchemy2 import Geometry
 
-
 router = APIRouter(prefix="/workers", tags=["Workers"])
+
 
 class WorkerLocationsIn(BaseModel):
     worker_chat_ids: list[int]
+
 
 @router.post("/locations", summary="Fetch exact coordinates for a batch of workers")
 def get_worker_locations(
     payload: WorkerLocationsIn,
     db: Session = Depends(get_db),
-    current_user: model.User = Depends(get_current_user)
+    current_user: model.User = Depends(get_current_user),
 ):
     if not payload.worker_chat_ids:
         return {"status": "success", "locations": []}
 
-    stmt = (
-        select(
-            model.WorkerProfile.worker_chat_id,
-            func.ST_Y(cast(model.WorkerProfile.location, Geometry)).label("latitude"),
-            func.ST_X(cast(model.WorkerProfile.location, Geometry)).label("longitude")
-        )
-        .where(
-            model.WorkerProfile.worker_chat_id.in_(payload.worker_chat_ids),
-            model.WorkerProfile.location.isnot(None)
-        )
+    stmt = select(
+        model.WorkerProfile.worker_chat_id,
+        func.ST_Y(cast(model.WorkerProfile.location, Geometry)).label("latitude"),
+        func.ST_X(cast(model.WorkerProfile.location, Geometry)).label("longitude"),
+    ).where(
+        model.WorkerProfile.worker_chat_id.in_(payload.worker_chat_ids),
+        model.WorkerProfile.location.isnot(None),
     )
-    
+
     results = db.execute(stmt).all()
 
     locations = [
@@ -42,7 +40,7 @@ def get_worker_locations(
             "worker_chat_id": row.worker_chat_id,
             "latitude": row.latitude,
             "longitude": row.longitude,
-            "is_interested": False 
+            "is_interested": False,
         }
         for row in results
     ]
@@ -50,11 +48,14 @@ def get_worker_locations(
     return {"status": "success", "locations": locations}
 
 
-@router.get("/jobs/{job_id}/bids", summary="Fetch all bids from JobWorkerMatch for a specific job")
+@router.get(
+    "/jobs/{job_id}/bids",
+    summary="Fetch all bids from JobWorkerMatch for a specific job",
+)
 def get_worker_job_bids(
     job_id: int,
     db: Session = Depends(get_db),
-    current_user: model.User = Depends(get_current_user)
+    current_user: model.User = Depends(get_current_user),
 ):
     job_exists = db.execute(
         select(model.Job).where(model.Job.id == job_id)
@@ -62,22 +63,24 @@ def get_worker_job_bids(
 
     if not job_exists:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Job not found."
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found."
         )
 
     stmt = (
         select(model.JobWorkerMatch, model.WorkerProfile)
-        .join(model.WorkerProfile, model.JobWorkerMatch.worker_id == model.WorkerProfile.id)
+        .join(
+            model.WorkerProfile,
+            model.JobWorkerMatch.worker_id == model.WorkerProfile.id,
+        )
         .where(
             model.JobWorkerMatch.job_id == job_id,
             model.JobWorkerMatch.is_active == True,
-            model.JobWorkerMatch.bid_amount.isnot(None) 
+            model.JobWorkerMatch.bid_amount.isnot(None),
         )
     )
-    
+
     results = db.execute(stmt).all()
-    
+
     formatted_bids = [
         {
             "id": match.id,
@@ -86,10 +89,14 @@ def get_worker_job_bids(
             "amount": float(match.bid_amount),
             "proposal_text": match.bid_message,
             "is_interested": match.is_interested,
-            "status": "Accepted" if match.is_selected else ("Rejected" if match.is_rejected else "Pending"),
-            "created_at": match.created_at
+            "status": (
+                "Accepted"
+                if match.is_selected
+                else ("Rejected" if match.is_rejected else "Pending")
+            ),
+            "created_at": match.created_at,
         }
         for match, worker in results
     ]
-    
+
     return {"status": "success", "bids": formatted_bids}

@@ -1,15 +1,16 @@
 export const createBookingsZlice = (set, get) => ({
   userAddrText: "Bhaktapur, Nepal",
-  userLng: 85.4280,
-  userLat: 27.6710,
+  userLng: 85.428,
+  userLat: 27.671,
 
   setUserAddrText: (text) => set({ userAddrText: text }),
   setUserCoordinates: (lng, lat) => set({ userLng: lng, userLat: lat }),
-  setUserLocation: (address, lng, lat) => set({
-    userAddrText: address,
-    userLng: lng,
-    userLat: lat
-  }),
+  setUserLocation: (address, lng, lat) =>
+    set({
+      userAddrText: address,
+      userLng: lng,
+      userLat: lat,
+    }),
 
   jobDescriptionDraft: "I want to install a smart home manager like alexa....",
   jobTitleDraft: "SMartHoME SeTUP",
@@ -43,19 +44,20 @@ export const createBookingsZlice = (set, get) => ({
   isEditMode: false,
   editingJobId: null,
 
-  loadJobForEdit: (job) => set({
-    isEditMode: true,
-    editingJobId: job.id,
-    booking_chat_id: job.booking_chat_id,
-    jobTitleDraft: job.title || "",
-    jobDescriptionDraft: job.description || "",
-    attachments: job.attachments || [],
-    userName: job.contact_name,
-    userAddrText: job.address_text,
-    userLat: job.latitude,
-    userLng: job.longitude,
-    userCont: job.contact_phone,
-  }),
+  loadJobForEdit: (job) =>
+    set({
+      isEditMode: true,
+      editingJobId: job.id,
+      booking_chat_id: job.booking_chat_id,
+      jobTitleDraft: job.title || "",
+      jobDescriptionDraft: job.description || "",
+      attachments: job.attachments || [],
+      userName: job.contact_name,
+      userAddrText: job.address_text,
+      userLat: job.latitude,
+      userLng: job.longitude,
+      userCont: job.contact_phone,
+    }),
 
   exitEditMode: async () => {
     set({ isEditMode: false, editingJobId: null });
@@ -100,7 +102,7 @@ export const createBookingsZlice = (set, get) => ({
         {
           method: "POST",
           body: formData,
-        }
+        },
       );
 
       if (!response.ok) {
@@ -140,19 +142,22 @@ export const createBookingsZlice = (set, get) => ({
   fetchBookingsPendingJobs: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/jobs/status/pending", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+      const response = await fetch(
+        "http://127.0.0.1:8000/jobs/status/pending",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP Error Status: ${response.status}`);
       }
 
       const data = await response.json();
-      
+
       if (data.status === "success") {
         set({ fetchedJobs: data.tasks });
         set({ activePostsCount: data.tasks.length });
@@ -163,16 +168,16 @@ export const createBookingsZlice = (set, get) => ({
   },
 
   createJob: async () => {
-    const { 
-      booking_chat_id, 
-      jobTitleDraft, 
-      jobDescriptionDraft, 
-      userLng, 
+    const {
+      booking_chat_id,
+      jobTitleDraft,
+      jobDescriptionDraft,
+      userLng,
       userLat,
       userName,
       userCont,
       attachments,
-      fetchBookingsPendingJobs 
+      fetchBookingsPendingJobs,
     } = get();
 
     if (!booking_chat_id) {
@@ -185,44 +190,57 @@ export const createBookingsZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
 
-      const response = await fetch(`http://127.0.0.1:8000/dispatch/${booking_chat_id}/complete`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          edited_description: jobDescriptionDraft || "",
-          location: {
-            longitude: parseFloat(userLng) || 0.0,
-            latitude: parseFloat(userLat) || 0.0
+      const response = await fetch(
+        `http://127.0.0.1:8000/dispatch/${booking_chat_id}/complete`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
-          title: jobTitleDraft || "NEW JOB REQUEST",
-          contact_name: userName || "",
-          contact_phone: userCont || "",
-          status: "pending",
-          mode: "regular",
-          attachments: attachments || []
-        }),
-      });
+          body: JSON.stringify({
+            edited_description: jobDescriptionDraft || "",
+            location: {
+              longitude: parseFloat(userLng) || 0.0,
+              latitude: parseFloat(userLat) || 0.0,
+            },
+            title: jobTitleDraft || "NEW JOB REQUEST",
+            contact_name: userName || "",
+            contact_phone: userCont || "",
+            status: "pending",
+            mode: "regular",
+            attachments: attachments || [],
+          }),
+        },
+      );
 
       if (!response.ok) {
-        throw new Error(`Posting pipeline rejected by server: ${response.status}`);
+        throw new Error(
+          `Posting pipeline rejected by server: ${response.status}`,
+        );
       }
 
       const data = await response.json();
       if (data.status === "success") {
-        console.log("🚀 Success! Job verified, vectorized by Nvidia, and stored securely.");
+        console.log(
+          "🚀 Success! Job verified, vectorized by Nvidia, and stored securely.",
+        );
         set({ attachments: [], isEditMode: false, editingJobId: null });
 
         const { fetchPendingJobs, fetchMatchedWorkersForJob } = get();
         if (typeof fetchPendingJobs === "function") {
           await fetchPendingJobs();
         }
-        
+
         const allPendingJobs = get().pendingJobs || [];
-        const newJob = allPendingJobs.find(j => j.booking_chat_id === booking_chat_id);
-        if (newJob && newJob.id && typeof fetchMatchedWorkersForJob === "function") {
+        const newJob = allPendingJobs.find(
+          (j) => j.booking_chat_id === booking_chat_id,
+        );
+        if (
+          newJob &&
+          newJob.id &&
+          typeof fetchMatchedWorkersForJob === "function"
+        ) {
           await fetchMatchedWorkersForJob(newJob.id);
         }
       }
@@ -231,7 +249,7 @@ export const createBookingsZlice = (set, get) => ({
     } finally {
       set({ isSubmitting: false });
     }
-    
+
     await fetchBookingsPendingJobs();
   },
 
@@ -280,14 +298,19 @@ export const createBookingsZlice = (set, get) => ({
   turns_remaining: 5,
 
   startNewSession: async () => {
-    set({ isAiGenerating: true, attachments: [], isEditMode: false, editingJobId: null });
+    set({
+      isAiGenerating: true,
+      attachments: [],
+      isEditMode: false,
+      editingJobId: null,
+    });
     try {
-      const token = localStorage.getItem("handy_man_access_token"); 
+      const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch("http://127.0.0.1:8000/dispatch/session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -318,20 +341,25 @@ export const createBookingsZlice = (set, get) => ({
             id: crypto.randomUUID(),
             sender: "assistant",
             text: data.ai_response,
-          }
+          },
         ],
       });
     } catch (error) {
-      console.error("❌ Failed to authenticate or establish chat session:", error);
+      console.error(
+        "❌ Failed to authenticate or establish chat session:",
+        error,
+      );
     } finally {
       set({ isAiGenerating: false });
     }
   },
 
   sendCustomerMessage: async (userMessage) => {
-    const { booking_chat_id, addChatMessage } = get(); 
+    const { booking_chat_id, addChatMessage } = get();
     if (!booking_chat_id) {
-      console.error("❌ No active booking_chat_id found. Initialize a session first.");
+      console.error(
+        "❌ No active booking_chat_id found. Initialize a session first.",
+      );
       return;
     }
 
@@ -343,7 +371,7 @@ export const createBookingsZlice = (set, get) => ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           booking_chat_id: parseInt(booking_chat_id),
@@ -355,10 +383,11 @@ export const createBookingsZlice = (set, get) => ({
         throw new Error(`Chat turn rejected by server: ${response.status}`);
       }
 
-      const data = await response.json(); 
-      const primaryCategory = data.categories && data.categories.length > 0 
-        ? data.categories[0].category 
-        : "";
+      const data = await response.json();
+      const primaryCategory =
+        data.categories && data.categories.length > 0
+          ? data.categories[0].category
+          : "";
 
       set({
         booking_chat_id: data.booking_chat_id,
@@ -370,20 +399,31 @@ export const createBookingsZlice = (set, get) => ({
         is_custom_category: data.is_custom_category,
         turns_used: data.turns_used,
         turns_remaining: data.turns_remaining,
-        ...(data.is_complete ? {
-          jobDescriptionDraft: data.problem_description || "",
-          jobTitleDraft: primaryCategory ? primaryCategory.toUpperCase() : "NEW JOB REQUEST"
-        } : {})
+        ...(data.is_complete
+          ? {
+              jobDescriptionDraft: data.problem_description || "",
+              jobTitleDraft: primaryCategory
+                ? primaryCategory.toUpperCase()
+                : "NEW JOB REQUEST",
+            }
+          : {}),
       });
 
       set((state) => ({
         chatMessages: [
           ...state.chatMessages,
-          { id: crypto.randomUUID(), sender: "assistant", text: data.ai_response }
-        ]
+          {
+            id: crypto.randomUUID(),
+            sender: "assistant",
+            text: data.ai_response,
+          },
+        ],
       }));
     } catch (error) {
-      console.error("❌ Failed to process chat turn over secure transport:", error);
+      console.error(
+        "❌ Failed to process chat turn over secure transport:",
+        error,
+      );
     }
   },
 });

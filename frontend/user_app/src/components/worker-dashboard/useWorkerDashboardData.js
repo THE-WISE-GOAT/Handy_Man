@@ -9,5 +9,5 @@ export const useWorkerDashboardData = create((...a) => ({
   ...createWorkspaceZlice(...a),
   ...createScheduledZlice(...a),
   ...createMeZlice(...a),
-  ...createMicsZlice(...a) 
+  ...createMicsZlice(...a),
 }));

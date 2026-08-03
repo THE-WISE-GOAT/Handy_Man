@@ -7,11 +7,7 @@ import "./dash4worker.css";
 export default function Dash4Worker({ viewSlug }) {
   const navigate = useNavigate();
 
-  const {
-    micsSlots,
-    swapMicsSlots,
-    micsEmptyLabel,
-  } = useWorkerDashboardData();
+  const { micsSlots, swapMicsSlots, micsEmptyLabel } = useWorkerDashboardData();
 
   // Route state synchronization layer
   useEffect(() => {
@@ -19,7 +15,7 @@ export default function Dash4Worker({ viewSlug }) {
 
     if (micsSlots.main !== viewSlug) {
       const targetSlot = Object.keys(micsSlots).find(
-        (key) => micsSlots[key] === viewSlug
+        (key) => micsSlots[key] === viewSlug,
       );
 
       if (targetSlot) {
@@ -40,16 +36,12 @@ export default function Dash4Worker({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main center-content">
-          <div className="card-header">
-            ••• EMPTY WORKING STATE
-          </div>
+          <div className="card-header">••• EMPTY WORKING STATE</div>
 
           <div className="main-panel">
             <h2>Mics Portal</h2>
 
-            <div className="fallback-text-large">
-              {micsEmptyLabel}
-            </div>
+            <div className="fallback-text-large">{micsEmptyLabel}</div>
           </div>
         </div>
       );
@@ -60,9 +52,7 @@ export default function Dash4Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("MicsEmpty")}
       >
-        <div className="card-header">
-          ••• EMPTY WORKING STATE
-        </div>
+        <div className="card-header">••• EMPTY WORKING STATE</div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
@@ -71,9 +61,7 @@ export default function Dash4Worker({ viewSlug }) {
                 Sidebar: Mics Dashboard
               </span>
 
-              <p className="card-summary">
-                {micsEmptyLabel}
-              </p>
+              <p className="card-summary">{micsEmptyLabel}</p>
             </>
           ) : (
             <span className="badge">
@@ -97,13 +85,9 @@ export default function Dash4Worker({ viewSlug }) {
 
   return (
     <div className="worker-mics-canvas-grid">
-      <div className="grid-area-main">
-        {resolveModuleBySlot("main")}
-      </div>
+      <div className="grid-area-main">{resolveModuleBySlot("main")}</div>
 
-      <div className="grid-area-sidebar">
-        {resolveModuleBySlot("sidebar")}
-      </div>
+      <div className="grid-area-sidebar">{resolveModuleBySlot("sidebar")}</div>
 
       <div className="grid-area-bottom-left">
         {resolveModuleBySlot("bottomLeft")}
