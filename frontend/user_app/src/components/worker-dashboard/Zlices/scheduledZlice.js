@@ -16,24 +16,25 @@ export const createScheduledZlice = (set) => ({
     main: "ScheduledCalendar",
     sidebar: "ScheduledJobCard",
     bottomLeft: "ClientQueries",
-    bottomRight: "ScheduledMap"
+    bottomRight: "ScheduledMap",
   },
 
   // ==========================================
   // 3. UNIVERSAL SWAPPING ACTION
   // ==========================================
-  swapScheduledSlots: (clickedSlotName) => set((state) => {
-    if (clickedSlotName === "main") return {}; // Ignore if already main
+  swapScheduledSlots: (clickedSlotName) =>
+    set((state) => {
+      if (clickedSlotName === "main") return {}; // Ignore if already main
 
-    const outgoingMain = state.scheduledSlots.main;
-    const incomingTarget = state.scheduledSlots[clickedSlotName];
+      const outgoingMain = state.scheduledSlots.main;
+      const incomingTarget = state.scheduledSlots[clickedSlotName];
 
-    return {
-      scheduledSlots: {
-        ...state.scheduledSlots,
-        main: incomingTarget,
-        [clickedSlotName]: outgoingMain
-      }
-    };
-  })
+      return {
+        scheduledSlots: {
+          ...state.scheduledSlots,
+          main: incomingTarget,
+          [clickedSlotName]: outgoingMain,
+        },
+      };
+    }),
 });
