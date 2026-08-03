@@ -228,29 +228,27 @@ MODEL_NAME = "meta/llama-3.1-8b-instruct"
 EXTRACTION_MODEL_NAME = "meta/llama-3.1-70b-instruct"
 
 EMBEDDING_MODEL_NAME = "nvidia/nv-embed-v1"
-EMBEDDING_DIMENSIONS = 4096          # pgvector column width — a mismatch here
-                                      # fails at INSERT time with a confusing
-                                      # error, so it is checked at the source
+EMBEDDING_DIMENSIONS = 4096  # pgvector column width — a mismatch here
+# fails at INSERT time with a confusing
+# error, so it is checked at the source
 
-MAX_PRETEST_TURNS = 12        # worker messages allowed before the interview
-                               # must resolve to REJECTED or TEST_REQUIRED.
-                               # Raised from 10: RULE 3 now spends one turn
-                               # confirming the trade's baseline scope.
+MAX_PRETEST_TURNS = 12  # worker messages allowed before the interview
+# must resolve to REJECTED or TEST_REQUIRED.
+# Raised from 10: RULE 3 now spends one turn
+# confirming the trade's baseline scope.
 SCENARIO_PASS_THRESHOLD = 75  # score must be STRICTLY GREATER than this
 
-MAX_SPECIALTY_PUSHBACKS = 1   # documented here so the router can assert it;
-                               # RULE 6 STEP C must never loop more than this
+MAX_SPECIALTY_PUSHBACKS = 1  # documented here so the router can assert it;
+# RULE 6 STEP C must never loop more than this
 
 _NIM_MAX_ATTEMPTS = 3
-_NIM_BACKOFF_BASE = 0.6       # seconds; exponential with jitter
+_NIM_BACKOFF_BASE = 0.6  # seconds; exponential with jitter
 
-INITIAL_GREETING = (
-    "Welcome to Kamigo worker registration. What type of work or service do you provide?"
-)
+INITIAL_GREETING = "Welcome to Kamigo worker registration. What type of work or service do you provide?"
 
 REJECTION_TOKEN = "[REJECTED]"
-TEST_TOKEN_RE   = re.compile(r"\[TEST_REQUIRED:\s*(.+?)\]", re.IGNORECASE | re.DOTALL)
-COMPLETE_TOKEN  = "[COMPLETE]"
+TEST_TOKEN_RE = re.compile(r"\[TEST_REQUIRED:\s*(.+?)\]", re.IGNORECASE | re.DOTALL)
+COMPLETE_TOKEN = "[COMPLETE]"
 
 # Emitted by RULE 6 STEP E: the worker passed the general competency test but
 # has no advanced niche to test. Terminal and NON-rejecting — it closes the
@@ -266,7 +264,8 @@ NO_SPECIALITY_TOKEN = "[NO_SPECIALITY]"
 GENERAL_COMPETENCY_SUFFIX = "general competency"
 
 _GENERAL_COMPETENCY_RE = re.compile(
-    r"[-—–:,]?\s*general[\s_-]*competency\s*$", re.IGNORECASE,
+    r"[-—–:,]?\s*general[\s_-]*competency\s*$",
+    re.IGNORECASE,
 )
 
 
@@ -505,18 +504,15 @@ def build_add_skill_messages(
     else:
         context_lines.append("They have no advanced specialities on file yet.")
 
-    return (
-        [
-            {"role": "system", "content": ADD_SKILL_SYSTEM_PROMPT},
-            {"role": "system", "content": " ".join(context_lines)},
-            {"role": "assistant", "content": ADD_SKILL_GREETING},
-        ]
-        + [
-            {"role": t["role"], "content": t.get("content") or ""}
-            for t in turns
-            if t.get("role") in ("user", "assistant")
-        ]
-    )
+    return [
+        {"role": "system", "content": ADD_SKILL_SYSTEM_PROMPT},
+        {"role": "system", "content": " ".join(context_lines)},
+        {"role": "assistant", "content": ADD_SKILL_GREETING},
+    ] + [
+        {"role": t["role"], "content": t.get("content") or ""}
+        for t in turns
+        if t.get("role") in ("user", "assistant")
+    ]
 
 
 # ── Scenario generator prompt ────────────────────────────────────────────────
@@ -614,6 +610,7 @@ Write ONLY the sentences."""
 
 # ── NIM call plumbing ────────────────────────────────────────────────────────
 
+
 def _chat(
     messages: list[dict],
     *,
@@ -650,7 +647,9 @@ def _chat(
             if not content:
                 raise ValueError("NIM returned an empty completion.")
             return content
-        except Exception as exc:  # noqa: BLE001 — deliberately broad; retry then re-raise
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 — deliberately broad; retry then re-raise
             last_error = exc
             if attempt == _NIM_MAX_ATTEMPTS:
                 break
@@ -658,20 +657,27 @@ def _chat(
             delay += random.uniform(0, _NIM_BACKOFF_BASE)
             logger.warning(
                 "NIM %s call failed (attempt %d/%d): %s — retrying in %.2fs",
-                purpose, attempt, _NIM_MAX_ATTEMPTS, exc, delay,
+                purpose,
+                attempt,
+                _NIM_MAX_ATTEMPTS,
+                exc,
+                delay,
             )
             time.sleep(delay)
 
     logger.error("NIM %s call failed after %d attempts.", purpose, _NIM_MAX_ATTEMPTS)
-    raise RuntimeError(f"NIM {purpose} call failed after {_NIM_MAX_ATTEMPTS} attempts.") from last_error
+    raise RuntimeError(
+        f"NIM {purpose} call failed after {_NIM_MAX_ATTEMPTS} attempts."
+    ) from last_error
 
 
 # ── History helpers ───────────────────────────────────────────────────────────
 
+
 def build_fresh_history() -> list[dict]:
     """Seed the conversation with the system prompt and the opening greeting."""
     return [
-        {"role": "system",    "content": INTERVIEWER_SYSTEM_PROMPT},
+        {"role": "system", "content": INTERVIEWER_SYSTEM_PROMPT},
         {"role": "assistant", "content": INITIAL_GREETING},
     ]
 
@@ -698,6 +704,7 @@ def worker_transcript_text(history: list[dict], limit: int = 6000) -> str:
 
 
 # ── Control-signal parsing ───────────────────────────────────────────────────
+
 
 def is_general_competency_test(sub_skill: str) -> bool:
     """True when a TEST_REQUIRED payload is the RULE 6 STEP E fallback."""
@@ -754,6 +761,7 @@ def parse_control_signal(reply: str) -> tuple[str, str | None]:
 
 # ── Scenario generation & grading ────────────────────────────────────────────
 
+
 def generate_scenario(sub_skill: str, model_name: str = MODEL_NAME) -> str:
     """Generate a field-specific test scenario for the claimed sub-skill
     (or the general-competency fallback subject)."""
@@ -763,7 +771,7 @@ def generate_scenario(sub_skill: str, model_name: str = MODEL_NAME) -> str:
     return _chat(
         [
             {"role": "system", "content": SCENARIO_GENERATOR_PROMPT},
-            {"role": "user",   "content": f"Sub-skill to test: {sub_skill}"},
+            {"role": "user", "content": f"Sub-skill to test: {sub_skill}"},
         ],
         model=model_name,
         temperature=0.5,
@@ -815,11 +823,19 @@ def evaluate_answer(
     """
     answer = (answer or "").strip()
     if len(answer) < 15:
-        logger.info("Scenario answer too short to grade (%d chars); auto-fail.", len(answer))
-        return False, 0, "Answer was empty or too short to demonstrate any field knowledge."
+        logger.info(
+            "Scenario answer too short to grade (%d chars); auto-fail.", len(answer)
+        )
+        return (
+            False,
+            0,
+            "Answer was empty or too short to demonstrate any field knowledge.",
+        )
 
     prompt = EVALUATOR_PROMPT_TEMPLATE.format(
-        sub_skill=sub_skill, scenario=scenario, answer=answer,
+        sub_skill=sub_skill,
+        scenario=scenario,
+        answer=answer,
     )
     result = _chat(
         [{"role": "user", "content": prompt}],
@@ -832,7 +848,8 @@ def evaluate_answer(
     score, parsed_ok = _parse_score(result)
     if not parsed_ok:
         logger.error(
-            "Evaluator returned no parseable SCORE line; scoring 0. Raw: %r", result[:500],
+            "Evaluator returned no parseable SCORE line; scoring 0. Raw: %r",
+            result[:500],
         )
 
     return score > SCENARIO_PASS_THRESHOLD, score, result
@@ -866,15 +883,23 @@ def _normalise_job_category(job_category: str) -> str:
     text = (job_category or "").strip().lower()
     text = re.sub(r"\(.*?\)", " ", text)
     text = re.sub(r"[^a-z\s/&-]", " ", text)
-    text = re.sub(r"\b(work|works|worker|service|services|job|jobs|technician|specialist)\b", " ", text)
+    text = re.sub(
+        r"\b(work|works|worker|service|services|job|jobs|technician|specialist)\b",
+        " ",
+        text,
+    )
     text = re.sub(r"\s+", " ", text).strip(" -/&")
     return text or (job_category or "").strip().lower()
 
 
 def _baseline_cache_key(job_category: str, excluded: list[str]) -> str:
     payload = json.dumps(
-        {"job": _normalise_job_category(job_category),
-         "excluded": sorted({e.strip().lower() for e in excluded if e and e.strip()})},
+        {
+            "job": _normalise_job_category(job_category),
+            "excluded": sorted(
+                {e.strip().lower() for e in excluded if e and e.strip()}
+            ),
+        },
         sort_keys=True,
     )
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()
@@ -930,7 +955,9 @@ def generate_baseline_scope(
     sent drainage jobs.
     """
     if not (job_category or "").strip():
-        raise ValueError("job_category must not be empty when generating baseline scope.")
+        raise ValueError(
+            "job_category must not be empty when generating baseline scope."
+        )
 
     excluded = [e.strip() for e in (excluded_tasks or []) if e and e.strip()]
     cache_key = _baseline_cache_key(job_category, excluded)
@@ -959,7 +986,7 @@ def generate_baseline_scope(
         text = _chat(
             [
                 {"role": "system", "content": BASELINE_SCOPE_PROMPT},
-                {"role": "user",   "content": "\n".join(user_lines)},
+                {"role": "user", "content": "\n".join(user_lines)},
             ],
             model=model_name,
             temperature=0.0 if attempt == 1 else 0.2,
@@ -972,7 +999,10 @@ def generate_baseline_scope(
             break
         logger.warning(
             "Baseline scope for %r rejected on attempt %d (%s): %r",
-            normalised, attempt, problem, text[:200],
+            normalised,
+            attempt,
+            problem,
+            text[:200],
         )
         user_lines.append(
             f"Your previous attempt was rejected because it {problem}. "
@@ -1006,15 +1036,21 @@ def _clean_description_text(text: str) -> str:
         text = text.rsplit("```", 1)[0]
     text = re.sub(
         r"^\s*(baseline scope|scope of work|description|job description|answer)\s*[:\-]\s*",
-        "", text, flags=re.IGNORECASE,
+        "",
+        text,
+        flags=re.IGNORECASE,
     )
-    lines = [re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", line).strip() for line in text.splitlines()]
+    lines = [
+        re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", line).strip()
+        for line in text.splitlines()
+    ]
     text = " ".join(line for line in lines if line)
     text = re.sub(r"\s+", " ", text).strip().strip('"“”')
     return text
 
 
 # ── Description composition ──────────────────────────────────────────────────
+
 
 def _compose_job_description(
     baseline_scope: str,
@@ -1058,6 +1094,7 @@ def _compose_job_description(
 
 # ── Extraction pipeline ──────────────────────────────────────────────────────
 
+
 def _vocabulary_anchor_block(candidate_categories: list[str]) -> str:
     """
     Render the matched categories' own tag descriptions so the extraction
@@ -1069,7 +1106,9 @@ def _vocabulary_anchor_block(candidate_categories: list[str]) -> str:
     """
     if not candidate_categories:
         return ""
-    lines = ["\nVOCABULARY REFERENCE — words and phrasing customers use for this kind of work:"]
+    lines = [
+        "\nVOCABULARY REFERENCE — words and phrasing customers use for this kind of work:"
+    ]
     for category in candidate_categories:
         tags = SERVICE_REGISTRY.get(category, {})
         description = CATEGORY_DESCRIPTIONS.get(category, "")
@@ -1227,7 +1266,9 @@ Rules:
 Output ONLY a JSON object of the form {"excluded": ["...", "..."]} with no other text."""
 
 
-def detect_scope_exclusions(history: list[dict], model_name: str = MODEL_NAME) -> list[str]:
+def detect_scope_exclusions(
+    history: list[dict], model_name: str = MODEL_NAME
+) -> list[str]:
     """
     Find the baseline tasks the worker explicitly denied in RULE 4.
 
@@ -1283,7 +1324,7 @@ def _strip_json_fences(raw: str) -> str:
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end > start:
-            raw = raw[start:end + 1]
+            raw = raw[start : end + 1]
     return raw
 
 
@@ -1334,18 +1375,25 @@ def extract_worker_profile(
 
     worker_text = worker_transcript_text(history)
     if not worker_text:
-        raise ValueError("Interview history contains no worker messages to extract from.")
+        raise ValueError(
+            "Interview history contains no worker messages to extract from."
+        )
 
     try:
         candidate_categories = _shortlist_categories(worker_text, top_k=3)
     except Exception as exc:  # noqa: BLE001
         # The shortlist is a vocabulary hint, not a requirement. An embedding
         # hiccup here must not cost the worker their registration.
-        logger.warning("Category shortlist failed (%s); continuing without anchor.", exc)
+        logger.warning(
+            "Category shortlist failed (%s); continuing without anchor.", exc
+        )
         candidate_categories = []
 
     prompt = _build_extraction_prompt(
-        pending_sub_skill, has_verified_specialty, scenario_score, candidate_categories,
+        pending_sub_skill,
+        has_verified_specialty,
+        scenario_score,
+        candidate_categories,
     )
 
     raw = _chat(
@@ -1388,14 +1436,18 @@ def extract_worker_profile(
         if exclusions:
             logger.info(
                 "Worker excluded %d baseline task(s) for %r: %s",
-                len(exclusions), profile.job_category, exclusions,
+                len(exclusions),
+                profile.job_category,
+                exclusions,
             )
     except Exception as exc:  # noqa: BLE001
         # Falling back to the model's own text keeps registration alive; the
         # worker matches less well on ordinary jobs until this is regenerated.
         logger.error(
             "Baseline scope generation failed for %r (%s); "
-            "falling back to extraction text only.", profile.job_category, exc,
+            "falling back to extraction text only.",
+            profile.job_category,
+            exc,
         )
 
     # If baseline generation failed outright, the extraction text is all there
@@ -1422,13 +1474,17 @@ def extract_worker_profile(
     if problem is not None:
         logger.warning(
             "Final job_description for %r %s: %r",
-            profile.job_category, problem, profile.job_description[:200],
+            profile.job_category,
+            problem,
+            profile.job_description[:200],
         )
 
     # Light normalisation, same spirit as the customer pipeline's
     # _sanitize_tag_list / _sanitize_categories.
     profile.specialities = _sanitize_tag_list(profile.specialities, max_count=4)
-    profile.category_tag = _slugify_tag(profile.category_tag) or profile.category_tag.strip().lower()
+    profile.category_tag = (
+        _slugify_tag(profile.category_tag) or profile.category_tag.strip().lower()
+    )
     profile.is_custom_category = profile.category_tag not in PROBLEM_CATEGORIES
     profile.job_category = (profile.job_category or "").strip().lower()
     if profile.years_experience is not None:
@@ -1505,7 +1561,7 @@ def generate_speciality_description(
             text = _chat(
                 [
                     {"role": "system", "content": SPECIALITY_DESCRIPTION_PROMPT},
-                    {"role": "user",   "content": "\n\n".join(user_lines)},
+                    {"role": "user", "content": "\n\n".join(user_lines)},
                 ],
                 model=model_name,
                 temperature=0.0 if attempt == 1 else 0.2,
@@ -1513,7 +1569,9 @@ def generate_speciality_description(
                 purpose="speciality-description",
             )
         except Exception as exc:  # noqa: BLE001
-            logger.error("Speciality description call failed (%s); using fallback.", exc)
+            logger.error(
+                "Speciality description call failed (%s); using fallback.", exc
+            )
             break
 
         text = _clean_description_text(text)
@@ -1522,7 +1580,10 @@ def generate_speciality_description(
             return text
         logger.warning(
             "Speciality description for %r rejected on attempt %d (%s): %r",
-            sub_skill, attempt, problem, text[:200],
+            sub_skill,
+            attempt,
+            problem,
+            text[:200],
         )
         user_lines.append(
             f"Your previous attempt was rejected because it {problem}. "
@@ -1545,7 +1606,9 @@ def generate_speciality_description(
 _EMBED_URL = "https://integrate.api.nvidia.com/v1/embeddings"
 
 
-async def get_worker_description_embedding(text: str, *, max_attempts: int = 3) -> list[float]:
+async def get_worker_description_embedding(
+    text: str, *, max_attempts: int = 3
+) -> list[float]:
     """
     Generate a 4096-dim embedding for a worker job description via
     NVIDIA nv-embed-v1.
@@ -1605,11 +1668,18 @@ async def get_worker_description_embedding(text: str, *, max_attempts: int = 3) 
 
             if attempt == max_attempts:
                 break
-            delay = _NIM_BACKOFF_BASE * (2 ** (attempt - 1)) + random.uniform(0, _NIM_BACKOFF_BASE)
+            delay = _NIM_BACKOFF_BASE * (2 ** (attempt - 1)) + random.uniform(
+                0, _NIM_BACKOFF_BASE
+            )
             logger.warning(
                 "Embedding call failed (attempt %d/%d): %s — retrying in %.2fs",
-                attempt, max_attempts, last_error, delay,
+                attempt,
+                max_attempts,
+                last_error,
+                delay,
             )
             await asyncio.sleep(delay)
 
-    raise RuntimeError(f"Embedding request failed after {max_attempts} attempts.") from last_error
+    raise RuntimeError(
+        f"Embedding request failed after {max_attempts} attempts."
+    ) from last_error

@@ -6,7 +6,6 @@ from src.core import model, schema
 from src.core.utils import hash_password
 from src.database.database import engine, get_db
 
-
 router = APIRouter(
     prefix="/auth",  # sets the prefix for all API endpoints same  for this router
     tags=[

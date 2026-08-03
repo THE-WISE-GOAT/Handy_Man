@@ -46,8 +46,10 @@ from src.core.schema import CustomerProblemSchema, CategoryMatch
 logger = logging.getLogger(__name__)
 
 # Force Python to search one directory layer up
-base_dir = Path(__file__).resolve().parent.parent.parent  # Steps out of ai -> src -> backend
-env_path = base_dir.parent / ".env"                       # Targets the root folder .env
+base_dir = (
+    Path(__file__).resolve().parent.parent.parent
+)  # Steps out of ai -> src -> backend
+env_path = base_dir.parent / ".env"  # Targets the root folder .env
 
 load_dotenv(dotenv_path=env_path)
 
@@ -61,14 +63,13 @@ _nvidia_client = OpenAI(
 )
 
 MODEL_NAME = "meta/llama-3.1-8b-instruct"
-MAX_TURNS         = 20  # customer messages; endpoint enforces this
-INITIAL_GREETING  = "Hi! What's going on — what's broken and what's happening?"
+MAX_TURNS = 20  # customer messages; endpoint enforces this
+INITIAL_GREETING = "Hi! What's going on — what's broken and what's happening?"
 
 SYSTEM_PROMPT = (
     "You are a friendly, efficient dispatch assistant for a multi-service platform. "
     "Customers can book help for a wide range of services — home repairs, cleaning, "
     "automotive, beauty, tutoring, healthcare, events, and more.\n\n"
-
     "SCOPE — READ CAREFULLY:\n"
     "- You exist for exactly one purpose: figuring out what JOB or SERVICE PROBLEM a "
     "customer needs a worker dispatched for.\n"
@@ -81,7 +82,6 @@ SYSTEM_PROMPT = (
     "- This applies for the entire conversation, not just the first message. If a "
     "customer starts on-topic and drifts off-topic, redirect them back without answering "
     "the off-topic part.\n\n"
-
     "WHAT YOU NEED, AND WHOSE JOB IT IS:\n"
     "You need exactly TWO things before you can close this conversation:\n"
     "  1. WHAT IS ACTUALLY NEEDED — a concrete, physical description of the task: what "
@@ -98,7 +98,6 @@ SYSTEM_PROMPT = (
     "the category, that is expected and fine — simply continue asking about the TASK "
     "itself (what needs doing, to what, where) until you have enough detail, without ever "
     "asking them to classify it.\n\n"
-
     "DETAIL CHECKLIST — what a good answer contains:\n"
     "A worker reading only the final summary should be able to picture the job and "
     "turn up with the right skills and tools. Before you finish, try to have learned "
@@ -123,7 +122,6 @@ SYSTEM_PROMPT = (
     "what the worker does or brings. Never run through this list mechanically, never "
     "ask about something the customer already covered, and never ask for a detail that "
     "obviously doesn't apply to the job in front of you.\n\n"
-
     "STYLE RULES:\n"
     "- Keep every reply to 1–2 short sentences. Never write long paragraphs.\n"
     "- Always acknowledge what the customer just told you before asking anything. "
@@ -137,7 +135,6 @@ SYSTEM_PROMPT = (
     "- Prioritize getting a SPECIFIC physical description over closing quickly. Reaching "
     "[COMPLETE] with a vague description (e.g. 'something with the tank') is worse than "
     "asking one more question to pin down exactly what's needed.\n\n"
-
     "WHEN A JOB DOESN'T FIT A TYPICAL EXAMPLE:\n"
     "- Do not refuse a real job just because it sounds unusual. Gather a clear physical "
     "description and proceed normally — an unfamiliar job is still a job.\n"
@@ -146,7 +143,6 @@ SYSTEM_PROMPT = (
     "to in-home care, writing or coding something, general chit-chat, shopping requests, "
     "etc.). In that case, explain you can only help book hands-on service work and ask "
     "them to describe a job, instead of moving toward completion.\n\n"
-
     "ATTACHMENTS:\n"
     "- You are text-only. You cannot receive, view, or store photos, files, "
     "measurements-as-images, or any other attachment in this chat, even if the "
@@ -169,7 +165,6 @@ SYSTEM_PROMPT = (
     "- A promised attachment never substitutes for a word description. Keep asking "
     "for the physical details you still need (what's wrong, what size/type in their "
     "own words, etc.) as normal.\n\n"
-
     "COMPLETION RULES:\n"
     "- The moment you have a specific, concrete description of the task AND the request "
     "is a genuine dispatchable job, write a short reassuring confirmation and end your "
@@ -196,232 +191,213 @@ SYSTEM_PROMPT = (
 # matches, not an exhaustive whitelist — see module docstring.
 
 SERVICE_REGISTRY: dict[str, dict[str, str]] = {
-
     # Home infrastructure
     "plumbing": {
-        "leak-detection":       "Locating the source of a water leak in pipes, walls, or fixtures",
-        "pipe-repair":          "Repairing or replacing damaged water or drainage pipes",
-        "pipe-welding":         "Welding or joining metal pipes",
-        "sewer-inspection":     "Camera inspection of sewer lines for blockages or damage",
-        "clog-removal":         "Clearing a clogged drain, toilet, or pipe",
-        "water-heater-repair":  "Repairing or servicing a water heater or geyser",
-        "water-tank-cleaning":  "Draining, scrubbing, and disinfecting a water storage tank",
-        "faucet-replacement":   "Replacing a kitchen or bathroom faucet or tap",
-        "toilet-repair":        "Fixing a running, leaking, or clogged toilet",
-        "water-pump-repair":    "Repairing or replacing a domestic water pump",
+        "leak-detection": "Locating the source of a water leak in pipes, walls, or fixtures",
+        "pipe-repair": "Repairing or replacing damaged water or drainage pipes",
+        "pipe-welding": "Welding or joining metal pipes",
+        "sewer-inspection": "Camera inspection of sewer lines for blockages or damage",
+        "clog-removal": "Clearing a clogged drain, toilet, or pipe",
+        "water-heater-repair": "Repairing or servicing a water heater or geyser",
+        "water-tank-cleaning": "Draining, scrubbing, and disinfecting a water storage tank",
+        "faucet-replacement": "Replacing a kitchen or bathroom faucet or tap",
+        "toilet-repair": "Fixing a running, leaking, or clogged toilet",
+        "water-pump-repair": "Repairing or replacing a domestic water pump",
     },
-
     "electrical": {
-        "wiring-repair":            "Fixing damaged, exposed, or faulty wiring",
-        "circuit-breaker-repair":   "Diagnosing or repairing a tripped or faulty breaker / MCB",
-        "outlet-installation":      "Installing or replacing electrical outlets or sockets",
-        "electrical-inspection":    "General safety inspection of an electrical system",
-        "lighting-installation":    "Installing light fixtures, switches, or ceiling fans",
-        "generator-repair":         "Repairing or servicing a backup generator or inverter",
+        "wiring-repair": "Fixing damaged, exposed, or faulty wiring",
+        "circuit-breaker-repair": "Diagnosing or repairing a tripped or faulty breaker / MCB",
+        "outlet-installation": "Installing or replacing electrical outlets or sockets",
+        "electrical-inspection": "General safety inspection of an electrical system",
+        "lighting-installation": "Installing light fixtures, switches, or ceiling fans",
+        "generator-repair": "Repairing or servicing a backup generator or inverter",
         "solar-panel-installation": "Installing or maintaining solar panels and inverter systems",
-        "earthing-installation":    "Installing or repairing electrical grounding / earthing",
-        "meter-box-work":           "Work on electricity meters, distribution boards, or consumer units",
+        "earthing-installation": "Installing or repairing electrical grounding / earthing",
+        "meter-box-work": "Work on electricity meters, distribution boards, or consumer units",
     },
-
     "construction": {
-        "roof-repair":         "Fixing roof leaks, missing tiles/shingles, or storm damage",
-        "door-repair":         "Fixing a stuck, broken, or off-hinge door",
-        "window-repair":       "Fixing a cracked, stuck, or broken window",
-        "wall-patching":       "Patching holes or cracks in drywall, plaster, or brick",
-        "flooring-repair":     "Fixing damaged, loose, warped, or cracked flooring",
-        "ceiling-repair":      "Fixing a leaking, cracked, or sagging ceiling",
-        "tiling":              "Laying or repairing floor or wall tiles",
-        "waterproofing":       "Applying waterproof coating to roofs, bathrooms, or terraces",
-        "demolition":          "Controlled demolition of walls, structures, or fittings",
-        "masonry":             "Brickwork, stonework, concrete repair, or block construction",
-        "staircase-repair":    "Fixing or replacing stairs, railings, or banisters",
-        "lock-repair":         "Fixing or replacing a broken door or window lock",
+        "roof-repair": "Fixing roof leaks, missing tiles/shingles, or storm damage",
+        "door-repair": "Fixing a stuck, broken, or off-hinge door",
+        "window-repair": "Fixing a cracked, stuck, or broken window",
+        "wall-patching": "Patching holes or cracks in drywall, plaster, or brick",
+        "flooring-repair": "Fixing damaged, loose, warped, or cracked flooring",
+        "ceiling-repair": "Fixing a leaking, cracked, or sagging ceiling",
+        "tiling": "Laying or repairing floor or wall tiles",
+        "waterproofing": "Applying waterproof coating to roofs, bathrooms, or terraces",
+        "demolition": "Controlled demolition of walls, structures, or fittings",
+        "masonry": "Brickwork, stonework, concrete repair, or block construction",
+        "staircase-repair": "Fixing or replacing stairs, railings, or banisters",
+        "lock-repair": "Fixing or replacing a broken door or window lock",
     },
-
     # Climate & appliances
     "hvac": {
-        "ac-installation":      "Installing a new air conditioning unit",
-        "ac-repair":            "Diagnosing and repairing a malfunctioning AC unit",
-        "ac-cleaning":          "Deep cleaning of AC filters, coils, and drainage",
-        "ac-gas-refill":        "Recharging refrigerant / gas in an AC system",
-        "heater-repair":        "Repairing a room heater, storage heater, or heat pump",
-        "ventilation-repair":   "Fixing exhaust fans, ventilation ducts, or air handlers",
-        "duct-cleaning":        "Cleaning HVAC ductwork and vents",
+        "ac-installation": "Installing a new air conditioning unit",
+        "ac-repair": "Diagnosing and repairing a malfunctioning AC unit",
+        "ac-cleaning": "Deep cleaning of AC filters, coils, and drainage",
+        "ac-gas-refill": "Recharging refrigerant / gas in an AC system",
+        "heater-repair": "Repairing a room heater, storage heater, or heat pump",
+        "ventilation-repair": "Fixing exhaust fans, ventilation ducts, or air handlers",
+        "duct-cleaning": "Cleaning HVAC ductwork and vents",
     },
-
     "appliance-repair": {
         "washing-machine-repair": "Repairing a front-load or top-load washing machine",
-        "refrigerator-repair":    "Repairing a fridge, freezer, or refrigerator-freezer combo",
-        "oven-repair":            "Repairing a gas or electric oven, stove, or range",
-        "microwave-repair":       "Repairing a microwave oven",
-        "dishwasher-repair":      "Repairing a built-in or freestanding dishwasher",
-        "tv-repair":              "Repairing a television set",
-        "water-purifier-repair":  "Repairing or servicing an RO or UV water purifier",
-        "mixer-grinder-repair":   "Repairing kitchen mixers, grinders, or blenders",
-        "iron-repair":            "Repairing a clothes iron or steam iron",
+        "refrigerator-repair": "Repairing a fridge, freezer, or refrigerator-freezer combo",
+        "oven-repair": "Repairing a gas or electric oven, stove, or range",
+        "microwave-repair": "Repairing a microwave oven",
+        "dishwasher-repair": "Repairing a built-in or freestanding dishwasher",
+        "tv-repair": "Repairing a television set",
+        "water-purifier-repair": "Repairing or servicing an RO or UV water purifier",
+        "mixer-grinder-repair": "Repairing kitchen mixers, grinders, or blenders",
+        "iron-repair": "Repairing a clothes iron or steam iron",
     },
-
     # Cleaning & hygiene
     "cleaning": {
-        "home-cleaning":              "Regular or one-time cleaning of a house or apartment",
-        "deep-cleaning":              "Thorough top-to-bottom cleaning including hard-to-reach areas",
-        "office-cleaning":            "Cleaning commercial office or workspace premises",
-        "carpet-cleaning":            "Steam or dry cleaning of carpets and rugs",
-        "sofa-cleaning":              "Deep cleaning of upholstered sofas and chairs",
-        "kitchen-cleaning":           "Deep cleaning of kitchen surfaces, appliances, and cabinets",
-        "bathroom-sanitisation":      "Disinfection and scrubbing of bathrooms and toilets",
-        "window-cleaning":            "Cleaning interior and exterior glass windows",
-        "tank-cleaning":              "Cleaning overhead or underground water storage tanks",
+        "home-cleaning": "Regular or one-time cleaning of a house or apartment",
+        "deep-cleaning": "Thorough top-to-bottom cleaning including hard-to-reach areas",
+        "office-cleaning": "Cleaning commercial office or workspace premises",
+        "carpet-cleaning": "Steam or dry cleaning of carpets and rugs",
+        "sofa-cleaning": "Deep cleaning of upholstered sofas and chairs",
+        "kitchen-cleaning": "Deep cleaning of kitchen surfaces, appliances, and cabinets",
+        "bathroom-sanitisation": "Disinfection and scrubbing of bathrooms and toilets",
+        "window-cleaning": "Cleaning interior and exterior glass windows",
+        "tank-cleaning": "Cleaning overhead or underground water storage tanks",
         "post-construction-cleaning": "Cleaning a space after renovation or construction work",
     },
-
     "pest-control": {
         "cockroach-treatment": "Targeted treatment to eliminate cockroach infestations",
-        "termite-treatment":   "Chemical or non-chemical treatment for termites / white ants",
-        "rodent-control":      "Trapping or exterminating rats and mice",
-        "mosquito-treatment":  "Fogging or spraying to control mosquito populations",
-        "bed-bug-treatment":   "Heat or chemical treatment to eliminate bed bugs",
-        "ant-control":         "Removing ant colonies from structures or gardens",
-        "general-fumigation":  "Full-property fumigation for multiple pest types",
+        "termite-treatment": "Chemical or non-chemical treatment for termites / white ants",
+        "rodent-control": "Trapping or exterminating rats and mice",
+        "mosquito-treatment": "Fogging or spraying to control mosquito populations",
+        "bed-bug-treatment": "Heat or chemical treatment to eliminate bed bugs",
+        "ant-control": "Removing ant colonies from structures or gardens",
+        "general-fumigation": "Full-property fumigation for multiple pest types",
     },
-
     # Outdoor & vehicle
     "landscaping": {
-        "lawn-mowing":        "Cutting and trimming grass on lawns",
+        "lawn-mowing": "Cutting and trimming grass on lawns",
         "garden-maintenance": "General upkeep of plants, beds, and borders",
-        "tree-trimming":      "Pruning or trimming trees and large shrubs",
-        "tree-removal":       "Felling and removal of a dead or hazardous tree",
-        "landscape-design":   "Planning and designing an outdoor garden layout",
-        "irrigation-setup":   "Installing or repairing drip or sprinkler irrigation systems",
-        "pathway-paving":     "Laying or repairing garden paths, driveways, or patios",
+        "tree-trimming": "Pruning or trimming trees and large shrubs",
+        "tree-removal": "Felling and removal of a dead or hazardous tree",
+        "landscape-design": "Planning and designing an outdoor garden layout",
+        "irrigation-setup": "Installing or repairing drip or sprinkler irrigation systems",
+        "pathway-paving": "Laying or repairing garden paths, driveways, or patios",
         "fence-installation": "Installing or repairing garden fencing or walls",
-        "plant-care":         "Watering, fertilising, and nurturing indoor or outdoor plants",
+        "plant-care": "Watering, fertilising, and nurturing indoor or outdoor plants",
     },
-
     "painting": {
-        "interior-painting":   "Painting walls, ceilings, or interior woodwork inside a building",
-        "exterior-painting":   "Painting outside walls, facades, or exterior woodwork",
+        "interior-painting": "Painting walls, ceilings, or interior woodwork inside a building",
+        "exterior-painting": "Painting outside walls, facades, or exterior woodwork",
         "waterproof-painting": "Applying weather-resistant or waterproof paint coatings",
-        "texture-painting":    "Applying textured or decorative paint finishes",
-        "furniture-painting":  "Repainting or refinishing wooden or metal furniture",
-        "metal-painting":      "Painting gates, grilles, railings, or metal structures",
-        "wall-priming":        "Applying primer coats before finishing paint",
-        "epoxy-flooring":      "Applying epoxy or resin coatings to concrete floors",
+        "texture-painting": "Applying textured or decorative paint finishes",
+        "furniture-painting": "Repainting or refinishing wooden or metal furniture",
+        "metal-painting": "Painting gates, grilles, railings, or metal structures",
+        "wall-priming": "Applying primer coats before finishing paint",
+        "epoxy-flooring": "Applying epoxy or resin coatings to concrete floors",
     },
-
     "moving": {
-        "home-relocation":   "Packing and moving all household belongings to a new address",
+        "home-relocation": "Packing and moving all household belongings to a new address",
         "office-relocation": "Moving office furniture and equipment to a new premises",
-        "furniture-moving":  "Moving heavy or bulky furniture within or between properties",
-        "packing-service":   "Professional packing of items for transport or storage",
+        "furniture-moving": "Moving heavy or bulky furniture within or between properties",
+        "packing-service": "Professional packing of items for transport or storage",
         "loading-unloading": "Loading or unloading a truck or van at a property",
         "vehicle-transport": "Transporting a car or bike on a flatbed or trailer",
-        "storage-service":   "Short or long-term storage of household or business items",
-        "courier-delivery":  "Pickup and delivery of small parcels or documents",
+        "storage-service": "Short or long-term storage of household or business items",
+        "courier-delivery": "Pickup and delivery of small parcels or documents",
     },
-
     "automotive": {
-        "car-wash":              "Exterior and interior cleaning of a car or SUV",
-        "oil-change":            "Draining and replacing engine oil and oil filter",
-        "tyre-change":           "Removing and fitting new or spare tyres",
-        "tyre-puncture-repair":  "Patching or plugging a punctured tyre",
-        "battery-replacement":   "Replacing a flat or dead car battery",
-        "car-denting-painting":  "Repairing dents and repainting body panels",
-        "car-ac-repair":         "Diagnosing or repairing a vehicle air conditioning system",
+        "car-wash": "Exterior and interior cleaning of a car or SUV",
+        "oil-change": "Draining and replacing engine oil and oil filter",
+        "tyre-change": "Removing and fitting new or spare tyres",
+        "tyre-puncture-repair": "Patching or plugging a punctured tyre",
+        "battery-replacement": "Replacing a flat or dead car battery",
+        "car-denting-painting": "Repairing dents and repainting body panels",
+        "car-ac-repair": "Diagnosing or repairing a vehicle air conditioning system",
         "car-electrical-repair": "Fixing electrical faults in a vehicle",
-        "car-inspection":        "General vehicle health and safety inspection",
-        "roadside-assistance":   "Emergency help for a broken-down or stranded vehicle",
-        "bike-service":          "Routine service or repair of a motorcycle or scooter",
+        "car-inspection": "General vehicle health and safety inspection",
+        "roadside-assistance": "Emergency help for a broken-down or stranded vehicle",
+        "bike-service": "Routine service or repair of a motorcycle or scooter",
     },
-
     # Tech & security
     "it-support": {
-        "computer-repair":       "Diagnosing and repairing desktop or laptop hardware faults",
-        "virus-removal":         "Removing malware, viruses, or spyware from a device",
-        "data-recovery":         "Recovering lost or deleted files from storage devices",
+        "computer-repair": "Diagnosing and repairing desktop or laptop hardware faults",
+        "virus-removal": "Removing malware, viruses, or spyware from a device",
+        "data-recovery": "Recovering lost or deleted files from storage devices",
         "software-installation": "Installing or configuring operating systems or software",
-        "network-setup":         "Setting up or troubleshooting a home or office network",
-        "wifi-troubleshooting":  "Diagnosing and fixing Wi-Fi connectivity issues",
-        "printer-setup":         "Connecting, configuring, or repairing a printer",
-        "cctv-installation":     "Installing CCTV cameras and recording systems",
-        "phone-repair":          "Repairing cracked screens, batteries, or hardware on smartphones",
-        "smart-home-setup":      "Installing smart bulbs, plugs, doorbells, or home automation",
+        "network-setup": "Setting up or troubleshooting a home or office network",
+        "wifi-troubleshooting": "Diagnosing and fixing Wi-Fi connectivity issues",
+        "printer-setup": "Connecting, configuring, or repairing a printer",
+        "cctv-installation": "Installing CCTV cameras and recording systems",
+        "phone-repair": "Repairing cracked screens, batteries, or hardware on smartphones",
+        "smart-home-setup": "Installing smart bulbs, plugs, doorbells, or home automation",
     },
-
     "security": {
-        "cctv-installation":     "Installing indoor or outdoor CCTV surveillance cameras",
-        "alarm-installation":    "Installing burglar alarms or motion-sensor alert systems",
+        "cctv-installation": "Installing indoor or outdoor CCTV surveillance cameras",
+        "alarm-installation": "Installing burglar alarms or motion-sensor alert systems",
         "intercom-installation": "Installing video or audio intercom / doorbell systems",
-        "safe-installation":     "Installing a wall or floor safe",
-        "access-control":        "Installing key-card, fingerprint, or pin-access door locks",
-        "electric-fence":        "Installing or repairing electric security fencing",
-        "security-audit":        "Assessing physical security vulnerabilities of a property",
+        "safe-installation": "Installing a wall or floor safe",
+        "access-control": "Installing key-card, fingerprint, or pin-access door locks",
+        "electric-fence": "Installing or repairing electric security fencing",
+        "security-audit": "Assessing physical security vulnerabilities of a property",
     },
-
     # Personal & wellness
     "beauty-wellness": {
-        "haircut-home":      "Home visit for a haircut, trim, or hair styling",
-        "hair-colour":       "Hair colouring, highlights, or bleaching service",
-        "facial-treatment":  "Skin care facial treatment at home",
-        "massage-therapy":   "Relaxation or therapeutic massage at home",
+        "haircut-home": "Home visit for a haircut, trim, or hair styling",
+        "hair-colour": "Hair colouring, highlights, or bleaching service",
+        "facial-treatment": "Skin care facial treatment at home",
+        "massage-therapy": "Relaxation or therapeutic massage at home",
         "manicure-pedicure": "Nail care and grooming for hands and feet",
-        "waxing":            "Hair removal waxing service at home",
-        "bridal-makeup":     "Professional makeup for a wedding or special event",
-        "mehendi":           "Henna / mehendi application for hands or feet",
-        "spa-at-home":       "Full spa package at the customer's location",
+        "waxing": "Hair removal waxing service at home",
+        "bridal-makeup": "Professional makeup for a wedding or special event",
+        "mehendi": "Henna / mehendi application for hands or feet",
+        "spa-at-home": "Full spa package at the customer's location",
     },
-
     "fitness": {
-        "personal-training":   "One-on-one fitness coaching and workout sessions at home",
-        "yoga-instruction":    "Guided yoga sessions at home or a preferred location",
-        "zumba-dance":         "Aerobic dance fitness sessions",
-        "physiotherapy":       "Therapeutic exercises and physical rehabilitation at home",
-        "diet-consultation":   "Personalised nutrition and diet planning session",
+        "personal-training": "One-on-one fitness coaching and workout sessions at home",
+        "yoga-instruction": "Guided yoga sessions at home or a preferred location",
+        "zumba-dance": "Aerobic dance fitness sessions",
+        "physiotherapy": "Therapeutic exercises and physical rehabilitation at home",
+        "diet-consultation": "Personalised nutrition and diet planning session",
         "gym-equipment-setup": "Assembling or installing home gym equipment",
     },
-
     # Professional services
     "tutoring": {
-        "school-tutoring":  "Academic tutoring for school-level subjects",
+        "school-tutoring": "Academic tutoring for school-level subjects",
         "exam-preparation": "Coaching for entrance exams, board exams, or competitive tests",
         "language-lessons": "Teaching a new language (English, Mandarin, etc.)",
-        "music-lessons":    "Instrument or vocal coaching at home",
+        "music-lessons": "Instrument or vocal coaching at home",
         "art-craft-lessons": "Art, drawing, or craft workshops",
-        "coding-lessons":   "Programming and coding education for beginners or students",
-        "adult-literacy":   "Basic reading, writing, or numeracy support for adults",
+        "coding-lessons": "Programming and coding education for beginners or students",
+        "adult-literacy": "Basic reading, writing, or numeracy support for adults",
     },
-
     "home-healthcare": {
-        "home-nursing":             "Skilled nursing care provided at the patient's home",
-        "elder-care":               "Assistance and supervision for elderly individuals at home",
-        "physiotherapy-home":       "At-home physiotherapy and rehabilitation sessions",
-        "wound-care":               "Professional cleaning and dressing of wounds at home",
-        "injection-service":        "Administering prescribed injections at home",
-        "blood-test-home":          "Blood sample collection at home for lab testing",
+        "home-nursing": "Skilled nursing care provided at the patient's home",
+        "elder-care": "Assistance and supervision for elderly individuals at home",
+        "physiotherapy-home": "At-home physiotherapy and rehabilitation sessions",
+        "wound-care": "Professional cleaning and dressing of wounds at home",
+        "injection-service": "Administering prescribed injections at home",
+        "blood-test-home": "Blood sample collection at home for lab testing",
         "medical-equipment-rental": "Renting medical equipment such as wheelchairs or nebulisers",
-        "caregiver-support":        "Daily assistance for patients recovering from illness or surgery",
+        "caregiver-support": "Daily assistance for patients recovering from illness or surgery",
     },
-
     "events-catering": {
-        "event-planning":      "Planning and coordinating a wedding, party, or corporate event",
-        "catering-service":    "Providing food and beverages for events or gatherings",
-        "tent-decoration":     "Setting up tents, lighting, and decorations for outdoor events",
-        "sound-system-setup":  "Installing and operating a PA or DJ sound system",
-        "photography-video":  "Event photography or videography coverage",
+        "event-planning": "Planning and coordinating a wedding, party, or corporate event",
+        "catering-service": "Providing food and beverages for events or gatherings",
+        "tent-decoration": "Setting up tents, lighting, and decorations for outdoor events",
+        "sound-system-setup": "Installing and operating a PA or DJ sound system",
+        "photography-video": "Event photography or videography coverage",
         "birthday-decoration": "Decorating a venue for a birthday celebration",
-        "wedding-planning":    "Full wedding coordination from venue to day-of logistics",
-        "waitstaff-service":   "Providing trained serving staff for events",
+        "wedding-planning": "Full wedding coordination from venue to day-of logistics",
+        "waitstaff-service": "Providing trained serving staff for events",
     },
-
     "laundry": {
-        "laundry-pickup":       "Pickup, washing, and delivery of clothes",
-        "dry-cleaning":         "Professional dry cleaning of delicate or formal garments",
-        "ironing-service":      "Steam or dry ironing of washed clothes",
-        "shoe-cleaning":        "Cleaning and polishing shoes or sneakers",
-        "carpet-laundry":       "Washing and drying large carpets or rugs",
-        "curtain-cleaning":     "Taking down, washing, and re-hanging curtains",
+        "laundry-pickup": "Pickup, washing, and delivery of clothes",
+        "dry-cleaning": "Professional dry cleaning of delicate or formal garments",
+        "ironing-service": "Steam or dry ironing of washed clothes",
+        "shoe-cleaning": "Cleaning and polishing shoes or sneakers",
+        "carpet-laundry": "Washing and drying large carpets or rugs",
+        "curtain-cleaning": "Taking down, washing, and re-hanging curtains",
         "tailoring-alteration": "Adjusting, hemming, or altering clothing",
-        "stitch-repair":        "Repairing torn seams, buttons, or zippers on garments",
+        "stitch-repair": "Repairing torn seams, buttons, or zippers on garments",
     },
 }
 
@@ -463,7 +439,7 @@ CATEGORY_DESCRIPTIONS: dict[str, str] = {
 def build_fresh_history() -> list[dict]:
     """Seed the conversation with the system prompt and the opening greeting."""
     return [
-        {"role": "system",    "content": SYSTEM_PROMPT},
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "assistant", "content": INITIAL_GREETING},
     ]
 
@@ -536,7 +512,7 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
-#start here
+# start here
 def _shortlist_categories(problem_text: str, top_k: int = 7) -> list[str] | None:
     """
     Rank registry categories by semantic similarity to what the customer
@@ -565,6 +541,7 @@ def _shortlist_categories(problem_text: str, top_k: int = 7) -> list[str] | None
 
 
 # ── Extraction pipeline ───────────────────────────────────────────────────────
+
 
 def _format_registry(categories: list[str] | None = None) -> str:
     lines: list[str] = []
@@ -728,29 +705,29 @@ def _build_extraction_prompt(candidate_categories: list[str] | None = None) -> s
         f"{shortlist_note}\n"
         "WORKED EXAMPLE — a job spanning two trades, including a category "
         "that LOOKS related by word-association but ISN'T:\n"
-        "  Customer: \"My automatic sliding driveway gate is stuck halfway "
+        '  Customer: "My automatic sliding driveway gate is stuck halfway '
         "open. It's the metal one at the street entrance of the house, "
         "about 12 feet wide, put in maybe six years ago. I think the "
         "motor's dead, and the manual release lever is jammed too so I "
         "can't push it by hand either.\"\n"
         "  Correct extraction:\n"
         "  {\n"
-        "    \"is_job_request\": true,\n"
-        "    \"categories\": [\n"
-        "      {\"category\": \"construction\", \"tags\": [\"gate-repair\", "
-        "\"manual-release-fixing\"], \"is_custom_category\": true},\n"
-        "      {\"category\": \"electrical\", \"tags\": "
-        "[\"electric-motor-replacement\", \"wiring-repair\"], "
-        "\"is_custom_category\": true}\n"
+        '    "is_job_request": true,\n'
+        '    "categories": [\n'
+        '      {"category": "construction", "tags": ["gate-repair", '
+        '"manual-release-fixing"], "is_custom_category": true},\n'
+        '      {"category": "electrical", "tags": '
+        '["electric-motor-replacement", "wiring-repair"], '
+        '"is_custom_category": true}\n'
         "    ],\n"
-        "    \"problem_description\": \"An automatic sliding metal gate at "
+        '    "problem_description": "An automatic sliding metal gate at '
         "the street entrance of a house, roughly 12 feet wide and about six "
         "years old, is stuck halfway open and cannot be moved by hand. The "
         "manual release lever is jammed, so the mechanical work covers "
         "freeing the release mechanism and checking the gate track and "
         "rollers it runs on. Separately, the drive motor is unresponsive and "
         "the customer reports it may be dead, so the motor and its supply "
-        "wiring need diagnosing and likely replacing.\"\n"
+        'wiring need diagnosing and likely replacing."\n'
         "  }\n"
         "  Note how the description names the object with its material, "
         "size and age exactly as stated, separates the mechanical scope "
@@ -788,7 +765,9 @@ def _sanitize_tag_list(tags: list[str], max_count: int = 3) -> list[str]:
     return cleaned
 
 
-def _sanitize_categories(categories: list[CategoryMatch], max_count: int = 3) -> list[CategoryMatch]:
+def _sanitize_categories(
+    categories: list[CategoryMatch], max_count: int = 3
+) -> list[CategoryMatch]:
     """
     Normalise the model's category list: lowercase names, sanitise each
     entry's own tags independently (so a tag never leaks across trades),
@@ -819,7 +798,9 @@ def _sanitize_categories(categories: list[CategoryMatch], max_count: int = 3) ->
             is_custom = any(t not in registry_tags for t in tags) or not tags
         else:
             is_custom = True
-        result.append(CategoryMatch(category=name, tags=tags, is_custom_category=is_custom))
+        result.append(
+            CategoryMatch(category=name, tags=tags, is_custom_category=is_custom)
+        )
     return result
 
 
@@ -917,11 +898,11 @@ def _looks_like_example_echo(problem_description: str) -> bool:
 # caught here and repaired with a single targeted retry rather than being
 # stored and silently degrading match quality downstream.
 
-_MIN_DESCRIPTION_WORDS = 18          # below this, it isn't a brief
-_MIN_DESCRIPTION_SENTENCES = 2       # the prompt asks for 2–4
-_DETAIL_RATIO = 0.22                 # vs. what the customer actually said
-_DETAIL_RATIO_WORD_CAP = 45          # never demand more than this many words
-_LONG_CONVERSATION_WORDS = 45        # only apply the ratio to real detail
+_MIN_DESCRIPTION_WORDS = 18  # below this, it isn't a brief
+_MIN_DESCRIPTION_SENTENCES = 2  # the prompt asks for 2–4
+_DETAIL_RATIO = 0.22  # vs. what the customer actually said
+_DETAIL_RATIO_WORD_CAP = 45  # never demand more than this many words
+_LONG_CONVERSATION_WORDS = 45  # only apply the ratio to real detail
 
 # Phrases that signal the model hedged instead of describing the job. Kept
 # deliberately narrow: each entry must be vague ON ITS OWN, so it can't fire
@@ -949,7 +930,9 @@ _FIRST_PERSON_RE = re.compile(r"\b(i|i'm|im|my|mine|we|we're|our|ours|me|us)\b")
 _SENTENCE_SPLIT_RE = re.compile(r"[.!?]+(?:\s|$)")
 
 
-def _description_needs_enrichment(problem_description: str, customer_text: str = "") -> bool:
+def _description_needs_enrichment(
+    problem_description: str, customer_text: str = ""
+) -> bool:
     """
     True when problem_description falls short of the brief contract and is
     worth one corrective retry.
@@ -1129,8 +1112,10 @@ def extract_final_json(
     # first gets the correction. Echo is checked first because an echoed
     # description is wrong about the job itself, not merely thin.
     echoed = _looks_like_example_echo(result.problem_description)
-    thin = False if echoed else _description_needs_enrichment(
-        result.problem_description, customer_text
+    thin = (
+        False
+        if echoed
+        else _description_needs_enrichment(result.problem_description, customer_text)
     )
 
     if echoed or thin:
@@ -1160,7 +1145,9 @@ def extract_final_json(
 
         retry_messages = messages + [{"role": "system", "content": nudge}]
         try:
-            retry_result = _call_extraction_model(retry_messages, model_name, temperature=0.2)
+            retry_result = _call_extraction_model(
+                retry_messages, model_name, temperature=0.2
+            )
             retry_description = _tidy_description(retry_result.problem_description)
             improved = (
                 getattr(retry_result, "is_job_request", True)

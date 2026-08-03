@@ -31,23 +31,27 @@ logger = logging.getLogger(__name__)
 # An explicit allowlist, not hasattr(): the extracted dict now also carries
 # baseline_description / speciality_* keys that belong on worker_skills rows,
 # not on the parent, and a blind copy would either crash or write junk.
-_EXTRACTED_PROFILE_FIELDS = frozenset({
-    "job_category",
-    "category_tag",
-    "is_custom_category",
-    "specialities",
-    "specialized_tools_or_equipment",
-    "years_experience",
-    "license_or_certification",
-    "job_description",
-    "emergency_available",
-    "has_verified_specialty",
-    "scenario_passed",
-    "scenario_score",
-})
+_EXTRACTED_PROFILE_FIELDS = frozenset(
+    {
+        "job_category",
+        "category_tag",
+        "is_custom_category",
+        "specialities",
+        "specialized_tools_or_equipment",
+        "years_experience",
+        "license_or_certification",
+        "job_description",
+        "emergency_available",
+        "has_verified_specialty",
+        "scenario_passed",
+        "scenario_score",
+    }
+)
 
 
-def sync_profile_extracted_fields(profile: model.WorkerProfile, extracted: dict) -> None:
+def sync_profile_extracted_fields(
+    profile: model.WorkerProfile, extracted: dict
+) -> None:
     """
     Copy the AI-extracted fields onto a WorkerProfile row.
 
@@ -115,7 +119,7 @@ def upsert_baseline_skill(
         description=description,
         embedding=embedding,
         is_active=True,
-        stage="pending_admin_review"
+        stage="pending_admin_review",
     )
     db.add(baseline)
     return baseline
@@ -170,7 +174,9 @@ def upsert_speciality_skill(
             existing.scenario_score = scenario_score
         existing.is_active = True
         logger.info(
-            "Refreshed existing speciality %r for worker_id=%s.", normalised, worker_id,
+            "Refreshed existing speciality %r for worker_id=%s.",
+            normalised,
+            worker_id,
         )
         return existing
 
@@ -184,7 +190,7 @@ def upsert_speciality_skill(
         scenario_answer=scenario_answer,
         scenario_score=scenario_score,
         is_active=True,
-        stage="pending_admin_review"
+        stage="pending_admin_review",
     )
     db.add(skill)
     logger.info("Added new speciality %r for worker_id=%s.", normalised, worker_id)

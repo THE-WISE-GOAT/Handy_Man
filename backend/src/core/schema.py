@@ -5,9 +5,13 @@ from typing import Any, Dict, List, Literal, Optional, TypedDict
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from src.core import model
 
+
 class LocationCoordinates(BaseModel):
-    longitude: float = Field(..., description="Longitude coordinate (X)", ge=-180, le=180)
+    longitude: float = Field(
+        ..., description="Longitude coordinate (X)", ge=-180, le=180
+    )
     latitude: float = Field(..., description="Latitude coordinate (Y)", ge=-90, le=90)
+
 
 class CompleteChatIn(BaseModel):
     edited_description: str
@@ -19,6 +23,7 @@ class CompleteChatIn(BaseModel):
     mode: str = "regular"
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
     phone_number: Optional[str] = None
+
 
 class CreateJobIn(BaseModel):
     title: str
@@ -33,8 +38,10 @@ class CreateJobIn(BaseModel):
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
     phone_number: Optional[str] = None
 
+
 class InitializeWorkerAppIn(BaseModel):
     pass
+
 
 class InitializeWorkerAppOut(BaseModel):
     worker_id: int
@@ -47,6 +54,7 @@ class InitializeWorkerAppOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class SubmitWorkerAppIn(BaseModel):
     worker_chat_id: int
     phone_number: str | None = None
@@ -54,10 +62,12 @@ class SubmitWorkerAppIn(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
 
+
 class SubmitWorkerAppOut(BaseModel):
     worker_id: int
     stage: str
     message: str
+
 
 class WorkerAppStatusOut(BaseModel):
     worker_id: int
@@ -75,13 +85,14 @@ class WorkerAppStatusOut(BaseModel):
 
     class Config:
         from_attributes = True
-        
+
+
 class AdminPendingAppOut(BaseModel):
     skill_id: int
     skill_title: str
     skill_type: str
-    stage: str  
-    
+    stage: str
+
     id: int
     user_id: int
     username: str
@@ -91,7 +102,9 @@ class AdminPendingAppOut(BaseModel):
     is_complete: bool
     is_rejected: bool
     rejection_reason: str | None = None
-    skill_rejection_reason: str | None = Field(None, validation_alias="rejection_reason") # maps skill's rejection reason cleanly
+    skill_rejection_reason: str | None = Field(
+        None, validation_alias="rejection_reason"
+    )  # maps skill's rejection reason cleanly
     job_category: str
     category_tag: str
     specialities: List[str]
@@ -106,8 +119,10 @@ class AdminPendingAppOut(BaseModel):
         from_attributes = True
         populate_by_name = True
 
+
 class RejectWorkerIn(BaseModel):
     reason: str = Field(..., min_length=1, max_length=1000)
+
 
 class UpdateWorkerProfileIn(BaseModel):
     job_category: Optional[str] = None
@@ -122,6 +137,7 @@ class UpdateWorkerProfileIn(BaseModel):
     address_text: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+
 
 class UpdateWorkerProfileOut(BaseModel):
     worker_id: int
@@ -139,6 +155,7 @@ class UpdateWorkerProfileOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class UpdateUserIn(BaseModel):
     firstName: Optional[str] = None
     lastName: Optional[str] = None
@@ -146,19 +163,24 @@ class UpdateUserIn(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
 
+
 class ChatMessageOut(BaseModel):
     """Returned after each chat turn (POST /dispatch/chat)."""
+
     booking_chat_id: int
     ai_response: str
     is_complete: bool
-    current_tags: List[str]  
-    is_job_request: bool  
-    is_custom_category: bool 
-    turns_used: int 
-    turns_remaining: int 
-    
+    current_tags: List[str]
+    is_job_request: bool
+    is_custom_category: bool
+    turns_used: int
+    turns_remaining: int
+
     problem_description: Optional[str] = None  # Allows AI summary to pass to UI
-    categories: List[CategoryMatch] = Field(default_factory=list)  # Allows title extraction to pass to UI
+    categories: List[CategoryMatch] = Field(
+        default_factory=list
+    )  # Allows title extraction to pass to UI
+
 
 class UserCreate(BaseModel):
     username: str
@@ -167,16 +189,18 @@ class UserCreate(BaseModel):
     firstName: Optional[str] = None
     lastName: Optional[str] = None
 
+
 class RoleOut(BaseModel):
     id: int
     name: str
 
     class Config:
         from_attributes = True
-            
+
+
 class UserOut(BaseModel):
     id: int
-    email: EmailStr 
+    email: EmailStr
     username: str
     is_active: bool
     created_at: datetime
@@ -187,16 +211,20 @@ class UserOut(BaseModel):
     class Config:
         from_attributes = True
 
+
 class Token(BaseModel):
-    access_token: str 
-    token_type: str 
-    
+    access_token: str
+    token_type: str
+
+
 class TokenData(BaseModel):
-    user_id: str | None = None 
+    user_id: str | None = None
+
 
 # this is the schema for the chat functionality, it will be used to validate the data that is sent to the API
 class ChatMessageIn(BaseModel):
     """Payload the client sends on each chat turn."""
+
     booking_chat_id: int = Field(
         ...,
         description="The session ID returned by POST /dispatch/session.",
@@ -207,7 +235,7 @@ class ChatMessageIn(BaseModel):
         max_length=2000,
         description="The customer's raw message text.",
     )
- 
+
     @field_validator("message")
     @classmethod
     def message_must_have_content(cls, v: str) -> str:
@@ -215,55 +243,67 @@ class ChatMessageIn(BaseModel):
         if not stripped:
             raise ValueError("message cannot be empty or whitespace-only")
         return stripped  # normalised once, here — not re-stripped downstream
- 
+
+
 # use to display session start response
 class SessionStartOut(BaseModel):
     """Returned when a new session is created (POST /dispatch/session)."""
+
     booking_chat_id: int
-    ai_response:     str
+    ai_response: str
     turns_remaining: int
- 
+
+
 # dsupport to display the chat history response after each chat turn
 class HistoryMessage(BaseModel):
     """A single turn in the client-visible conversation."""
-    role:  Literal["user", "assistant"]
+
+    role: Literal["user", "assistant"]
     content: str
- 
-# display the all chat history response 
+
+
+# display the all chat history response
 class ChatHistoryOut(BaseModel):
     """Returned by GET /dispatch/{id}/history."""
+
     booking_chat_id: int
-    history:         List[HistoryMessage]
-    is_complete:     bool
-    turns_used:      int
+    history: List[HistoryMessage]
+    is_complete: bool
+    turns_used: int
     turns_remaining: int
- 
- # this is use to disply category for the specific job request
+
+
+# this is use to disply category for the specific job request
 class CategoryMatch(BaseModel):
     category: str
     tags: List[str] = Field(default_factory=list)
     is_custom_category: bool
- 
+
+
 # to display the structured summary mainly needed for the frontend to use dict keys
 class BookingSummaryOut(BaseModel):
     """Returned by GET /dispatch/{id}/summary once is_complete is True."""
+
     categories: List[CategoryMatch] = Field(default_factory=list)
     problem_description: str
     is_complete: bool
     is_job_request: bool
- 
+
+
 # use in the customer_chat_analyser_nvidia.py to validate the data that is sent to the API
 class CustomerProblemSchema(BaseModel):
     is_job_request: bool
     categories: List[CategoryMatch] = Field(default_factory=list)
     problem_description: str
 
- # for now this is just use to get the what is the roles of the user 
+
+# for now this is just use to get the what is the roles of the user
 # 1. Schema for a single Role
 class UserRolesOut(BaseModel):
     roles: list[str]
-    
-  # for now this support in worker_onboarding.py
+
+
+# for now this support in worker_onboarding.py
 class WorkerOnboardIn(BaseModel):
     latitude: float
     longitude: float
@@ -274,7 +314,9 @@ class WorkerOnboardIn(BaseModel):
     additional_metadata: Dict[str, Any]
     ai_assessed_skills_json: Optional[List[str]] = []
 
+
 ### schemas for the worker chat functionality
+
 
 # use in the worker_chat_analyser_nvidia.py to validate the data that is sent to the API
 # use in the worker_chat_analyser_nvidia.py to validate the data that is sent to the API
@@ -304,8 +346,12 @@ class WorkerProfileSchema(BaseModel):
     speciality_description: str = ""
 
     @field_validator(
-        "job_description", "license_or_certification", "job_category",
-        "baseline_description", "speciality_title", "speciality_description",
+        "job_description",
+        "license_or_certification",
+        "job_category",
+        "baseline_description",
+        "speciality_title",
+        "speciality_description",
         mode="before",
     )
     @classmethod
@@ -316,29 +362,33 @@ class WorkerProfileSchema(BaseModel):
         # Ensure it's a string even if the AI sends an int or other type
         return str(value)
 
+
 # use to display session start response
 class WorkerSessionStartOut(BaseModel):
     worker_chat_id: int
     ai_response: str
     stage: str
 
+
 # this is the schema for the chat functionality, it will be used to validate the data that is sent to the API
 class WorkerChatMessageIn(BaseModel):
     worker_chat_id: int
     message: str
 
+
 # this display the chat message response after each chat turn
 class WorkerChatMessageOut(BaseModel):
     worker_chat_id: int
     ai_response: str
-    stage: str     # "interviewing" | "awaiting_scenario_answer" | "complete"
+    stage: str  # "interviewing" | "awaiting_scenario_answer" | "complete"
     is_complete: bool
     is_rejected: bool
-    scenario_question: Optional[str] = None  
+    scenario_question: Optional[str] = None
     turns_used: int
     turns_remaining: int
 
-#  display the all chat history response 
+
+#  display the all chat history response
 class WorkerChatHistoryOut(BaseModel):
     worker_chat_id: int
     history: List[dict]
@@ -347,15 +397,18 @@ class WorkerChatHistoryOut(BaseModel):
     turns_used: int
     turns_remaining: int
 
+
 # to display the structured summary mainly needed for the frontend to use dict keys
 class WorkerSummaryOut(BaseModel):
     stage: str
     is_complete: bool
     is_rejected: bool
     rejection_reason: Optional[str] = None
-    profile: Optional[WorkerProfileSchema] = None   
-    
+    profile: Optional[WorkerProfileSchema] = None
+
+
 # ── Find Help (worker matching) ──────────────────────────────────────────────
+
 
 class WorkerMatchOut(BaseModel):
     worker_chat_id: int
@@ -363,18 +416,21 @@ class WorkerMatchOut(BaseModel):
     job_category: str
     category_tag: str
     job_description: str
-    match_score: float  # 1.0 = near-identical meaning, 0 = unrelated, negative = opposite
+    match_score: (
+        float  # 1.0 = near-identical meaning, 0 = unrelated, negative = opposite
+    )
     # Which of the worker's capabilities won this match. None for matches recorded
     # before per-skill matching, or if the skill has since been removed.
     matched_skill: Optional[str] = None
     matched_skill_description: Optional[str] = None
 
+
 class FindHelpOut(BaseModel):
-    matched_by_category: bool          # True if the category filter was actually used
-    category: Optional[str] = None     # the category that was searched (if any)
+    matched_by_category: bool  # True if the category filter was actually used
+    category: Optional[str] = None  # the category that was searched (if any)
     workers: List[WorkerMatchOut]
-    
-    
+
+
 class WorkerCompleteChatIn(BaseModel):
     location: LocationCoordinates
     phone_number: Optional[str] = None
@@ -382,15 +438,17 @@ class WorkerCompleteChatIn(BaseModel):
 
 # ── Add-skill flow (already-verified worker adds another speciality) ──────────
 
+
 class WorkerSkillOut(BaseModel):
     """One independently matchable capability of a worker."""
+
     id: int
-    skill_type: str          # "baseline" | "speciality"
+    skill_type: str  # "baseline" | "speciality"
     title: str
     description: str
     scenario_score: Optional[int] = None
     is_active: bool
-    has_vector: bool         # False means it is stored but not yet matchable
+    has_vector: bool  # False means it is stored but not yet matchable
 
     class Config:
         from_attributes = True
@@ -407,7 +465,7 @@ class AddSkillStartOut(BaseModel):
     worker_chat_id: int
     ai_response: str
     existing_skills: List[str]
-    stage: str               # always "adding_skill"
+    stage: str  # always "adding_skill"
 
 
 class AddSkillMessageIn(BaseModel):
@@ -425,7 +483,7 @@ class AddSkillMessageIn(BaseModel):
 class AddSkillMessageOut(BaseModel):
     worker_chat_id: int
     ai_response: str
-    stage: str                              # "adding_skill" | "awaiting_skill_scenario" | "skill_complete" | "skill_declined"
+    stage: str  # "adding_skill" | "awaiting_skill_scenario" | "skill_complete" | "skill_declined"
     scenario_question: Optional[str] = None
     # Populated only once a scenario has been graded.
     skill_added: bool = False
@@ -434,8 +492,15 @@ class AddSkillMessageOut(BaseModel):
 
 
 class WorkerExpertiseIn(BaseModel):
-    title: str = Field(..., max_length=255, description="E.g., CCTV Installation, Electrical Repair")
-    description: str = Field(..., max_length=3000, description="Detailed breakdown of experience or tools owned")
+    title: str = Field(
+        ..., max_length=255, description="E.g., CCTV Installation, Electrical Repair"
+    )
+    description: str = Field(
+        ...,
+        max_length=3000,
+        description="Detailed breakdown of experience or tools owned",
+    )
+
 
 class WorkerExpertiseOut(BaseModel):
     id: int
@@ -447,8 +512,8 @@ class WorkerExpertiseOut(BaseModel):
 
     class Config:
         from_attributes = True
-        
-        
+
+
 # ___________________ for mathcing worker with job request ___________________________
 class _MatchDetailRequired(TypedDict):
     worker_profile: model.WorkerProfile
@@ -456,6 +521,7 @@ class _MatchDetailRequired(TypedDict):
     score: float
     rank: int
     worker_chat_id: int
+
 
 class MatchDetail(_MatchDetailRequired, total=False):
     """
@@ -465,14 +531,17 @@ class MatchDetail(_MatchDetailRequired, total=False):
     (and the reranker's .get() reads) stay valid without every call site having
     to populate them.
     """
+
     matched_skill_id: Optional[int]
     matched_skill_title: Optional[str]
     matched_skill_description: Optional[str]
+
 
 class MatchingResult(TypedDict):
     matches: list[MatchDetail]
     worker_chat_ids: list[int]
     count: int
+
 
 class _MatchedJobDetailRequired(TypedDict):
     booking_chat_id: int
@@ -481,16 +550,18 @@ class _MatchedJobDetailRequired(TypedDict):
     score: float
     rank: int
 
+
 class MatchedJobDetail(_MatchedJobDetailRequired, total=False):
     """matched_skill_title = which of the worker's skills won this job."""
+
     matched_skill_title: Optional[str]
+
 
 class WorkerMatchingResult(TypedDict):
     matched_jobs: list[MatchedJobDetail]
     count: int
-    
-    
-    
+
+
 # _____ schema for the worker to see what job were matched with them and the details of the job request____
 class WorkerMatchedJobDetail(BaseModel):
     job_id: int
@@ -504,8 +575,9 @@ class WorkerMatchedJobDetail(BaseModel):
     matched_skill: Optional[str] = None
     matched_skill_description: Optional[str] = None
 
+
 class WorkerMatchedJobsOut(BaseModel):
     worker_id: int
-    worker_ids: Optional[List[int]] = None   # <--- ADD THIS (e.g., [19, 22])
+    worker_ids: Optional[List[int]] = None  # <--- ADD THIS (e.g., [19, 22])
     count: int
     jobs: List[WorkerMatchedJobDetail]

@@ -11,17 +11,18 @@ from src.database.database import engine, get_db
 
 # Route Imports (Imported exactly ONCE)
 from src.core.router import (
-    auth, 
-    login, 
-    user, 
-    chat_customer, 
+    auth,
+    login,
+    user,
+    chat_customer,
     chat_worker,
     job_router,
     worker_onboarding,
     socket,
-    worker_router
+    worker_router,
 )
 from src.core.oauth2 import get_current_user
+
 
 # 1. Define the startup logic using a SINGLE lifespan block
 @asynccontextmanager
@@ -29,12 +30,15 @@ async def lifespan(app: FastAPI):
     # This runs BEFORE the server starts accepting requests
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))  # Ensure pgvector is active
+        conn.execute(
+            text("CREATE EXTENSION IF NOT EXISTS vector;")
+        )  # Ensure pgvector is active
         conn.commit()
-    
+
     # Create all tables safely now that extensions are active
     model.Base.metadata.create_all(bind=engine)
     yield
+
 
 # 2. Initialize FastAPI exactly ONCE
 app = FastAPI(lifespan=lifespan)
@@ -73,16 +77,19 @@ app.include_router(worker_router.router)
 @app.post("/workers/locations", summary="Get worker locations (stub)")
 async def worker_locations_stub(
     payload: dict,
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     return {"status": "success", "locations": []}
 
 
 # 6. Core Alias Root Routes
-@app.post("/register", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut)
+@app.post(
+    "/register", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut
+)
 @app.post("/signup", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut)
 def register_alias(new_user: schema.UserCreate, db: Session = Depends(get_db)):
     return auth._create_user(new_user, db)
+
 
 @app.post("/login", response_model=schema.Token)
 @app.post("/login/", response_model=schema.Token, include_in_schema=False)
