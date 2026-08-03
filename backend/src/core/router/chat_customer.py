@@ -29,6 +29,8 @@ from src.core import model, schema, job_manager, matching_manager
 from src.core.manager import manager
 import math
 from fastapi.concurrency import run_in_threadpool
+import json
+from typing import Dict, Any
 
 from src.ai.customer_chat_analyser_nvidia import (
     _nvidia_client,
@@ -346,22 +348,25 @@ def get_booking_summary(
     }
 
 
-async def _refine_job_description_with_ai(raw_description: str) -> str:
+async def _refine_job_description_with_ai(raw_description: str) -> Dict[str, Any]:
     """
-    Acts as a secondary intelligence layer to sanitize and optimize 
-    customer inputs for better vector embedding matching.
+    Acts as a secondary intelligence layer to sanitize customer inputs 
+    and automatically extract categories for manual job entries.
     """
     prompt = f"""
-    You are a backend data processor for a service marketplace. Your only job is to clean up a customer's raw task description so it can be accurately converted into a semantic database vector.
+    You are a backend data processor for a service marketplace. Your job is to clean up a customer's raw task description and categorize it.
     
-    Rewrite the customer's text into a single, clear, and reliable paragraph describing the physical work required.
-
-    STRICT RULES:
-    1. DO NOT write a formal job posting or job description.
-    2. DO NOT use headers, bullet points, or titles (e.g., no "Job Title:", "Key Responsibilities:").
-    3. DO NOT hallucinate or add extra requirements (no "communication skills", "valid license", etc.).
-    4. ONLY clarify the exact task, duration, location, and items mentioned by the customer.
-    5. Output NOTHING except the single, cleaned paragraph.
+    Output valid JSON strictly matching this schema:
+    {{
+        "refined_description": "A single, clear, and reliable paragraph describing the physical work required. No headers, no bullet points.",
+        "categories": [
+            {{
+                "category": "Main trade (e.g., plumbing, electrical, cleaning, automotive, moving)",
+                "tags": ["specific-task-1", "specific-task-2"],
+                "is_custom_category": true
+            }}
+        ]
+    }}
     
     Raw Customer Text: {raw_description}
     """
@@ -371,14 +376,28 @@ async def _refine_job_description_with_ai(raw_description: str) -> str:
             lambda: _nvidia_client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.1, # Dropped to 0.1 to make the AI extremely literal and robotic
-                max_tokens=150   # Lowered to physically prevent it from generating long bulleted lists
+                temperature=0.1, 
+                max_tokens=300,
+                response_format={"type": "json_object"} # Force JSON output if supported by your NVIDIA model version
             )
         )
-        return response.choices[0].message.content.strip()
+        
+        # Parse the JSON string returned by the AI
+        content = response.choices[0].message.content.strip()
+        
+        # Sometimes LLMs wrap JSON in markdown blocks (```json ... ```). Strip them if present.
+        if content.startswith("```json"):
+            content = content[7:-3]
+            
+        return json.loads(content)
+        
     except Exception as e:
-        logger.error(f"AI description refinement failed: {e}. Falling back to raw text.")
-        return raw_description
+        logger.error(f"AI description refinement & categorization failed: {e}. Falling back to raw text.")
+        # Fallback dictionary if the AI fails
+        return {
+            "refined_description": raw_description,
+            "categories": [{"category": "general", "tags": ["manual-entry"], "is_custom_category": True}]
+        }
     
     
 @router.post(
@@ -412,17 +431,30 @@ async def complete_customer_chat(
         )
 
     # ══════════════════════════════════════════════════════════════════════════
-    # 2. CONDITIONAL AI REFINEMENT (The Diff Check)
+    # 2. CONDITIONAL AI REFINEMENT & CATEGORY EXTRACTION
     # ══════════════════════════════════════════════════════════════════════════
     original_ai_desc = (chat_session.problem_description or "").strip()
+    existing_categories = getattr(chat_session, "categories", [])
     
-    # Check if this is a manual entry (no original AI desc) OR if the user edited the text
-    if not original_ai_desc or raw_job_desc != original_ai_desc:
-        logger.info(f"[Booking {booking_chat_id}] Description modified or manual. Running AI refinement.")
-        final_job_desc = await _refine_job_description_with_ai(raw_job_desc)
+    # Check if manual entry (no original desc), edited text, OR missing categories
+    if not original_ai_desc or raw_job_desc != original_ai_desc or not existing_categories:
+        logger.info(f"[Booking {booking_chat_id}] Manual entry or modified description detected. Running AI refinement.")
+        
+        ai_data = await _refine_job_description_with_ai(raw_job_desc)
+        final_job_desc = ai_data.get("refined_description", raw_job_desc)
+        
+        # If the chat already had categories (but text was edited), you can choose to keep them
+        # or overwrite them with the new AI-generated ones. Overwriting is usually safer 
+        # if the customer completely changed the job requirement.
+        final_categories = ai_data.get("categories", []) 
+        
+        if not final_categories and existing_categories:
+            final_categories = existing_categories
+            
     else:
         logger.info(f"[Booking {booking_chat_id}] Description matches original AI summary. Skipping refinement.")
         final_job_desc = raw_job_desc
+        final_categories = existing_categories
     # ══════════════════════════════════════════════════════════════════════════
 
     # 3. Use the final description for vectorization and saving
@@ -432,7 +464,7 @@ async def complete_customer_chat(
     customer_fields = {
         "is_complete": getattr(chat_session, "is_complete", False),
         "is_job_request": getattr(chat_session, "is_job_request", False),
-        "categories": getattr(chat_session, "categories", []), 
+        "categories": final_categories, # <-- USING THE NEW EXTRACTED CATEGORIES
         "problem_description": final_job_desc 
     }
 
@@ -441,7 +473,7 @@ async def complete_customer_chat(
         "description": final_job_desc, 
         "status": payload.status,
         "is_job_request": getattr(chat_session, "is_job_request", True),
-        "categories": getattr(chat_session, "categories", []),
+        "categories": final_categories, # <-- USING THE NEW EXTRACTED CATEGORIES
         "contact_name": payload.contact_name,
         "contact_phone": payload.contact_phone,
         "mode": payload.mode,
@@ -450,9 +482,10 @@ async def complete_customer_chat(
         "longitude": lng,
         "location": wkt_point,
         "description_vector": embedding_vector,
-        "address_text": address_text,
-        "attachments": payload.attachments
+        "address_text": address_text
     }
+
+    
 
     try:
         job_manager.upsert_chat_data(db, booking_chat_id, current_user.id, customer_fields)
