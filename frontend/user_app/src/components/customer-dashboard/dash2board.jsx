@@ -1,17 +1,17 @@
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useCustomerDashboardData } from './useCustomerDashboardData';
-import './dash2board.css';
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCustomerDashboardData } from "./useCustomerDashboardData";
+import "./dash2board.css";
 
 // 1. IMPORT LEAFLET
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 
 // 2. VITE-COMPATIBLE ICON IMPORTS
-import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
-import iconUrl from 'leaflet/dist/images/marker-icon.png';
-import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
+import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
+import iconUrl from "leaflet/dist/images/marker-icon.png";
+import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -28,29 +28,28 @@ const personSvg = `
 `;
 
 const staticWorkerIcon = L.divIcon({
-  className: 'custom-worker-icon',
+  className: "custom-worker-icon",
   html: `<div style="color: #1F1F1F; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
   iconSize: [30, 30],
   iconAnchor: [15, 15],
-  popupAnchor: [0, -15]
+  popupAnchor: [0, -15],
 });
 
 const blinkingWorkerIcon = L.divIcon({
-  className: 'custom-worker-icon blinking-red-icon',
+  className: "custom-worker-icon blinking-red-icon",
   html: `<div style="display: flex; justify-content: center; align-items: center;">${personSvg}</div>`,
   iconSize: [30, 30],
   iconAnchor: [15, 15],
-  popupAnchor: [0, -15]
+  popupAnchor: [0, -15],
 });
 
 const goldenWorkerIcon = L.divIcon({
-  className: 'custom-worker-icon golden-worker-icon',
+  className: "custom-worker-icon golden-worker-icon",
   html: `<div style="color: #FF6B1A; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
   iconSize: [30, 30],
   iconAnchor: [15, 15],
-  popupAnchor: [0, -15]
+  popupAnchor: [0, -15],
 });
-
 
 const MapUpdater = ({ center }) => {
   const map = useMap();
@@ -65,12 +64,19 @@ const MapUpdater = ({ center }) => {
 const Card = ({ slug, title, position, onSelect, children }) => {
   const isMain = position === "main";
   return (
-    <div 
-      className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
+    <div
+      className={`dashboard-card slot-${position} ${!isMain ? "clickable" : ""}`}
       onClick={!isMain ? () => onSelect(slug) : undefined}
     >
       <div className="card-header">••• {title}</div>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         {children}
       </div>
     </div>
@@ -80,7 +86,7 @@ const Card = ({ slug, title, position, onSelect, children }) => {
 export default function Dash2Board({ viewSlug }) {
   const navigate = useNavigate();
   const workerCardRefs = React.useRef({});
-  
+
   const {
     postingsSlots,
     swapPostingsSlots,
@@ -89,13 +95,13 @@ export default function Dash2Board({ viewSlug }) {
     selectedJob,
     setSelectedJob,
     fetchPendingJobs,
-    
+
     matchedWorkersMap,
-    workerLocations,          
-    toggleWorkerInterest,     
+    workerLocations,
+    toggleWorkerInterest,
 
     selectedWorkerId,
-    setSelectedWorkerId
+    setSelectedWorkerId,
   } = useCustomerDashboardData();
 
   useEffect(() => {
@@ -103,16 +109,18 @@ export default function Dash2Board({ viewSlug }) {
   }, [fetchPendingJobs]);
 
   useEffect(() => {
-    const handleFocus = () => { fetchPendingJobs(); };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    const handleFocus = () => {
+      fetchPendingJobs();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [fetchPendingJobs]);
 
   useEffect(() => {
     if (selectedWorkerId && workerCardRefs.current[selectedWorkerId]) {
       workerCardRefs.current[selectedWorkerId].scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
+        behavior: "smooth",
+        block: "center",
       });
     }
   }, [selectedWorkerId]);
@@ -120,7 +128,9 @@ export default function Dash2Board({ viewSlug }) {
   useEffect(() => {
     if (!viewSlug) return;
     if (postingsSlots.main !== viewSlug) {
-      const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
+      const targetSlot = Object.keys(postingsSlots).find(
+        (key) => postingsSlots[key] === viewSlug,
+      );
       if (targetSlot) swapPostingsSlots(targetSlot);
     }
   }, [viewSlug, postingsSlots, swapPostingsSlots]);
@@ -130,17 +140,40 @@ export default function Dash2Board({ viewSlug }) {
   };
 
   const renderBiddingsEngine = (position) => (
-    <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position} onSelect={handleModuleSelect}>
+    <Card
+      slug="ActiveBiddingsEngine"
+      title="COMPETITIVE MARKETPLACE METRICS"
+      position={position}
+      onSelect={handleModuleSelect}
+    >
       {position === "main" ? (
-        <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div
+          className="main-panel"
+          style={{
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
           <h2 style={{ flexShrink: 0 }}>ACTIVE BIDDINGS ENGINE</h2>
           <h3 style={{ color: "var(--k-ink-3)", flexShrink: 0 }}>
             Bids for job: {selectedJob ? selectedJob.title : "No Job Selected"}
           </h3>
-          <div className="bids-box" style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginTop: '10px' }}>
-            {biddingsStream.map(bid => (
+          <div
+            className="bids-box"
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              minHeight: 0,
+              marginTop: "10px",
+            }}
+          >
+            {biddingsStream.map((bid) => (
               <div key={bid.id} className="bid-row">
-                <span><strong>{bid.provider}</strong>: {bid.offer}</span>
+                <span>
+                  <strong>{bid.provider}</strong>: {bid.offer}
+                </span>
                 <span className="status-badge">{bid.status}</span>
               </div>
             ))}
@@ -149,13 +182,21 @@ export default function Dash2Board({ viewSlug }) {
       ) : (
         <div className="preview-panel">
           {position === "sidebar" ? (
-             <>
-             <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
-             <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
-             <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
-           </>
+            <>
+              <span className="badge badge-highlight">
+                Sidebar: Bids Incoming Feed Active
+              </span>
+              <p className="card-summary">
+                Target: {selectedJob?.title || "N/A"}
+              </p>
+              <p className="card-summary">
+                Pending Offers Count: {biddingsStream.length}
+              </p>
+            </>
           ) : (
-            <span className="badge">Footer Slot: Bids for {selectedJob?.title || "N/A"}</span>
+            <span className="badge">
+              Footer Slot: Bids for {selectedJob?.title || "N/A"}
+            </span>
           )}
         </div>
       )}
@@ -164,16 +205,23 @@ export default function Dash2Board({ viewSlug }) {
 
   const renderLiveMap = (position) => {
     // 🛠️ ARCHITECTURAL FIX: Consumes seamlessly flattened store coordinates safely
-    const centerPoint = selectedJob && selectedJob.latitude && selectedJob.longitude 
-      ? [parseFloat(selectedJob.latitude), parseFloat(selectedJob.longitude)]
-      : [27.7172, 85.3240];
+    const centerPoint =
+      selectedJob && selectedJob.latitude && selectedJob.longitude
+        ? [parseFloat(selectedJob.latitude), parseFloat(selectedJob.longitude)]
+        : [27.7172, 85.324];
 
-    const currentWorkers = selectedJob && matchedWorkersMap[selectedJob.id] 
-      ? matchedWorkersMap[selectedJob.id] 
-      : [];
+    const currentWorkers =
+      selectedJob && matchedWorkersMap[selectedJob.id]
+        ? matchedWorkersMap[selectedJob.id]
+        : [];
 
     return (
-      <Card slug="GeospatialLiveMap" title="GEOSPATIAL LIVE MAP" position={position} onSelect={handleModuleSelect}>
+      <Card
+        slug="GeospatialLiveMap"
+        title="GEOSPATIAL LIVE MAP"
+        position={position}
+        onSelect={handleModuleSelect}
+      >
         <style>
           {`
             @keyframes blinkRedIcon {
@@ -196,54 +244,91 @@ export default function Dash2Board({ viewSlug }) {
         </style>
 
         {position === "main" ? (
-          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div
+            className="main-panel"
+            style={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+            }}
+          >
             <h2 style={{ flexShrink: 0 }}>GEOSPATIAL ENGINE FULL DISPLAY</h2>
-            <div style={{ flex: 1, minHeight: 0, borderRadius: '12px', overflow: 'hidden', marginTop: '10px' }}>
-              <MapContainer center={centerPoint} zoom={13} style={{ height: '100%', width: '100%' }}>
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                borderRadius: "12px",
+                overflow: "hidden",
+                marginTop: "10px",
+              }}
+            >
+              <MapContainer
+                center={centerPoint}
+                zoom={13}
+                style={{ height: "100%", width: "100%" }}
+              >
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 />
                 <MapUpdater center={centerPoint} />
-                
+
                 {selectedJob && selectedJob.latitude && (
                   <Marker position={centerPoint}>
-                    <Popup><strong>{selectedJob.title}</strong><br/>Job Location</Popup>
+                    <Popup>
+                      <strong>{selectedJob.title}</strong>
+                      <br />
+                      Job Location
+                    </Popup>
                   </Marker>
                 )}
 
                 {/* 2. Worker Location Markers */}
                 {currentWorkers.map((worker, index) => {
                   const locInfo = workerLocations[worker.worker_chat_id];
-                  if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
-                  
+                  if (!locInfo || !locInfo.latitude || !locInfo.longitude)
+                    return null;
+
                   const workerPos = [locInfo.latitude, locInfo.longitude];
                   const rank = index + 1;
                   const isTopThree = rank <= 3;
-                  const iconToUse = isTopThree ? goldenWorkerIcon : (locInfo.is_interested ? blinkingWorkerIcon : staticWorkerIcon);
+                  const iconToUse = isTopThree
+                    ? goldenWorkerIcon
+                    : locInfo.is_interested
+                      ? blinkingWorkerIcon
+                      : staticWorkerIcon;
 
                   return (
-                    <Marker 
-                      key={`map-worker-${worker.worker_chat_id}`} 
-                      position={workerPos} 
+                    <Marker
+                      key={`map-worker-${worker.worker_chat_id}`}
+                      position={workerPos}
                       icon={iconToUse}
-                      eventHandlers={{ click: () => setSelectedWorkerId(worker.worker_chat_id) }}
+                      eventHandlers={{
+                        click: () => setSelectedWorkerId(worker.worker_chat_id),
+                      }}
                     >
                       <Popup>
-                        <div style={{ textAlign: 'center' }}>
-                          <strong>{worker.username}</strong><br/>
-                          {isTopThree ? `🏆 Rank #${rank} Match` : `Rank #${rank}`}<br/>
-                          Match Score: {worker.match_score}%<br/>
-                          <button 
-                            onClick={() => toggleWorkerInterest(worker.worker_chat_id)}
+                        <div style={{ textAlign: "center" }}>
+                          <strong>{worker.username}</strong>
+                          <br />
+                          {isTopThree
+                            ? `🏆 Rank #${rank} Match`
+                            : `Rank #${rank}`}
+                          <br />
+                          Match Score: {worker.match_score}%<br />
+                          <button
+                            onClick={() =>
+                              toggleWorkerInterest(worker.worker_chat_id)
+                            }
                             style={{
-                              marginTop: '8px',
-                              padding: '4px 8px',
-                              backgroundColor: '#FF6B1A',
-                              color: '#0D0D0D',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer'
+                              marginTop: "8px",
+                              padding: "4px 8px",
+                              backgroundColor: "#FF6B1A",
+                              color: "#0D0D0D",
+                              border: "none",
+                              borderRadius: "4px",
+                              cursor: "pointer",
                             }}
                           >
                             Toggle Interest (Test)
@@ -260,9 +345,16 @@ export default function Dash2Board({ viewSlug }) {
           <div className="preview-panel">
             {position === "sidebar" ? (
               <>
-                <span className="badge badge-highlight">Sidebar: GPS Map Node Tracker</span>
-                <p className="card-summary">Lat: {selectedJob?.latitude || "N/A"} | Lng: {selectedJob?.longitude || "N/A"}</p>
-                <p className="card-summary">Workers Rendered: {currentWorkers.length}</p>
+                <span className="badge badge-highlight">
+                  Sidebar: GPS Map Node Tracker
+                </span>
+                <p className="card-summary">
+                  Lat: {selectedJob?.latitude || "N/A"} | Lng:{" "}
+                  {selectedJob?.longitude || "N/A"}
+                </p>
+                <p className="card-summary">
+                  Workers Rendered: {currentWorkers.length}
+                </p>
               </>
             ) : (
               <span className="badge">Footer Slot: Map Tracking Active</span>
@@ -274,102 +366,189 @@ export default function Dash2Board({ viewSlug }) {
   };
 
   const renderReviewLogs = (position) => {
-    const currentWorkers = selectedJob && matchedWorkersMap[selectedJob.id] 
-      ? matchedWorkersMap[selectedJob.id] 
-      : [];
+    const currentWorkers =
+      selectedJob && matchedWorkersMap[selectedJob.id]
+        ? matchedWorkersMap[selectedJob.id]
+        : [];
 
     return (
-      <Card slug="RatingsReviewLogs" title="MATCHED PROFESSIONALS LOGS" position={position} onSelect={handleModuleSelect}>
+      <Card
+        slug="RatingsReviewLogs"
+        title="MATCHED PROFESSIONALS LOGS"
+        position={position}
+        onSelect={handleModuleSelect}
+      >
         {position === "main" ? (
-          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div
+            className="main-panel"
+            style={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+            }}
+          >
             <h2 style={{ flexShrink: 0 }}>QUALIFIED WORKER NETWORK</h2>
-            
-            <h3 style={{ color: "var(--text-primary)", flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span>Matched Profiles For: {selectedJob ? selectedJob.title : "No Job Selected"}</span>
-              
+
+            <h3
+              style={{
+                color: "var(--text-primary)",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <span>
+                Matched Profiles For:{" "}
+                {selectedJob ? selectedJob.title : "No Job Selected"}
+              </span>
+
               {selectedJob?.matchCategory && (
-                <span style={{
-                  fontSize: '0.65em',
-                  backgroundColor: 'var(--k-wash)',
-                  color: selectedJob.matchedByCategory ? 'var(--k-orange-ink)' : 'var(--k-ink-3)',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  border: `1px solid ${selectedJob.matchedByCategory ? 'rgba(255, 107, 26, 0.5)' : 'var(--k-border-strong)'}`
-                }}>
-                  {selectedJob.matchedByCategory 
-                    ? `Category Match: ${selectedJob.matchCategory}` 
+                <span
+                  style={{
+                    fontSize: "0.65em",
+                    backgroundColor: "var(--k-wash)",
+                    color: selectedJob.matchedByCategory
+                      ? "var(--k-orange-ink)"
+                      : "var(--k-ink-3)",
+                    padding: "4px 8px",
+                    borderRadius: "4px",
+                    border: `1px solid ${selectedJob.matchedByCategory ? "rgba(255, 107, 26, 0.5)" : "var(--k-border-strong)"}`,
+                  }}
+                >
+                  {selectedJob.matchedByCategory
+                    ? `Category Match: ${selectedJob.matchCategory}`
                     : `Semantic Radius Fallback`}
                 </span>
               )}
             </h3>
 
-            <div style={{ 
-              flex: 1, 
-              overflowY: 'scroll',
-              maxHeight: '23vw',
-              minHeight: 0, 
-              marginTop: '15px', 
-              paddingRight: '10px', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '12px' 
-            }}>
+            <div
+              style={{
+                flex: 1,
+                overflowY: "scroll",
+                maxHeight: "23vw",
+                minHeight: 0,
+                marginTop: "15px",
+                paddingRight: "10px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+              }}
+            >
               {currentWorkers.length === 0 ? (
-                <p style={{ opacity: 0.7 }}>No professionals matched yet or scanning network...</p>
+                <p style={{ opacity: 0.7 }}>
+                  No professionals matched yet or scanning network...
+                </p>
               ) : (
                 currentWorkers.map((worker, index) => {
-                  const isSelected = selectedWorkerId && worker.worker_chat_id === selectedWorkerId;
+                  const isSelected =
+                    selectedWorkerId &&
+                    worker.worker_chat_id === selectedWorkerId;
                   const rank = index + 1;
                   return (
-                    <div 
-                      key={worker.worker_chat_id} 
-                      ref={el => workerCardRefs.current[worker.worker_chat_id] = el}
+                    <div
+                      key={worker.worker_chat_id}
+                      ref={(el) =>
+                        (workerCardRefs.current[worker.worker_chat_id] = el)
+                      }
                       style={{
-                        border: isSelected ? '2px solid #FF6B1A' : '1px solid var(--k-line)',
-                        borderRadius: '8px',
-                        padding: '15px',
-                        backgroundColor: isSelected ? 'var(--k-wash)' : 'var(--k-raise)',
-                        boxShadow: isSelected ? '0 0 0 4px rgba(255, 107, 26, 0.12)' : '0 2px 8px rgba(0, 0, 0, 0.3)',
-                        transform: isSelected ? 'scale(1.02)' : 'none',
-                        transition: 'all 0.2s ease-in-out'
+                        border: isSelected
+                          ? "2px solid #FF6B1A"
+                          : "1px solid var(--k-line)",
+                        borderRadius: "8px",
+                        padding: "15px",
+                        backgroundColor: isSelected
+                          ? "var(--k-wash)"
+                          : "var(--k-raise)",
+                        boxShadow: isSelected
+                          ? "0 0 0 4px rgba(255, 107, 26, 0.12)"
+                          : "0 2px 8px rgba(0, 0, 0, 0.3)",
+                        transform: isSelected ? "scale(1.02)" : "none",
+                        transition: "all 0.2s ease-in-out",
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <strong style={{ fontSize: '1.1em', color: 'var(--k-ink)' }}>{worker.username}</strong>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: "8px",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                          }}
+                        >
+                          <strong
+                            style={{ fontSize: "1.1em", color: "var(--k-ink)" }}
+                          >
+                            {worker.username}
+                          </strong>
                           {isSelected && (
-                            <span style={{
-                              backgroundColor: '#FF6B1A',
-                              color: '#0D0D0D',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontWeight: 700,
-                              fontSize: '0.75em'
-                            }}>
+                            <span
+                              style={{
+                                backgroundColor: "#FF6B1A",
+                                color: "#0D0D0D",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                fontWeight: 700,
+                                fontSize: "0.75em",
+                              }}
+                            >
                               🏆 Rank #{rank}
                             </span>
                           )}
                         </div>
-                        <span style={{ fontSize: '0.85em', color: 'var(--k-ink-3)', border: '1px solid var(--k-border-strong)', padding: '2px 6px', borderRadius: '4px' }}>
+                        <span
+                          style={{
+                            fontSize: "0.85em",
+                            color: "var(--k-ink-3)",
+                            border: "1px solid var(--k-border-strong)",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                          }}
+                        >
                           ID: {worker.worker_chat_id}
                         </span>
                       </div>
 
-                    <p style={{ margin: '0 0 10px 0', fontSize: '0.9em', color: 'var(--k-ink-3)', fontStyle: 'italic', lineHeight: '1.4' }}>
-                      "{worker.job_description}"
-                    </p>
+                      <p
+                        style={{
+                          margin: "0 0 10px 0",
+                          fontSize: "0.9em",
+                          color: "var(--k-ink-3)",
+                          fontStyle: "italic",
+                          lineHeight: "1.4",
+                        }}
+                      >
+                        "{worker.job_description}"
+                      </p>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', fontSize: '0.85em' }}>
-                      <span style={{
-                        backgroundColor: 'var(--k-wash)',
-                        color: 'var(--k-orange-ink)',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontWeight: 700
-                      }}>
-                        Vector Match Score: {worker.match_score}%
-                      </span>
-                    </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "flex-start",
+                          alignItems: "center",
+                          fontSize: "0.85em",
+                        }}
+                      >
+                        <span
+                          style={{
+                            backgroundColor: "var(--k-wash)",
+                            color: "var(--k-orange-ink)",
+                            padding: "4px 8px",
+                            borderRadius: "4px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Vector Match Score: {worker.match_score}%
+                        </span>
+                      </div>
                     </div>
                   );
                 })
@@ -380,12 +559,20 @@ export default function Dash2Board({ viewSlug }) {
           <div className="preview-panel">
             {position === "sidebar" ? (
               <>
-                <span className="badge badge-highlight">Sidebar: Network Discovery</span>
-                <p className="card-summary">Scanning: {selectedJob?.title || "N/A"}</p>
-                <p className="card-summary">Available Matches: {currentWorkers.length}</p>
+                <span className="badge badge-highlight">
+                  Sidebar: Network Discovery
+                </span>
+                <p className="card-summary">
+                  Scanning: {selectedJob?.title || "N/A"}
+                </p>
+                <p className="card-summary">
+                  Available Matches: {currentWorkers.length}
+                </p>
               </>
             ) : (
-              <span className="badge">Footer Slot: Matches for {selectedJob?.title || "N/A"}</span>
+              <span className="badge">
+                Footer Slot: Matches for {selectedJob?.title || "N/A"}
+              </span>
             )}
           </div>
         )}
@@ -394,7 +581,12 @@ export default function Dash2Board({ viewSlug }) {
   };
 
   const renderPostsDashboard = (position) => (
-    <Card slug="ActivePostsDashboard" title="ACTIVE POSTS DASHBOARD" position={position} onSelect={handleModuleSelect}>
+    <Card
+      slug="ActivePostsDashboard"
+      title="ACTIVE POSTS DASHBOARD"
+      position={position}
+      onSelect={handleModuleSelect}
+    >
       <style>
         {`
           @keyframes blinkDot {
@@ -418,57 +610,105 @@ export default function Dash2Board({ viewSlug }) {
       </style>
 
       {position === "main" ? (
-        <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <h2 style={{ flexShrink: 0 }}>ACTIVE POSTS PIPELINE NETWORK</h2>
-          
-          <div className="jobs-selector-list" style={{ 
-            flex: 1, 
-            overflowY: 'scroll',
-            maxHeight: '23vw',
+        <div
+          className="main-panel"
+          style={{
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
             minHeight: 0,
-            marginTop: '20px', 
-            paddingRight: '10px', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '12px' 
-          }}>
+          }}
+        >
+          <h2 style={{ flexShrink: 0 }}>ACTIVE POSTS PIPELINE NETWORK</h2>
+
+          <div
+            className="jobs-selector-list"
+            style={{
+              flex: 1,
+              overflowY: "scroll",
+              maxHeight: "23vw",
+              minHeight: 0,
+              marginTop: "20px",
+              paddingRight: "10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+            }}
+          >
             {pendingJobs.length === 0 ? (
               <p>No pending jobs found.</p>
             ) : (
-              pendingJobs.map(job => {
+              pendingJobs.map((job) => {
                 const isActive = selectedJob && selectedJob.id === job.id;
                 return (
-                  <div 
-                    key={job.id} 
+                  <div
+                    key={job.id}
                     onClick={(e) => {
-                      e.stopPropagation(); 
+                      e.stopPropagation();
                       setSelectedJob(job);
                     }}
                     style={{
-                      border: isActive ? '2px solid #FF6B1A' : '1px solid var(--k-border-strong)',
-                      padding: '15px',
-                      cursor: 'pointer',
-                      backgroundColor: isActive ? 'var(--k-wash)' : 'transparent',
-                      color: 'inherit',
-                      borderRadius: '5px',
-                      transition: 'all 0.2s ease-in-out'
+                      border: isActive
+                        ? "2px solid #FF6B1A"
+                        : "1px solid var(--k-border-strong)",
+                      padding: "15px",
+                      cursor: "pointer",
+                      backgroundColor: isActive
+                        ? "var(--k-wash)"
+                        : "transparent",
+                      color: "inherit",
+                      borderRadius: "5px",
+                      transition: "all 0.2s ease-in-out",
                     }}
                   >
-                    <div style={{ display: 'flex', gap: '20px', marginBottom: '8px', fontSize: '0.85em', fontWeight: 600 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--k-ink-3)' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "20px",
+                        marginBottom: "8px",
+                        fontSize: "0.85em",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          color: "var(--k-ink-3)",
+                        }}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                         </svg>
-                        <span>{job.matchedCount || 0} matched professionals</span>
+                        <span>
+                          {job.matchedCount || 0} matched professionals
+                        </span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--k-alert-ink)' }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          color: "var(--k-alert-ink)",
+                        }}
+                      >
                         <span className="status-indicator-dot"></span>
                         <span>{job.interestedCount || 0} interested</span>
                       </div>
                     </div>
 
-                    <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
-                    <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
+                    <strong style={{ display: "block", fontSize: "1.2em" }}>
+                      {job.title}
+                    </strong>
+                    <span style={{ fontSize: "0.9em", opacity: 0.8 }}>
+                      {job.description}
+                    </span>
                   </div>
                 );
               })
@@ -479,12 +719,20 @@ export default function Dash2Board({ viewSlug }) {
         <div className="preview-panel">
           {position === "sidebar" ? (
             <>
-              <span className="badge badge-highlight">Sidebar: Pipeline Stream</span>
-              <p className="card-summary">Selected: {selectedJob?.title || "None"}</p>
-              <p className="card-summary">Total Pending: {pendingJobs.length}</p>
+              <span className="badge badge-highlight">
+                Sidebar: Pipeline Stream
+              </span>
+              <p className="card-summary">
+                Selected: {selectedJob?.title || "None"}
+              </p>
+              <p className="card-summary">
+                Total Pending: {pendingJobs.length}
+              </p>
             </>
           ) : (
-            <span className="badge">Footer Slot: Active Job ({selectedJob?.title || "None"})</span>
+            <span className="badge">
+              Footer Slot: Active Job ({selectedJob?.title || "None"})
+            </span>
           )}
         </div>
       )}
@@ -493,11 +741,16 @@ export default function Dash2Board({ viewSlug }) {
 
   const resolveModuleBySlot = (slotKey) => {
     switch (postingsSlots[slotKey]) {
-      case "ActiveBiddingsEngine": return renderBiddingsEngine(slotKey);
-      case "GeospatialLiveMap":    return renderLiveMap(slotKey);
-      case "ActivePostsDashboard": return renderPostsDashboard(slotKey);
-      case "RatingsReviewLogs":    return renderReviewLogs(slotKey);
-      default:                     return null;
+      case "ActiveBiddingsEngine":
+        return renderBiddingsEngine(slotKey);
+      case "GeospatialLiveMap":
+        return renderLiveMap(slotKey);
+      case "ActivePostsDashboard":
+        return renderPostsDashboard(slotKey);
+      case "RatingsReviewLogs":
+        return renderReviewLogs(slotKey);
+      default:
+        return null;
     }
   };
 
@@ -505,8 +758,12 @@ export default function Dash2Board({ viewSlug }) {
     <div className="dashboard-grid-4pane">
       <div className="grid-main">{resolveModuleBySlot("main")}</div>
       <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
-      <div className="grid-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
-      <div className="grid-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
+      <div className="grid-bottom-left">
+        {resolveModuleBySlot("bottomLeft")}
+      </div>
+      <div className="grid-bottom-right">
+        {resolveModuleBySlot("bottomRight")}
+      </div>
     </div>
   );
 }
