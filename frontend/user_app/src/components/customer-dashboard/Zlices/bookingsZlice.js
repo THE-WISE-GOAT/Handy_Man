@@ -30,9 +30,37 @@ export const createBookingsZlice = (set, get) => ({
   userAddr: "BHAKTAPUR",
   userCont: "+977 9814737741",
 
+  longitude: 27.671,
+  latitude: 85.428,
+
   jobProfessional: "plumber",
   cust_id: 1,
   isSubmitting: false,
+
+  // -------------------------------------------------------------
+  // EDIT MODE STATE & ACTIONS
+  // -------------------------------------------------------------
+  isEditMode: false,
+  editingJobId: null,
+
+  loadJobForEdit: (job) => set({
+    isEditMode: true,
+    editingJobId: job.id,
+    booking_chat_id: job.booking_chat_id,
+    jobTitleDraft: job.title || "",
+    jobDescriptionDraft: job.description || "",
+    attachments: job.attachments || [],
+    userName: job.contact_name,
+    userAddrText: job.address_text,
+    userLat: job.latitude,
+    userLng: job.longitude,
+    userCont: job.contact_phone,
+  }),
+
+  exitEditMode: async () => {
+    set({ isEditMode: false, editingJobId: null });
+    await get().startNewSession();
+  },
 
   // -------------------------------------------------------------
   // ATTACHMENTS STATE & ACTIONS
@@ -87,7 +115,6 @@ export const createBookingsZlice = (set, get) => ({
         type: "IMG",
       };
 
-      // Prepend newly uploaded image to state
       set((state) => ({
         attachments: [newAttachment, ...state.attachments],
       }));
@@ -175,7 +202,7 @@ export const createBookingsZlice = (set, get) => ({
           contact_phone: userCont || "",
           status: "pending",
           mode: "regular",
-          attachments: attachments || [] // Sends current Cloudinary attachments array
+          attachments: attachments || []
         }),
       });
 
@@ -186,9 +213,7 @@ export const createBookingsZlice = (set, get) => ({
       const data = await response.json();
       if (data.status === "success") {
         console.log("🚀 Success! Job verified, vectorized by Nvidia, and stored securely.");
-        
-        // Clear attachments on success
-        set({ attachments: [] });
+        set({ attachments: [], isEditMode: false, editingJobId: null });
 
         const { fetchPendingJobs, fetchMatchedWorkersForJob } = get();
         if (typeof fetchPendingJobs === "function") {
@@ -242,6 +267,9 @@ export const createBookingsZlice = (set, get) => ({
   setProfessional: (text) => set({ jobProfessional: text }),
 
   booking_chat_id: null,
+
+  setBookingChatId: (id) => set({ booking_chat_id: id }),
+
   ai_response: "",
   is_complete: false,
   categories: [],
@@ -252,7 +280,7 @@ export const createBookingsZlice = (set, get) => ({
   turns_remaining: 5,
 
   startNewSession: async () => {
-    set({ isAiGenerating: true, attachments: [] });
+    set({ isAiGenerating: true, attachments: [], isEditMode: false, editingJobId: null });
     try {
       const token = localStorage.getItem("handy_man_access_token"); 
       const response = await fetch("http://127.0.0.1:8000/dispatch/session", {
