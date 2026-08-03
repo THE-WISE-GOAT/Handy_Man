@@ -12,12 +12,29 @@ Public surface
   CATEGORY_DESCRIPTIONS    — one-line disambiguation per category, used both in
                               the extraction prompt and as the embedding corpus
   extract_final_json()    — converts a finished conversation into a validated payload
+
+problem_description contract
+----------------------------
+problem_description is the single field that downstream matching actually
+embeds, so it is treated here as a first-class deliverable rather than a
+one-line summary. It must be a 2–4 sentence, worker-facing job brief that
+covers, in order: (1) the object/system and its type, (2) the observed
+symptom or the work requested, (3) the location and physical context, and
+(4) any concrete specifics the customer volunteered — material, size,
+count, floor/level, access constraints, age, whether it's a repair vs a new
+install. Anything the customer did not say is simply omitted; the field is
+enriched by *using more of the conversation*, never by inventing detail.
+Two guards enforce this after extraction: _looks_like_example_echo (the
+model parroting the prompt's worked example) and
+_description_needs_enrichment (a thin, vague, or first-person description).
+Either one buys the model exactly one corrective retry.
 """
 
 import json
 import logging
 import math
 import os
+import re
 from pathlib import Path
 from typing import List
 
@@ -82,11 +99,38 @@ SYSTEM_PROMPT = (
     "itself (what needs doing, to what, where) until you have enough detail, without ever "
     "asking them to classify it.\n\n"
 
+    "DETAIL CHECKLIST — what a good answer contains:\n"
+    "A worker reading only the final summary should be able to picture the job and "
+    "turn up with the right skills and tools. Before you finish, try to have learned "
+    "as many of these as the job actually calls for:\n"
+    "  - THE OBJECT: what exact thing is involved, and what kind it is (a geyser vs a "
+    "solar water heater; a front-load vs top-load washing machine; a wooden vs metal "
+    "gate).\n"
+    "  - THE SYMPTOM OR THE ASK: what it's doing wrong (leaking, tripping, stuck, not "
+    "heating, making noise) — or, for non-repair jobs, exactly what should be done "
+    "(install, clean, move, paint, teach, cater).\n"
+    "  - REPAIR vs INSTALL vs MAINTENANCE: whether an existing item is being fixed, a "
+    "new one is being fitted, or something is being serviced/cleaned routinely. These "
+    "look alike in words and are completely different jobs to staff.\n"
+    "  - WHERE: which room, floor, or part of the property — kitchen, second-floor "
+    "bathroom, rooftop tank, driveway, back garden.\n"
+    "  - SCALE: how many, how big, how much area — one tap or five, a single room or "
+    "the whole flat, a 2-seater sofa or a full lounge suite.\n"
+    "  - ANYTHING THAT CHANGES THE APPROACH: material, rough age, whether it's been "
+    "worked on before, or access limits (rooftop, locked shaft, third floor with no "
+    "lift).\n"
+    "Ask about a checklist item only when it is genuinely missing AND it would change "
+    "what the worker does or brings. Never run through this list mechanically, never "
+    "ask about something the customer already covered, and never ask for a detail that "
+    "obviously doesn't apply to the job in front of you.\n\n"
+
     "STYLE RULES:\n"
     "- Keep every reply to 1–2 short sentences. Never write long paragraphs.\n"
-    "- Always acknowledge what the customer just told you before asking anything. " # something here
+    "- Always acknowledge what the customer just told you before asking anything. "
     "They should feel heard, not interrogated.\n"
     "- Ask about ONE missing piece at a time. Never stack two questions in one reply.\n"
+    "- Prefer concrete, answerable questions over open ones: 'Is it the rooftop tank or "
+    "an underground one?' beats 'Can you tell me more about the tank?'\n"
     "- Never diagnose the problem or suggest a fix — you are a dispatcher, not a technician.\n"
     "- Do NOT ask about urgency, danger, or safety — those are handled separately.\n"
     "- Do NOT repeat information the customer already gave you.\n"
@@ -99,10 +143,10 @@ SYSTEM_PROMPT = (
     "description and proceed normally — an unfamiliar job is still a job.\n"
     "- Only refuse if the request isn't a dispatchable job at all — e.g. it's not "
     "something a worker could physically show up and do (legal/medical advice unrelated "
-    "to in-home care, writing or coding something, general chit-chat, shopping requests, " # something here
+    "to in-home care, writing or coding something, general chit-chat, shopping requests, "
     "etc.). In that case, explain you can only help book hands-on service work and ask "
     "them to describe a job, instead of moving toward completion.\n\n"
-    
+
     "ATTACHMENTS:\n"
     "- You are text-only. You cannot receive, view, or store photos, files, "
     "measurements-as-images, or any other attachment in this chat, even if the "
@@ -137,7 +181,7 @@ SYSTEM_PROMPT = (
     "now. [COMPLETE]'\n"
     "    'Noted — installing a timer on your water tank. Getting someone to you. "
     "[COMPLETE]'\n"
-    "- If the customer has already sent 5 messages and the task still isn't fully "    # something here
+    "- If the customer has already sent 5 messages and the task still isn't fully "
     "specific, make your best inference from what they've said, confirm it naturally, "
     "and end with [COMPLETE]. Do not keep asking indefinitely.\n"
     "- NEVER emit [COMPLETE] before you have a concrete description of an actual task.\n"
@@ -379,7 +423,7 @@ SERVICE_REGISTRY: dict[str, dict[str, str]] = {
         "tailoring-alteration": "Adjusting, hemming, or altering clothing",
         "stitch-repair":        "Repairing torn seams, buttons, or zippers on garments",
     },
-} 
+}
 
 PROBLEM_CATEGORIES: List[str] = list(SERVICE_REGISTRY.keys())
 ALL_TAGS: List[str] = [tag for tags in SERVICE_REGISTRY.values() for tag in tags]
@@ -591,28 +635,86 @@ def _build_extraction_prompt(candidate_categories: list[str] | None = None) -> s
         "described the task. False only when both the category and every "
         "one of its tags are exact, verified registry matches.\n"
         "     Empty list if is_job_request is false.\n\n"
-        "  3. problem_description — 1-2 plain sentences describing the "
-        "physical task or problem itself: what needs doing, to what, and "
-        "where. Empty string if is_job_request is false. Do not invent "
-        "details the customer didn't say; do not mention urgency or "
-        "safety.\n"
-        "     This text will later be embedded and matched against worker "
-        "job_description text from the worker vetting pipeline, so:\n"
-        "       - Never use first-person voice ('my sink is leaking') or "
-        "third-person customer framing ('the customer's sink is "
-        "leaking') — state the task directly, e.g. 'Leaking pipe under "
-        "the kitchen sink needs repair.'\n"
-        "       - Strip conversational filler, apologies, and requests "
-        "for help ('please help', 'can someone fix') — describe only the "
-        "physical task.\n"
-        "       - Use the same plain, concrete vocabulary as TAG REGISTRY "
-        "below for the matched category or categories, so wording lines "
-        "up with how worker capabilities are described for the same "
-        "domain. Do not force a registry term that doesn't genuinely fit "
-        "the task.\n"
-        "       - If the job spans more than one trade, cover every trade "
-        "listed in categories, but stay concise — 2 sentences is a "
-        "ceiling, not a target.\n\n"
+        "  3. problem_description — THE MOST IMPORTANT FIELD. This is the job "
+        "brief a worker will read to decide whether they can do this job, and "
+        "it is the text that gets embedded and matched against worker "
+        "capability profiles. A thin one-liner is a FAILURE even when it is "
+        "technically accurate. Empty string only if is_job_request is false.\n\n"
+        "     LENGTH AND SHAPE: write 2 to 4 complete sentences (roughly "
+        "35–90 words) of flowing prose. Not a single clause, not bullet "
+        "points, not a list of keywords, not a transcript. Longer than 4 "
+        "sentences means you are padding — stop.\n\n"
+        "     COVER THESE, IN THIS ORDER, using only what the conversation "
+        "actually contains:\n"
+        "       (a) THE OBJECT AND ITS TYPE — name the exact item, system, "
+        "surface, vehicle, or person-facing service involved, with whatever "
+        "type/model/material qualifier the customer gave (e.g. 'rooftop "
+        "plastic water storage tank', 'front-load washing machine', "
+        "'wall-mounted split AC unit', 'wooden main entrance door').\n"
+        "       (b) THE SYMPTOM OR THE WORK REQUESTED — what is observably "
+        "wrong (leaking, tripping, stuck, not heating, making noise, "
+        "cracked, infested) or, for non-repair jobs, precisely what must be "
+        "done (install, replace, clean, move, paint, coach, cater). State "
+        "clearly whether this is a REPAIR of an existing item, a NEW "
+        "INSTALLATION, or ROUTINE SERVICING/CLEANING — these read alike in "
+        "words but are different jobs to staff.\n"
+        "       (c) LOCATION AND CONTEXT — where on the property or vehicle "
+        "the work happens: which room, floor, rooftop, exterior wall, "
+        "driveway, or garden, plus property type (flat, house, office, shop) "
+        "when the customer mentioned it.\n"
+        "       (d) CONCRETE SPECIFICS THE CUSTOMER GAVE — quantity, "
+        "dimensions, area, material, approximate age, prior repair attempts, "
+        "and any access constraint (rooftop access, third floor without a "
+        "lift, locked utility shaft, work must happen around furniture). "
+        "Include the numbers and units exactly as stated.\n"
+        "       (e) SCOPE PER TRADE — if categories lists more than one "
+        "trade, make explicit which part of the work belongs to each, so a "
+        "single-trade worker can tell what they'd be responsible for.\n\n"
+        "     HARD RULES:\n"
+        "       - NEVER invent, assume, or infer a detail the customer did "
+        "not state. If the floor, size, material, or age never came up, "
+        "simply do not mention it. Enrichment comes from using MORE of what "
+        "was actually said, never from filling gaps with plausible guesses. "
+        "A confidently wrong detail is far more damaging than a missing "
+        "one, because it misroutes the job.\n"
+        "       - Do NOT diagnose a root cause the customer did not "
+        "themselves report. Describe the reported symptom. If the customer "
+        "offered their own guess, attribute it as reported (e.g. 'customer "
+        "reports the motor appears dead') rather than stating it as fact.\n"
+        "       - Never use first person ('my sink is leaking') or "
+        "customer framing ('the customer's sink is leaking'); the ONLY "
+        "permitted use of the word 'customer' is attributing a reported "
+        "guess as above. State the job directly: 'Water is leaking from the "
+        "supply pipe under the kitchen sink.'\n"
+        "       - Strip greetings, apologies, thanks, pleading and requests "
+        "for help ('please help', 'can someone come fast'). Describe only "
+        "the work.\n"
+        "       - Do NOT mention urgency, danger, safety, scheduling "
+        "preference, budget, or price — those are captured separately. "
+        "Scheduling is only in-scope when it defines the job itself (e.g. "
+        "'weekly recurring cleaning' vs a one-off).\n"
+        "       - Use the plain, concrete vocabulary of TAG REGISTRY for "
+        "the matched categories so the wording lines up with how worker "
+        "capabilities are written in the same domain — but never bend the "
+        "facts to fit a registry phrase.\n"
+        "       - Write it so it stands alone. Someone who never saw this "
+        "conversation must understand the whole job from this text only, "
+        "with no pronouns pointing at things that were only mentioned in "
+        "chat ('it', 'that one', 'the same as before').\n\n"
+        "     QUALITY BAR — compare these:\n"
+        "       WEAK (rejected): 'Water tank problem needs fixing.'\n"
+        "       WEAK (rejected): 'Customer needs help with their tank and a "
+        "timer.'\n"
+        "       STRONG (accepted): 'A 1000-litre rooftop water storage tank "
+        "on a two-storey house needs an automatic level-control timer "
+        "fitted so the supply pump stops on its own. The work covers "
+        "mounting the timer unit at the tank and adapting the existing tank "
+        "inlet fittings, then wiring the timer into the pump's mains supply. "
+        "The tank is reached by an external rooftop ladder.'\n"
+        "     The strong version wins because every clause came from the "
+        "conversation, the object is named with its type and size, the work "
+        "type (new fitting, not repair) is explicit, and the two trades' "
+        "portions are separable.\n\n"
         "REMEMBER: CATEGORY LIST and TAG REGISTRY below are a preferred, "
         "commonly-used set — not the only valid answers. Treat them as "
         "helpful defaults, not a constraint that overrides accuracy. "
@@ -627,8 +729,10 @@ def _build_extraction_prompt(candidate_categories: list[str] | None = None) -> s
         "WORKED EXAMPLE — a job spanning two trades, including a category "
         "that LOOKS related by word-association but ISN'T:\n"
         "  Customer: \"My automatic sliding driveway gate is stuck halfway "
-        "open. I think the motor's dead, and the manual release lever is "
-        "jammed too so I can't push it by hand either.\"\n"
+        "open. It's the metal one at the street entrance of the house, "
+        "about 12 feet wide, put in maybe six years ago. I think the "
+        "motor's dead, and the manual release lever is jammed too so I "
+        "can't push it by hand either.\"\n"
         "  Correct extraction:\n"
         "  {\n"
         "    \"is_job_request\": true,\n"
@@ -636,12 +740,22 @@ def _build_extraction_prompt(candidate_categories: list[str] | None = None) -> s
         "      {\"category\": \"construction\", \"tags\": [\"gate-repair\", "
         "\"manual-release-fixing\"], \"is_custom_category\": true},\n"
         "      {\"category\": \"electrical\", \"tags\": "
-        "[\"electric-motor-replacement\"], \"is_custom_category\": true}\n"
+        "[\"electric-motor-replacement\", \"wiring-repair\"], "
+        "\"is_custom_category\": true}\n"
         "    ],\n"
-        "    \"problem_description\": \"Automatic sliding driveway gate "
-        "stuck halfway open due to a dead motor and a jammed manual release "
-        "lever.\"\n"
+        "    \"problem_description\": \"An automatic sliding metal gate at "
+        "the street entrance of a house, roughly 12 feet wide and about six "
+        "years old, is stuck halfway open and cannot be moved by hand. The "
+        "manual release lever is jammed, so the mechanical work covers "
+        "freeing the release mechanism and checking the gate track and "
+        "rollers it runs on. Separately, the drive motor is unresponsive and "
+        "the customer reports it may be dead, so the motor and its supply "
+        "wiring need diagnosing and likely replacing.\"\n"
         "  }\n"
+        "  Note how the description names the object with its material, "
+        "size and age exactly as stated, separates the mechanical scope "
+        "from the electrical scope, and attributes the dead-motor guess as "
+        "reported rather than asserting it.\n"
         "  This is NOT 'security', even though gates control access to a "
         "property. The job here is fixing stuck hardware — structural and "
         "electrical repair — not monitoring or protecting the property. "
@@ -649,11 +763,12 @@ def _build_extraction_prompt(candidate_categories: list[str] | None = None) -> s
         "alarms, or access-control systems (cameras, intercoms, alarm "
         "panels), not the physical mechanism of a gate, door, or lock.\n"
         "  STYLE NOTE: this example illustrates categorisation and "
-        "description FORMAT only. If your own problem_description starts "
-        "to closely mirror its exact wording for a different job, that's a "
-        "sign you're echoing the example rather than describing what this "
-        "customer actually said — rewrite using only this conversation's "
-        "details, in your own words.\n\n"
+        "description FORMAT only. Reuse its STRUCTURE, never its wording or "
+        "its facts. If your own problem_description starts to mirror its "
+        "phrasing for a different job, or mentions a gate, motor or release "
+        "lever that this customer never brought up, you are echoing the "
+        "example instead of describing the real conversation — rewrite "
+        "using only this conversation's details, in your own words.\n\n"
         f"CATEGORY LIST (preferred, not exhaustive):\n{json.dumps(PROBLEM_CATEGORIES)}\n\n"
         f"TAG REGISTRY (grouped by category, examples only):"
         f"{_format_registry(candidate_categories)}"
@@ -716,30 +831,183 @@ def _blank_non_job_result(result: CustomerProblemSchema) -> CustomerProblemSchem
     return result
 
 
+# ── Description normalisation ────────────────────────────────────────────────
+# Cheap, deterministic tidy-up applied to whatever the model returns, so the
+# stored brief is always clean prose regardless of how the model formatted
+# it. Strictly cosmetic — it never adds, removes, or reorders meaning, and
+# never rewrites the job itself. Anything substantive is handled by the
+# enrichment retry below, which asks the model to do the rewriting.
+
+_MARKDOWN_BULLET_RE = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+", re.MULTILINE)
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _tidy_description(problem_description: str) -> str:
+    """
+    Flatten bullets/newlines into prose, collapse runs of whitespace, drop
+    stray wrapping quotes, and make sure the text ends with a full stop.
+    """
+    text = problem_description.strip()
+    if not text:
+        return ""
+    text = _MARKDOWN_BULLET_RE.sub("", text)
+    text = _WHITESPACE_RE.sub(" ", text).strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'"}:
+        text = text[1:-1].strip()
+    if text and text[-1] not in ".!?":
+        text += "."
+    return text
+
+
 # ── Worked-example echo guard ────────────────────────────────────────────────
 # Small models occasionally reproduce a prompt's own worked example almost
 # verbatim instead of describing the real conversation, especially when the
 # real job is topically close to the example. This is a targeted guard
 # against that specific, observed failure mode — not a general plagiarism
-# detector — so it's deliberately cheap: an exact/near-exact substring check
-# against the one example string that actually appears in this prompt.
+# detector — so it's deliberately cheap: exact/near-exact substring checks
+# against the distinctive phrases of the one example in this prompt.
+#
+# Keep these fragments in sync with the worked example in
+# _build_extraction_prompt. If that example is reworded, the fragments here
+# must be reworded with it or the guard silently stops firing.
 
 _EXAMPLE_ECHO_TEXTS = [
+    "an automatic sliding metal gate at the street entrance of a house",
+    "roughly 12 feet wide and about six years old, is stuck halfway open",
+    "the manual release lever is jammed, so the mechanical work covers",
+    # Retained from the earlier, shorter worked example so histories or
+    # cached prompts carrying the old wording are still caught.
     "automatic sliding driveway gate stuck halfway open due to a dead "
     "motor and a jammed manual release lever",
 ]
+
+
+_MIN_ECHO_COMPARE_LEN = 40  # don't call a stub an "echo" just for being short
 
 
 def _looks_like_example_echo(problem_description: str) -> bool:
     """
     True if problem_description closely matches the worked example's own
     wording rather than describing what this specific customer said.
+
+    The reverse containment check (description inside an example fragment)
+    only applies to text long enough for the overlap to be meaningful —
+    otherwise a short, unrelated stub could coincidentally sit inside a
+    fragment and get routed to the echo branch instead of the enrichment
+    branch, which is the correction it actually needs.
     """
-    normalized = problem_description.strip().lower()
-    return any(
-        example in normalized or normalized in example
-        for example in _EXAMPLE_ECHO_TEXTS
-    )
+    normalized = _WHITESPACE_RE.sub(" ", problem_description.strip().lower())
+    if not normalized:
+        return False
+    for example in _EXAMPLE_ECHO_TEXTS:
+        if example in normalized:
+            return True
+        if len(normalized) >= _MIN_ECHO_COMPARE_LEN and normalized in example:
+            return True
+    return False
+
+
+# ── Thin-description guard ───────────────────────────────────────────────────
+# The whole point of this change is that problem_description must be a real
+# job brief, not a label. Models under-deliver on that in a few predictable
+# ways: they return one short clause, they hedge with placeholder nouns
+# ('some issue with the tank'), they slip back into first person, or they
+# compress a long, detail-rich conversation into a fraction of what was
+# said. Each of those is detectable without another model call, so they're
+# caught here and repaired with a single targeted retry rather than being
+# stored and silently degrading match quality downstream.
+
+_MIN_DESCRIPTION_WORDS = 18          # below this, it isn't a brief
+_MIN_DESCRIPTION_SENTENCES = 2       # the prompt asks for 2–4
+_DETAIL_RATIO = 0.22                 # vs. what the customer actually said
+_DETAIL_RATIO_WORD_CAP = 45          # never demand more than this many words
+_LONG_CONVERSATION_WORDS = 45        # only apply the ratio to real detail
+
+# Phrases that signal the model hedged instead of describing the job. Kept
+# deliberately narrow: each entry must be vague ON ITS OWN, so it can't fire
+# on a detailed brief that merely happens to contain the words. "needs
+# fixing" is excluded for exactly that reason — "the leaking mixer tap in
+# the second-floor bathroom needs fixing" is a perfectly good brief.
+_VAGUE_DESCRIPTION_MARKERS = (
+    "something wrong",
+    "something is wrong",
+    "some issue",
+    "some problem",
+    "some kind of",
+    "some work",
+    "needs help",
+    "general problem",
+    "unspecified",
+    "as described above",
+    "as mentioned above",
+    "see conversation",
+    "details not provided",
+    "no further details",
+)
+
+_FIRST_PERSON_RE = re.compile(r"\b(i|i'm|im|my|mine|we|we're|our|ours|me|us)\b")
+_SENTENCE_SPLIT_RE = re.compile(r"[.!?]+(?:\s|$)")
+
+
+def _description_needs_enrichment(problem_description: str, customer_text: str = "") -> bool:
+    """
+    True when problem_description falls short of the brief contract and is
+    worth one corrective retry.
+
+    Fires on any of: empty/near-empty text, fewer than two sentences, a
+    placeholder/hedging phrase, first-person voice, or a description that is
+    disproportionately thin next to a detail-rich conversation. Deliberately
+    conservative — a description that is merely concise but complete should
+    pass, because a needless retry costs latency and risks the model
+    padding with invented detail.
+    """
+    text = _tidy_description(problem_description)
+    if not text:
+        return True
+
+    words = text.split()
+    if len(words) < _MIN_DESCRIPTION_WORDS:
+        return True
+
+    sentences = [s for s in _SENTENCE_SPLIT_RE.split(text) if s.strip()]
+    if len(sentences) < _MIN_DESCRIPTION_SENTENCES:
+        return True
+
+    lowered = text.lower()
+    if any(marker in lowered for marker in _VAGUE_DESCRIPTION_MARKERS):
+        return True
+
+    if _FIRST_PERSON_RE.search(lowered):
+        return True
+
+    # The customer gave plenty of detail but almost none of it survived.
+    customer_word_count = len(customer_text.split())
+    if customer_word_count >= _LONG_CONVERSATION_WORDS:
+        required = min(int(customer_word_count * _DETAIL_RATIO), _DETAIL_RATIO_WORD_CAP)
+        if len(words) < required:
+            return True
+
+    return False
+
+
+_ENRICHMENT_NUDGE = (
+    "Your previous problem_description does not meet the required "
+    "standard: it is too short, too vague, written in first person, or it "
+    "dropped concrete details the customer actually provided. Produce the "
+    "same JSON again with is_job_request and categories UNCHANGED, and "
+    "rewrite problem_description as 2 to 4 full sentences (roughly 35–90 "
+    "words) that state, in order: the exact object or service and its type "
+    "or material, the observed symptom or the work requested and whether "
+    "it is a repair, a new installation, or routine servicing/cleaning, "
+    "where on the property or vehicle it is, and every concrete specific "
+    "the customer gave — quantities, sizes, ages, access constraints — "
+    "using their exact numbers. If more than one trade is involved, say "
+    "which part of the work belongs to each. Use third-person, "
+    "worker-facing prose with no first-person pronouns and no pleading or "
+    "filler. Do NOT invent, assume, or infer anything the customer did not "
+    "say: draw only on details actually present in the conversation above, "
+    "and leave out anything that never came up."
+)
 
 
 def _call_extraction_model(
@@ -802,11 +1070,19 @@ def extract_final_json(
     multi-trade jobs route to every relevant worker pool without tags
     bleeding into the wrong trade.
 
-    problem_description is checked against _looks_like_example_echo after
-    the first extraction call. If it matches, the model gets one retry at a
-    higher temperature with an explicit correction nudge; if that retry
-    still echoes (or fails outright), the original result is kept rather
-    than blocking extraction on this defensive check.
+    problem_description quality is enforced after the first extraction call,
+    because it is the text downstream matching actually embeds:
+      - _tidy_description flattens any bullets/newlines into clean prose.
+      - _looks_like_example_echo catches the model parroting the prompt's
+        worked example instead of this conversation.
+      - _description_needs_enrichment catches briefs that are too short,
+        single-sentence, hedging, first-person, or disproportionately thin
+        next to a detail-rich conversation.
+    Whichever fires first buys exactly ONE corrective retry at a slightly
+    higher temperature with a targeted nudge. The retry is accepted only if
+    it is genuinely better by the same checks; otherwise the original is
+    kept. Extraction is never blocked on these defensive checks — a
+    mediocre brief still dispatches, it just gets logged.
 
     Outcomes:
       - Clean registry match: a category entry's name is an exact
@@ -828,9 +1104,10 @@ def extract_final_json(
     cleaned = [msg for msg in chat_history if msg["role"] != "system"]
 
     # Plain-text version of what the customer described, used only to find
-    # the semantic neighbourhood of categories for the shortlist — never
-    # sent to the model as a leading question, and never overrides anything
-    # the model itself decides.
+    # the semantic neighbourhood of categories for the shortlist and to
+    # judge whether the returned brief used a fair share of the detail on
+    # offer — never sent to the model as a leading question, and never
+    # overrides anything the model itself decides.
     customer_text = " ".join(msg["content"] for msg in cleaned if msg["role"] == "user")
     candidate_categories = _shortlist_categories(customer_text)
 
@@ -846,35 +1123,64 @@ def extract_final_json(
         return _blank_non_job_result(result)
 
     result.categories = _sanitize_categories(result.categories)
+    result.problem_description = _tidy_description(result.problem_description)
 
-    if _looks_like_example_echo(result.problem_description):
-        logger.warning(
-            "Extraction echoed the worked example's problem_description "
-            "verbatim; retrying at a higher temperature."
-        )
-        retry_messages = messages + [
-            {
-                "role": "system",
-                "content": (
-                    "Your previous problem_description copied the worked "
-                    "example's exact wording. That example illustrates "
-                    "format only. Rewrite problem_description using only "
-                    "details this specific customer actually said, in "
-                    "different words."
-                ),
-            }
-        ]
+    # One retry budget, shared: whichever description problem shows up
+    # first gets the correction. Echo is checked first because an echoed
+    # description is wrong about the job itself, not merely thin.
+    echoed = _looks_like_example_echo(result.problem_description)
+    thin = False if echoed else _description_needs_enrichment(
+        result.problem_description, customer_text
+    )
+
+    if echoed or thin:
+        if echoed:
+            logger.warning(
+                "Extraction echoed the worked example's problem_description; "
+                "retrying at a higher temperature."
+            )
+            nudge = (
+                "Your previous problem_description reused the worked "
+                "example's wording and details. That example illustrates "
+                "STRUCTURE only, never content. Produce the same JSON again "
+                "with is_job_request and categories UNCHANGED, and rewrite "
+                "problem_description from scratch as 2 to 4 full sentences "
+                "using only what this specific customer actually said, in "
+                "your own words. Do not mention any object, fault, "
+                "measurement or component that does not appear in the "
+                "conversation above."
+            )
+        else:
+            logger.info(
+                "problem_description fell short of the job-brief standard "
+                "(%d words); retrying for a richer description.",
+                len(result.problem_description.split()),
+            )
+            nudge = _ENRICHMENT_NUDGE
+
+        retry_messages = messages + [{"role": "system", "content": nudge}]
         try:
             retry_result = _call_extraction_model(retry_messages, model_name, temperature=0.2)
-            if (
+            retry_description = _tidy_description(retry_result.problem_description)
+            improved = (
                 getattr(retry_result, "is_job_request", True)
-                and not _looks_like_example_echo(retry_result.problem_description)
-            ):
+                and not _looks_like_example_echo(retry_description)
+                and not _description_needs_enrichment(retry_description, customer_text)
+                and bool(retry_result.categories)
+            )
+            if improved:
                 retry_result.categories = _sanitize_categories(retry_result.categories)
+                retry_result.problem_description = retry_description
                 result = retry_result
+            else:
+                logger.warning(
+                    "Description retry did not clear the quality checks; "
+                    "keeping the original extraction."
+                )
         except Exception as exc:
             logger.warning(
-                "Retry after example echo failed, keeping original result: %s", exc
+                "Retry after description quality check failed, keeping original result: %s",
+                exc,
             )
 
     if not result.categories or not result.problem_description.strip():

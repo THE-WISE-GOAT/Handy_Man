@@ -1,20 +1,34 @@
+"""
+Dispatch router — AI-powered home-repair booking interview.
+
+Endpoints
+---------
+  POST /dispatch/session
+      Start a brand-new chat session.  Returns the opening greeting and
+      the new booking_chat_id so the client can display it immediately.
+
+  POST /dispatch/chat
+      Send one customer message and get the AI reply back.
+
+  GET  /dispatch/{booking_chat_id}/history
+      Fetch the full conversation so far (client-safe subset only).
+
+  GET  /dispatch/{booking_chat_id}/summary
+      Fetch the structured extraction result once the session is complete.
+"""
 import logging
 import os
-import math
-import io
-import httpx
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Response
-from sqlalchemy import select, func
+import httpx  # Swapped requests for httpx
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
-
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema, job_manager, matching_manager
 from src.core.manager import manager
-
-import matplotlib.pyplot as plt
-import seaborn as sns
+import math
+from fastapi.concurrency import run_in_threadpool
 
 from src.ai.customer_chat_analyser_nvidia import (
     _nvidia_client,
@@ -27,20 +41,20 @@ from src.ai.customer_chat_analyser_nvidia import (
 )
 
 router = APIRouter(prefix="/dispatch", tags=["Dispatch"])
-match_router = APIRouter(tags=["Matching"])
+match_router = APIRouter( tags=["Matching"])  # Separate router for matching endpoints
 logger = logging.getLogger(__name__)
 
-DEFAULT_SEARCH_RADIUS_METERS = 600_000  # 60 km radius cutoff
+DEFAULT_SEARCH_RADIUS_METERS = 600_000  # 60 km — hard cutoff
 
 
-# ── Helper Functions ─────────────────────────────────────────────────────────
+# ── Helper ───────────────────────────────────────────────────────────────────
 
 def _get_own_session(
     booking_chat_id: int,
     db: Session,
     current_user: model.User,
 ) -> model.BookingChat:
-    """Fetch a BookingChat belonging to current_user or raise 404."""
+    """Fetch a BookingChat that belongs to the current user; 404 if missing."""
     session = db.execute(
         select(model.BookingChat).where(
             model.BookingChat.id == booking_chat_id,
@@ -57,11 +71,17 @@ def _get_own_session(
 
 
 async def _get_address_from_coords(lat: float, lng: float) -> str:
-    """Reverse-geocode latitude and longitude into physical address text."""
+    """Detects the physical location address text from latitude and longitude coordinates."""
     url = "https://nominatim.openstreetmap.org/reverse"
-    params = {"lat": lat, "lon": lng, "format": "json", "addressdetails": 1}
-    headers = {"User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"}
-    
+    params = {
+        "lat": lat,
+        "lon": lng,
+        "format": "json",
+        "addressdetails": 1
+    }
+    headers = {
+        "User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"
+    }
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(url, params=params, headers=headers, timeout=8.0)
@@ -69,14 +89,17 @@ async def _get_address_from_coords(lat: float, lng: float) -> str:
                 data = response.json()
                 if "display_name" in data:
                     return data["display_name"]
+                logger.error("[Geocode Error] 'display_name' field missing in JSON response")
+            else:
+                logger.error(f"[Geocode Error] Server responded with code: {response.status_code}")
     except Exception as e:
         logger.error(f"[Geocode Exception] Network failure details: {e}")
-
+        
     return f"Location ({lat}, {lng})"
 
 
 async def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
-    """Fetch vector embedding from NVIDIA NIM API."""
+    """Requests a vector embedding from the Nvidia NIM API for a given job description."""
     api_key = os.getenv("NVIDIA_API_KEY")
     if not api_key:
         logger.error("NVIDIA_API_KEY environment variable is missing.")
@@ -97,19 +120,22 @@ async def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
     }
 
     try:
+        logger.info("Requesting embedding from Nvidia NIM...")
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://integrate.api.nvidia.com/v1/embeddings",
-                headers=headers,
-                json=nvidia_payload,
+                headers=headers, 
+                json=nvidia_payload, 
                 timeout=20.0
             )
             if response.status_code == 200:
                 return response.json()["data"][0]["embedding"]
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Nvidia API error: {response.status_code}"
-            )
+            else:
+                logger.error(f"Nvidia API error: {response.status_code} - {response.text}")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Nvidia API error: {response.status_code}"
+                )
     except httpx.RequestError as e:
         logger.error(f"Failed to connect to Nvidia API: {e}")
         raise HTTPException(
@@ -119,7 +145,7 @@ async def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
 
 
 async def _broadcast_notifications(worker_chat_ids: list[int], job_payload: dict):
-    """Background task to broadcast real-time websocket alerts to workers."""
+    """Helper to run async websocket broadcasts from a sync endpoint in the background."""
     for worker_chat_id in worker_chat_ids:
         try:
             await manager.send_worker_notification(worker_chat_id, job_payload)
@@ -127,14 +153,7 @@ async def _broadcast_notifications(worker_chat_ids: list[int], job_payload: dict
             logger.warning(f"Failed live alert broadcast to worker {worker_chat_id}: {ws_err}")
 
 
-def _extract_primary_category(categories: list[dict]) -> tuple[str | None, bool]:
-    if not categories:
-        return None, False
-    top = categories[0]
-    return top.get("category"), bool(top.get("is_custom_category", False))
-
-
-# ── Core Dispatch Endpoints ──────────────────────────────────────────────────
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post(
     "/session",
@@ -183,7 +202,7 @@ def dispatch_chat(
     if payload.booking_chat_id <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="booking_chat_id must be a positive integer.",
+            detail="booking_chat_id must be a positive integer. Call POST /dispatch/session first.",
         )
 
     chat_session = _get_own_session(payload.booking_chat_id, db, current_user)
@@ -271,7 +290,7 @@ def dispatch_chat(
 @router.get(
     "/{booking_chat_id}/history",
     response_model=schema.ChatHistoryOut,
-    summary="Get full conversation history for a session",
+    summary="Get the full conversation history for a session",
 )
 def get_history(
     booking_chat_id: int,
@@ -293,18 +312,18 @@ def get_history(
     ]
 
     return {
-        "booking_chat_id": chat_session.id,
-        "history": visible_history,
-        "is_complete": chat_session.is_complete,
-        "turns_used": count_user_turns(chat_session.history),
-        "turns_remaining": max(0, MAX_TURNS - count_user_turns(chat_session.history)),
+        "booking_chat_id":  chat_session.id,
+        "history":          visible_history,
+        "is_complete":      chat_session.is_complete,
+        "turns_used":       count_user_turns(chat_session.history),
+        "turns_remaining":  max(0, MAX_TURNS - count_user_turns(chat_session.history)),
     }
 
 
 @router.get(
     "/{booking_chat_id}/summary",
     response_model=schema.BookingSummaryOut,
-    summary="Get structured extraction result",
+    summary="Get the structured extraction result (only available after completion)",
 )
 def get_booking_summary(
     booking_chat_id: int,
@@ -320,18 +339,53 @@ def get_booking_summary(
         )
 
     return {
-        "categories": chat_session.categories or [],
-        "problem_description": chat_session.problem_description or "",
-        "is_complete": chat_session.is_complete,
-        "is_job_request": bool(chat_session.is_job_request),
+        "categories":           chat_session.categories           or [],
+        "problem_description":  chat_session.problem_description  or "",
+        "is_complete":          chat_session.is_complete,
+        "is_job_request":       bool(chat_session.is_job_request),
     }
 
 
+async def _refine_job_description_with_ai(raw_description: str) -> str:
+    """
+    Acts as a secondary intelligence layer to sanitize and optimize 
+    customer inputs for better vector embedding matching.
+    """
+    prompt = f"""
+    You are a backend data processor for a service marketplace. Your only job is to clean up a customer's raw task description so it can be accurately converted into a semantic database vector.
+    
+    Rewrite the customer's text into a single, clear, and reliable paragraph describing the physical work required.
+
+    STRICT RULES:
+    1. DO NOT write a formal job posting or job description.
+    2. DO NOT use headers, bullet points, or titles (e.g., no "Job Title:", "Key Responsibilities:").
+    3. DO NOT hallucinate or add extra requirements (no "communication skills", "valid license", etc.).
+    4. ONLY clarify the exact task, duration, location, and items mentioned by the customer.
+    5. Output NOTHING except the single, cleaned paragraph.
+    
+    Raw Customer Text: {raw_description}
+    """
+    
+    try:
+        response = await run_in_threadpool(
+            lambda: _nvidia_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1, # Dropped to 0.1 to make the AI extremely literal and robotic
+                max_tokens=150   # Lowered to physically prevent it from generating long bulleted lists
+            )
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"AI description refinement failed: {e}. Falling back to raw text.")
+        return raw_description
+    
+    
 @router.post(
     "/{booking_chat_id}/complete",
-    summary="Complete booking session, save Cloudinary attachments, vectorize request, and perform worker matching", # //att-change
+    summary="Complete the AI chat, write core records, invoke engine matching, and alert workers",
 )
-async def complete_customer_chat(
+async def complete_customer_chat( 
     booking_chat_id: int, 
     payload: schema.CompleteChatIn, 
     background_tasks: BackgroundTasks,
@@ -346,42 +400,58 @@ async def complete_customer_chat(
 
     chat_session = _get_own_session(booking_chat_id, db, current_user)
     
-    job_desc = payload.edited_description.strip()
-    if not job_desc:
-        job_desc = f"{payload.title}: {payload.contact_name or ''}".strip()
+    # 1. Get the raw text from the frontend submission
+    raw_job_desc = payload.edited_description.strip()
+    if not raw_job_desc:
+        raw_job_desc = f"{payload.title}: {payload.contact_name or ''}".strip()
     
-    if not chat_session.is_complete and not job_desc:
+    if not chat_session.is_complete and not raw_job_desc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot process summary. AI session incomplete and job description missing."
+            detail="Cannot process summary. The AI chat session is not complete yet. Please provide a job description."
         )
 
-    # Fetch embedding vectors and resolve coordinate address
-    embedding_vector = await _fetch_nvidia_embedding(job_desc)
+    # ══════════════════════════════════════════════════════════════════════════
+    # 2. CONDITIONAL AI REFINEMENT (The Diff Check)
+    # ══════════════════════════════════════════════════════════════════════════
+    original_ai_desc = (chat_session.problem_description or "").strip()
+    
+    # Check if this is a manual entry (no original AI desc) OR if the user edited the text
+    if not original_ai_desc or raw_job_desc != original_ai_desc:
+        logger.info(f"[Booking {booking_chat_id}] Description modified or manual. Running AI refinement.")
+        final_job_desc = await _refine_job_description_with_ai(raw_job_desc)
+    else:
+        logger.info(f"[Booking {booking_chat_id}] Description matches original AI summary. Skipping refinement.")
+        final_job_desc = raw_job_desc
+    # ══════════════════════════════════════════════════════════════════════════
+
+    # 3. Use the final description for vectorization and saving
+    embedding_vector = await _fetch_nvidia_embedding(final_job_desc)
     address_text = await _get_address_from_coords(lat, lng)
         
     customer_fields = {
         "is_complete": getattr(chat_session, "is_complete", False),
         "is_job_request": getattr(chat_session, "is_job_request", False),
         "categories": getattr(chat_session, "categories", []), 
-        "problem_description": job_desc
+        "problem_description": final_job_desc 
     }
 
     job_fields = {
         "title": payload.title,
-        "description": job_desc,
+        "description": final_job_desc, 
         "status": payload.status,
         "is_job_request": getattr(chat_session, "is_job_request", True),
         "categories": getattr(chat_session, "categories", []),
         "contact_name": payload.contact_name,
         "contact_phone": payload.contact_phone,
         "mode": payload.mode,
-        "attachments": payload.attachments,  # //att-change
+        "attachments": payload.attachments,
         "latitude": lat,
         "longitude": lng,
         "location": wkt_point,
         "description_vector": embedding_vector,
-        "address_text": address_text
+        "address_text": address_text,
+        "attachments": payload.attachments
     }
 
     try:
@@ -399,42 +469,55 @@ async def complete_customer_chat(
             query_vector=embedding_vector,
             customer_location=wkt_point,
             radius_meters=DEFAULT_SEARCH_RADIUS_METERS,
-            job_description=job_desc,
+            job_description=final_job_desc, 
         )
         db.commit()
     except Exception as engine_err:
         db.rollback()
-        logger.error(f"Matching Engine execution failed: {engine_err}")
-        raise HTTPException(status_code=500, detail="Failed to record marketplace matches.")
+        logger.error(f"Matching Engine execution forced transaction rollback: {engine_err}")
+        raise HTTPException(status_code=500, detail="Failed to safely compile and record marketplace matches.")
 
     job_payload = {
         "booking_chat_id": booking_chat_id, 
         "title": payload.title, 
-        "description": job_desc
+        "description": final_job_desc 
     }
     
+    if worker_chat_ids := matching_result.get("worker_chat_ids", []):
+        background_tasks.add_task(_broadcast_notifications, worker_chat_ids, job_payload)
+
+    return {
+        "status": "success", 
+        "message": f"Job registered. Established {matching_result.get('count', 0)} matches successfully."
+    }
+    
+    # Broadcast asynchronously without blocking the main event loop
     worker_chat_ids = matching_result.get("worker_chat_ids", [])
     if worker_chat_ids:
         background_tasks.add_task(_broadcast_notifications, worker_chat_ids, job_payload)
 
     return {
         "status": "success", 
-        "message": f"Job registered successfully with {len(payload.attachments)} attachment(s). Found {matching_result.get('count', 0)} matches." # //att-change
+        "message": f"Job registered. Established {matching_result.get('count', 0)} matches successfully."
     }
 
-
-# ── Matching & Analytics Endpoints ───────────────────────────────────────────
+def _extract_primary_category(categories: list[dict]) -> tuple[str | None, bool]:
+    if not categories:
+        return None, False
+    top = categories[0]
+    return top.get("category"), bool(top.get("is_custom_category", False)) 
 
 @router.get(
     "/match/{booking_chat_id}/find-help",
     response_model=schema.FindHelpOut,
-    summary="Fetch pre-calculated matching workers for job layout",
+    summary="Fetch pre-calculated matching workers for a completed job layout from DB",
 )
 def find_help(
     booking_chat_id: int,
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
+
     job_data = db.execute(
         select(model.Job).where(
             model.Job.booking_chat_id == booking_chat_id,
@@ -448,12 +531,15 @@ def find_help(
             detail="No operational job data found for this booking_chat_id.",
         )
 
-    category, _ = _extract_primary_category(job_data.categories or [])
+    category, is_custom = _extract_primary_category(job_data.categories or [])
     
     stmt = (
         select(model.JobWorkerMatch, model.WorkerProfile, model.User.username, model.WorkerSkill)
         .join(model.WorkerProfile, model.WorkerProfile.id == model.JobWorkerMatch.worker_id)
         .join(model.User, model.User.id == model.WorkerProfile.user_id)
+        # OUTER: matched_skill_id is nullable (SET NULL on skill removal, and rows
+        # written before multi-vector matching have none), so an inner join would
+        # silently drop otherwise-valid matches.
         .outerjoin(model.WorkerSkill, model.WorkerSkill.id == model.JobWorkerMatch.matched_skill_id)
         .where(
             model.JobWorkerMatch.job_id == job_data.id,
@@ -466,7 +552,7 @@ def find_help(
     if not matches:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No matching workers found for this job specification.",
+            detail="No matching workers found recorded for this job specification.",
         )
 
     workers = [
@@ -477,6 +563,9 @@ def find_help(
             "category_tag": worker.category_tag,
             "job_description": worker.job_description,
             "match_score": match.match_score,
+            # The specific capability that surfaced this worker — a plumber can be
+            # here for their general plumbing baseline or for a tested speciality,
+            # and the customer should be able to tell which.
             "matched_skill": skill.title if skill is not None else None,
             "matched_skill_description": skill.description if skill is not None else None,
         }
@@ -488,7 +577,12 @@ def find_help(
         "category": category,
         "workers": workers,
     }
+    
 
+import io
+import matplotlib.pyplot as plt
+import seaborn as sns
+from fastapi import Response
 
 @match_router.get(
     "/match/{booking_chat_id}/validate-vectors",
@@ -499,6 +593,7 @@ def validate_vectors(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
+    # 1. Fetch the job request data exactly like your find_help route
     job_data = db.execute(
         select(model.Job).where(
             model.Job.booking_chat_id == booking_chat_id,
@@ -509,6 +604,10 @@ def validate_vectors(
     if not job_data or job_data.description_vector is None or job_data.location is None:
         raise HTTPException(status_code=400, detail="Invalid job data or missing vector.")
 
+    # 2. Grab a wider pool of workers (limit=50) to evaluate the model distribution.
+    #    This mirrors matching_manager._search_workers deliberately: it scores each
+    #    worker on their single closest SKILL vector, not on the abandoned blended
+    #    profile vector, so the chart reflects what matching actually does.
     distance = model.WorkerSkill.embedding.cosine_distance(job_data.description_vector)
 
     best_skill = (
@@ -542,25 +641,31 @@ def validate_vectors(
     if not results:
         raise HTTPException(status_code=404, detail="No regional workers found to validate against.")
 
+    # 3. Extract the math data points
     raw_distances = []
     calculated_scores = []
     
     for worker, dist in results:
         raw_distances.append(dist)
+        # FIXED: Changed 'distance' to 'dist', and removed trailing comma
         score = max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(25.0 * (dist - 0.90)))) * 100.0, 2)))
         calculated_scores.append(score)
 
+    # 4. Generate the graph purely in memory
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
+    # Graph A: Score vs Distance Curve Validation
     ax1.scatter(raw_distances, calculated_scores, color='purple', alpha=0.7, edgecolors='k', s=60, label='Worker Matches')
+    # UPDATED: Moved line to 0.90 to match new formula
     ax1.axvline(x=0.90, color='red', linestyle='--', label='Inflection Threshold (0.90)')
     ax1.axhline(y=50.0, color='gray', linestyle=':')
     ax1.set_title('Sigmoid Scoring Curve Validation')
-    ax1.set_xlabel('Raw Cosine Distance')
+    ax1.set_xlabel('Raw Cosine Distance (Lower = Closer Meaning)')
     ax1.set_ylabel('Calculated Match Score (0 - 100)')
     ax1.grid(True, alpha=0.3)
     ax1.legend()
 
+    # Graph B: Score Density Spread
     sns.kdeplot(calculated_scores, fill=True, color='teal', ax=ax2, bw_adjust=0.5)
     ax2.set_title('Distribution Spectrum of Match Scores')
     ax2.set_xlabel('Match Score Output')
@@ -570,6 +675,7 @@ def validate_vectors(
     plt.suptitle(f"Vector Reliability Analysis for Booking Chat ID: {booking_chat_id}", fontsize=14, y=0.98)
     plt.tight_layout()
 
+    # 5. Stream the chart binary image directly to your browser
     buf = io.BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight')
     plt.close(fig)
