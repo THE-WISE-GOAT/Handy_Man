@@ -1,6 +1,10 @@
 import React from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { getCustomerViewBySlug, isCustomerViewInSection, getDefaultCustomerPath } from "@shared/config/viewRoutes";
+import {
+  getCustomerViewBySlug,
+  isCustomerViewInSection,
+  getDefaultCustomerPath,
+} from "@shared/config/viewRoutes";
 
 // Direct component layout imports
 import Dash1Board from "../../components/customer-dashboard/dash1board";
@@ -17,9 +21,13 @@ export default function CustomerViewRoute() {
 
   // Render the appropriate layout panel canvas directly by section string and pass the viewSlug down
   switch (section?.toLowerCase()) {
-    case "bookings": return <Dash1Board viewSlug={viewSlug} />;
-    case "postings": return <Dash2Board viewSlug={viewSlug} />;
-    case "more":     return <Dash3Board viewSlug={viewSlug} />;
-    default:         return <Dash1Board viewSlug={viewSlug} />;
+    case "bookings":
+      return <Dash1Board viewSlug={viewSlug} />;
+    case "postings":
+      return <Dash2Board viewSlug={viewSlug} />;
+    case "more":
+      return <Dash3Board viewSlug={viewSlug} />;
+    default:
+      return <Dash1Board viewSlug={viewSlug} />;
   }
 }

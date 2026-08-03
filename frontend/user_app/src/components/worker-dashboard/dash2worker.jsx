@@ -22,7 +22,7 @@ export default function Dash2Worker({ viewSlug }) {
 
     if (scheduledSlots.main !== viewSlug) {
       const targetSlot = Object.keys(scheduledSlots).find(
-        (key) => scheduledSlots[key] === viewSlug
+        (key) => scheduledSlots[key] === viewSlug,
       );
 
       if (targetSlot) {
@@ -43,9 +43,7 @@ export default function Dash2Worker({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">
-            ••• SCHEDULE PLATFORM PLANNERS
-          </div>
+          <div className="card-header">••• SCHEDULE PLATFORM PLANNERS</div>
 
           <div className="main-panel">
             <h2>System Planner Calendar</h2>
@@ -60,9 +58,7 @@ export default function Dash2Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("ScheduledCalendar")}
       >
-        <div className="card-header">
-          ••• SCHEDULE PLATFORM PLANNERS
-        </div>
+        <div className="card-header">••• SCHEDULE PLATFORM PLANNERS</div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
@@ -71,9 +67,7 @@ export default function Dash2Worker({ viewSlug }) {
                 Sidebar: Planner Context
               </span>
 
-              <p className="card-summary">
-                {calendarDescText}
-              </p>
+              <p className="card-summary">{calendarDescText}</p>
             </>
           ) : (
             <span className="badge">
@@ -89,9 +83,7 @@ export default function Dash2Worker({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">
-            ••• UPCOMING DEPLOYMENT NODES
-          </div>
+          <div className="card-header">••• UPCOMING DEPLOYMENT NODES</div>
 
           <div className="main-panel">
             <h2>Scheduled Jobs Registry</h2>
@@ -105,20 +97,14 @@ export default function Dash2Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("ScheduledJobCard")}
       >
-        <div className="card-header">
-          ••• UPCOMING DEPLOYMENT NODES
-        </div>
+        <div className="card-header">••• UPCOMING DEPLOYMENT NODES</div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
             <>
-              <span className="badge badge-highlight">
-                Sidebar: Job Matrix
-              </span>
+              <span className="badge badge-highlight">Sidebar: Job Matrix</span>
 
-              <p className="card-summary">
-                Status: {jobsRegistryStatus}
-              </p>
+              <p className="card-summary">Status: {jobsRegistryStatus}</p>
             </>
           ) : (
             <span className="badge">
@@ -134,9 +120,7 @@ export default function Dash2Worker({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">
-            ••• ACTIVE MESSAGING CORRIDOR
-          </div>
+          <div className="card-header">••• ACTIVE MESSAGING CORRIDOR</div>
 
           <div className="main-panel">
             <h2>Client Communications Terminal</h2>
@@ -150,9 +134,7 @@ export default function Dash2Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("ClientQueries")}
       >
-        <div className="card-header">
-          ••• ACTIVE MESSAGING CORRIDOR
-        </div>
+        <div className="card-header">••• ACTIVE MESSAGING CORRIDOR</div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
@@ -161,9 +143,7 @@ export default function Dash2Worker({ viewSlug }) {
                 Sidebar: Inbox Comms
               </span>
 
-              <p className="card-summary">
-                Queue: {clientQueryStatus}
-              </p>
+              <p className="card-summary">Queue: {clientQueryStatus}</p>
             </>
           ) : (
             <span className="badge">
@@ -179,9 +159,7 @@ export default function Dash2Worker({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">
-            ••• APPOINTMENT LOCATION INDEX
-          </div>
+          <div className="card-header">••• APPOINTMENT LOCATION INDEX</div>
 
           <div className="main-panel">
             <h2>Route Matrix Overview</h2>
@@ -195,9 +173,7 @@ export default function Dash2Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("ScheduledMap")}
       >
-        <div className="card-header">
-          ••• APPOINTMENT LOCATION INDEX
-        </div>
+        <div className="card-header">••• APPOINTMENT LOCATION INDEX</div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
@@ -206,9 +182,7 @@ export default function Dash2Worker({ viewSlug }) {
                 Sidebar: Matrix Node
               </span>
 
-              <p className="card-summary">
-                Routing: {routeMatrixStatus}
-              </p>
+              <p className="card-summary">Routing: {routeMatrixStatus}</p>
             </>
           ) : (
             <span className="badge">
@@ -241,13 +215,9 @@ export default function Dash2Worker({ viewSlug }) {
 
   return (
     <div className="dashboard-grid-4pane">
-      <div className="grid-main">
-        {resolveModuleBySlot("main")}
-      </div>
+      <div className="grid-main">{resolveModuleBySlot("main")}</div>
 
-      <div className="grid-sidebar">
-        {resolveModuleBySlot("sidebar")}
-      </div>
+      <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
 
       <div className="grid-bottom-left">
         {resolveModuleBySlot("bottomLeft")}

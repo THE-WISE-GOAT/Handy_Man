@@ -1,8 +1,8 @@
 // components/customer-dashboard/dash3board.jsx
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useCustomerDashboardData } from './useCustomerDashboardData';
-import './dash3board.css';
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCustomerDashboardData } from "./useCustomerDashboardData";
+import "./dash3board.css";
 
 export default function Dash3Board({ viewSlug }) {
   const navigate = useNavigate();
@@ -12,14 +12,16 @@ export default function Dash3Board({ viewSlug }) {
     calendarEventsCount,
     profileSecurityStatus,
     archivePipelineStatus,
-    systemPortalStatus
+    systemPortalStatus,
   } = useCustomerDashboardData();
 
   // Route state synchronization layer
   useEffect(() => {
     if (!viewSlug) return;
     if (miscSlots.main !== viewSlug) {
-      const targetSlot = Object.keys(miscSlots).find((key) => miscSlots[key] === viewSlug);
+      const targetSlot = Object.keys(miscSlots).find(
+        (key) => miscSlots[key] === viewSlug,
+      );
       if (targetSlot) swapMiscSlots(targetSlot);
     }
   }, [viewSlug, miscSlots, swapMiscSlots]);
@@ -32,8 +34,8 @@ export default function Dash3Board({ viewSlug }) {
   const Card = ({ slug, title, position, children }) => {
     const isMain = position === "main";
     return (
-      <div 
-        className={`dashboard-card slot-${position} ${!isMain ? 'clickable' : ''}`}
+      <div
+        className={`dashboard-card slot-${position} ${!isMain ? "clickable" : ""}`}
         onClick={!isMain ? () => handleModuleSelect(slug) : undefined}
       >
         <div className="card-header">••• {title}</div>
@@ -47,11 +49,17 @@ export default function Dash3Board({ viewSlug }) {
   // ====================================================
 
   const renderSystemCalendar = (position) => (
-    <Card slug="SystemCalendar" title="SCHEDULE PLATFORM PLANNERS" position={position}>
+    <Card
+      slug="SystemCalendar"
+      title="SCHEDULE PLATFORM PLANNERS"
+      position={position}
+    >
       {position === "main" ? (
         <div className="main-panel">
           <h2>SYSTEM CALENDAR</h2>
-          <p className="panel-desc">Calendar Workspace Terminal Primary Schedule Router.</p>
+          <p className="panel-desc">
+            Calendar Workspace Terminal Primary Schedule Router.
+          </p>
           <div className="calendar-box">
             <p>Active Planned Tasks: {calendarEventsCount}</p>
           </div>
@@ -60,11 +68,17 @@ export default function Dash3Board({ viewSlug }) {
         <div className="preview-panel">
           {position === "sidebar" ? (
             <>
-              <span className="badge badge-highlight">Sidebar: Planner Overview</span>
-              <p className="card-summary">Events Loaded: {calendarEventsCount}</p>
+              <span className="badge badge-highlight">
+                Sidebar: Planner Overview
+              </span>
+              <p className="card-summary">
+                Events Loaded: {calendarEventsCount}
+              </p>
             </>
           ) : (
-            <span className="badge">Footer ({position}): {calendarEventsCount} Scheduled Tasks</span>
+            <span className="badge">
+              Footer ({position}): {calendarEventsCount} Scheduled Tasks
+            </span>
           )}
         </div>
       )}
@@ -76,17 +90,24 @@ export default function Dash3Board({ viewSlug }) {
       {position === "main" ? (
         <div className="main-panel">
           <h2>ACCOUNT PROFILE MANAGER</h2>
-          <p>Configure client accounts, authentication layers, and permissions records details.</p>
+          <p>
+            Configure client accounts, authentication layers, and permissions
+            records details.
+          </p>
         </div>
       ) : (
         <div className="preview-panel">
           {position === "sidebar" ? (
             <>
-              <span className="badge badge-highlight">Sidebar: Security Node</span>
+              <span className="badge badge-highlight">
+                Sidebar: Security Node
+              </span>
               <p className="card-summary">Status: {profileSecurityStatus}</p>
             </>
           ) : (
-            <span className="badge">Footer ({position}): Profile Status [{profileSecurityStatus}]</span>
+            <span className="badge">
+              Footer ({position}): Profile Status [{profileSecurityStatus}]
+            </span>
           )}
         </div>
       )}
@@ -94,7 +115,11 @@ export default function Dash3Board({ viewSlug }) {
   );
 
   const renderHistoricalLogs = (position) => (
-    <Card slug="HistoricalRecordsLogs" title="HISTORICAL RECORDS LOGS" position={position}>
+    <Card
+      slug="HistoricalRecordsLogs"
+      title="HISTORICAL RECORDS LOGS"
+      position={position}
+    >
       {position === "main" ? (
         <div className="main-panel">
           <h2>HISTORICAL SYSTEM LOGS TERMINAL</h2>
@@ -103,11 +128,15 @@ export default function Dash3Board({ viewSlug }) {
         <div className="preview-panel">
           {position === "sidebar" ? (
             <>
-              <span className="badge badge-highlight">Sidebar: Archive System</span>
+              <span className="badge badge-highlight">
+                Sidebar: Archive System
+              </span>
               <p className="card-summary">Pipeline: {archivePipelineStatus}</p>
             </>
           ) : (
-            <span className="badge">Footer ({position}): Logs Stream {archivePipelineStatus}</span>
+            <span className="badge">
+              Footer ({position}): Logs Stream {archivePipelineStatus}
+            </span>
           )}
         </div>
       )}
@@ -124,11 +153,15 @@ export default function Dash3Board({ viewSlug }) {
         <div className="preview-panel">
           {position === "sidebar" ? (
             <>
-              <span className="badge badge-highlight">Sidebar: Configuration Environment</span>
+              <span className="badge badge-highlight">
+                Sidebar: Configuration Environment
+              </span>
               <p className="card-summary">Status: {systemPortalStatus}</p>
             </>
           ) : (
-            <span className="badge">Footer ({position}): Environment Config {systemPortalStatus}</span>
+            <span className="badge">
+              Footer ({position}): Environment Config {systemPortalStatus}
+            </span>
           )}
         </div>
       )}
@@ -137,11 +170,16 @@ export default function Dash3Board({ viewSlug }) {
 
   const resolveModuleBySlot = (slotKey) => {
     switch (miscSlots[slotKey]) {
-      case "SystemCalendar":        return renderSystemCalendar(slotKey);
-      case "AccountProfiles":       return renderAccountProfiles(slotKey);
-      case "HistoricalRecordsLogs": return renderHistoricalLogs(slotKey);
-      case "SystemSettings":        return renderSystemSettings(slotKey);
-      default:                      return null;
+      case "SystemCalendar":
+        return renderSystemCalendar(slotKey);
+      case "AccountProfiles":
+        return renderAccountProfiles(slotKey);
+      case "HistoricalRecordsLogs":
+        return renderHistoricalLogs(slotKey);
+      case "SystemSettings":
+        return renderSystemSettings(slotKey);
+      default:
+        return null;
     }
   };
 
@@ -149,8 +187,12 @@ export default function Dash3Board({ viewSlug }) {
     <div className="dashboard-grid-4pane">
       <div className="grid-main">{resolveModuleBySlot("main")}</div>
       <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
-      <div className="grid-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
-      <div className="grid-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
+      <div className="grid-bottom-left">
+        {resolveModuleBySlot("bottomLeft")}
+      </div>
+      <div className="grid-bottom-right">
+        {resolveModuleBySlot("bottomRight")}
+      </div>
     </div>
   );
 }

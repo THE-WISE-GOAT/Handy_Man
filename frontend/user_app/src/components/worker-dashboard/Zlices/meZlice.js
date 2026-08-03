@@ -73,7 +73,7 @@ export const createMeZlice = (set, get) => ({
   mapReady: false,
   modalSearchQuery: "",
   modalLat: 27.7172,
-  modalLng: 85.3240,
+  modalLng: 85.324,
   modalAddrText: "",
 
   // ==========================================
@@ -169,9 +169,12 @@ export const createMeZlice = (set, get) => ({
     if (!workerChatId) return;
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const res = await fetch(`http://127.0.0.1:8000/worker-interview/${workerChatId}/skills`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const res = await fetch(
+        `http://127.0.0.1:8000/worker-interview/${workerChatId}/skills`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       if (res.ok) {
         const data = await res.json();
         set({ workerSkills: data.skills || [] });
@@ -191,7 +194,9 @@ export const createMeZlice = (set, get) => ({
       // Bring interview panel to main slot if not already
       if (meSlots.main !== "MeInterview") {
         const slots = { ...meSlots };
-        const slotKeyWithInterview = Object.keys(slots).find(k => slots[k] === "MeInterview");
+        const slotKeyWithInterview = Object.keys(slots).find(
+          (k) => slots[k] === "MeInterview",
+        );
         if (slotKeyWithInterview) {
           slots[slotKeyWithInterview] = slots.main;
         }
@@ -200,16 +205,23 @@ export const createMeZlice = (set, get) => ({
       }
 
       const token = localStorage.getItem("handy_man_access_token");
-      const res = await fetch(`http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const res = await fetch(
+        `http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (res.ok) {
         const data = await res.json();
         set({
           chatMessages: [
-            { id: crypto.randomUUID(), sender: "assistant", text: data.ai_response }
+            {
+              id: crypto.randomUUID(),
+              sender: "assistant",
+              text: data.ai_response,
+            },
           ],
           applicantStage: data.stage,
           isChatComplete: false,
@@ -234,7 +246,11 @@ export const createMeZlice = (set, get) => ({
     set({
       isAddingSkill: false,
       chatMessages: [
-        { id: crypto.randomUUID(), sender: "system", text: "Interview session canceled." }
+        {
+          id: crypto.randomUUID(),
+          sender: "system",
+          text: "Interview session canceled.",
+        },
       ],
       isChatComplete: true,
     });
@@ -248,13 +264,16 @@ export const createMeZlice = (set, get) => ({
     set({ isAiGenerating: true });
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/worker-interview/session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+      const response = await fetch(
+        "http://127.0.0.1:8000/worker-interview/session",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         throw new Error(`Session failed: ${response.status}`);
@@ -307,16 +326,20 @@ export const createMeZlice = (set, get) => ({
 
       if (isAddingSkill) {
         // ENDPOINT: POST /{worker_chat_id}/add-skill/chat
-        const response = await fetch(`http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill/chat`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+        const response = await fetch(
+          `http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill/chat`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ message: userMessage }),
           },
-          body: JSON.stringify({ message: userMessage }),
-        });
+        );
 
-        if (!response.ok) throw new Error(`Add-skill turn failed: ${response.status}`);
+        if (!response.ok)
+          throw new Error(`Add-skill turn failed: ${response.status}`);
 
         const data = await response.json();
 
@@ -329,30 +352,40 @@ export const createMeZlice = (set, get) => ({
         set((state) => ({
           chatMessages: [
             ...state.chatMessages,
-            { id: crypto.randomUUID(), sender: "assistant", text: data.ai_response },
+            {
+              id: crypto.randomUUID(),
+              sender: "assistant",
+              text: data.ai_response,
+            },
           ],
         }));
 
-        if (data.stage === "skill_complete" || data.stage === "skill_declined") {
+        if (
+          data.stage === "skill_complete" ||
+          data.stage === "skill_declined"
+        ) {
           await get().fetchWorkerSkills();
           set({ isAddingSkill: false });
         }
-
       } else {
         // ENDPOINT: POST /worker-interview/chat (Initial category interview)
-        const response = await fetch("http://127.0.0.1:8000/worker-interview/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+        const response = await fetch(
+          "http://127.0.0.1:8000/worker-interview/chat",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              worker_chat_id: parseInt(workerChatId),
+              message: userMessage,
+            }),
           },
-          body: JSON.stringify({
-            worker_chat_id: parseInt(workerChatId),
-            message: userMessage,
-          }),
-        });
+        );
 
-        if (!response.ok) throw new Error(`Chat turn rejected: ${response.status}`);
+        if (!response.ok)
+          throw new Error(`Chat turn rejected: ${response.status}`);
 
         const data = await response.json();
 
@@ -369,7 +402,11 @@ export const createMeZlice = (set, get) => ({
         set((state) => ({
           chatMessages: [
             ...state.chatMessages,
-            { id: crypto.randomUUID(), sender: "assistant", text: data.ai_response },
+            {
+              id: crypto.randomUUID(),
+              sender: "assistant",
+              text: data.ai_response,
+            },
           ],
         }));
 
@@ -394,9 +431,9 @@ export const createMeZlice = (set, get) => ({
         `http://127.0.0.1:8000/worker-interview/${workerChatId}/summary`,
         {
           headers: {
-            "Authorization": `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.ok) {
@@ -413,9 +450,11 @@ export const createMeZlice = (set, get) => ({
               job_category: data.profile.job_category || "",
               category_tag: data.profile.category_tag || "",
               specialities: data.profile.specialities || [],
-              specialized_tools_or_equipment: data.profile.specialized_tools_or_equipment || [],
+              specialized_tools_or_equipment:
+                data.profile.specialized_tools_or_equipment || [],
               years_experience: data.profile.years_experience || 0,
-              license_or_certification: data.profile.license_or_certification || "",
+              license_or_certification:
+                data.profile.license_or_certification || "",
               job_description: data.profile.job_description || "",
               emergency_available: data.profile.emergency_available || false,
               phone_number: get().phoneNumber || "",
@@ -430,7 +469,8 @@ export const createMeZlice = (set, get) => ({
   },
 
   submitApplication: async () => {
-    const { workerChatId, phoneNumber, addressText, latitude, longitude } = get();
+    const { workerChatId, phoneNumber, addressText, latitude, longitude } =
+      get();
 
     if (!workerChatId) {
       console.error("No worker_chat_id found.");
@@ -441,27 +481,32 @@ export const createMeZlice = (set, get) => ({
 
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch(`http://127.0.0.1:8000/worker-interview/${workerChatId}/complete`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+      const response = await fetch(
+        `http://127.0.0.1:8000/worker-interview/${workerChatId}/complete`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            phone_number: phoneNumber || "",
+            location: {
+              longitude: parseFloat(longitude) || 0.0,
+              latitude: parseFloat(latitude) || 0.0,
+            },
+          }),
         },
-        body: JSON.stringify({
-          phone_number: phoneNumber || "",
-          location: {
-            longitude: parseFloat(longitude) || 0.0,
-            latitude: parseFloat(latitude) || 0.0
-          }
-        }),
-      });
+      );
 
       if (!response.ok) {
-        throw new Error(`Completion / submit pipeline failed: ${response.status}`);
+        throw new Error(
+          `Completion / submit pipeline failed: ${response.status}`,
+        );
       }
 
       await response.json();
-      
+
       set({
         applicantStage: "pending_admin_review",
         applicationSubmitted: true,
@@ -493,10 +538,10 @@ export const createMeZlice = (set, get) => ({
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(editableProfile),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -504,7 +549,9 @@ export const createMeZlice = (set, get) => ({
       }
 
       const data = await response.json();
-      set({ profileSaveMessage: data.message || "Profile updated successfully." });
+      set({
+        profileSaveMessage: data.message || "Profile updated successfully.",
+      });
     } catch (error) {
       console.error("Failed to update worker profile:", error);
       set({ profileSaveMessage: "Failed to update profile." });
@@ -518,7 +565,7 @@ export const createMeZlice = (set, get) => ({
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch("http://127.0.0.1:8000/users/me", {
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -550,7 +597,7 @@ export const createMeZlice = (set, get) => ({
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(userProfile),
       });
@@ -561,7 +608,8 @@ export const createMeZlice = (set, get) => ({
 
       const data = await response.json();
       set({
-        userInfoSaveMessage: data.message || "User profile updated successfully.",
+        userInfoSaveMessage:
+          data.message || "User profile updated successfully.",
         isEditingUserInfo: false,
       });
     } catch (error) {
@@ -575,11 +623,14 @@ export const createMeZlice = (set, get) => ({
   loadApplicantStatus: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/worker-onboarding/my-status", {
-        headers: {
-          "Authorization": `Bearer ${token}`,
+      const response = await fetch(
+        "http://127.0.0.1:8000/worker-onboarding/my-status",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -647,9 +698,9 @@ export const createMeZlice = (set, get) => ({
         `http://127.0.0.1:8000/worker-interview/${workerChatId}/history`,
         {
           headers: {
-            "Authorization": `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.ok) {
@@ -662,14 +713,23 @@ export const createMeZlice = (set, get) => ({
             text: m.content ?? "",
           }));
         set({
-          chatMessages: visibleHistory.length > 0
-            ? [
-                { id: "init-1", sender: "system", text: "Onboarding interview session restored." },
-                ...visibleHistory,
-              ]
-            : [
-                { id: "init-1", sender: "system", text: "Onboarding interview session ready." },
-              ],
+          chatMessages:
+            visibleHistory.length > 0
+              ? [
+                  {
+                    id: "init-1",
+                    sender: "system",
+                    text: "Onboarding interview session restored.",
+                  },
+                  ...visibleHistory,
+                ]
+              : [
+                  {
+                    id: "init-1",
+                    sender: "system",
+                    text: "Onboarding interview session ready.",
+                  },
+                ],
           applicantStage: data.stage,
           isChatComplete: data.is_complete,
           turnsUsed: data.turns_used,

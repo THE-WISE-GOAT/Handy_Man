@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class ConnectionManager:
     def __init__(self):
         # Two separate pools to prevent ID collisions
@@ -24,7 +25,9 @@ class ConnectionManager:
             try:
                 await websocket.send_json(message)
             except Exception as e:
-                logger.error(f"Error sending notification to worker {worker_chat_id}: {e}")
+                logger.error(
+                    f"Error sending notification to worker {worker_chat_id}: {e}"
+                )
                 self.disconnect_worker(worker_chat_id)
 
     # --- CUSTOMER METHODS ---
@@ -41,8 +44,11 @@ class ConnectionManager:
             try:
                 await websocket.send_json(message)
             except Exception as e:
-                logger.error(f"Error sending notification to customer {booking_chat_id}: {e}")
+                logger.error(
+                    f"Error sending notification to customer {booking_chat_id}: {e}"
+                )
                 self.disconnect_customer(booking_chat_id)
+
 
 # Create a global instance to be used across your app
 manager = ConnectionManager()

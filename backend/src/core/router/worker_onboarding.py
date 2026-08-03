@@ -9,8 +9,15 @@ from sqlalchemy import select
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model, schema
-from src.core.worker_profile_helper import sync_profile_extracted_fields, upsert_baseline_skill
-from src.ai.worker_chat_analyser_nvidia import build_fresh_history, INITIAL_GREETING, get_worker_description_embedding
+from src.core.worker_profile_helper import (
+    sync_profile_extracted_fields,
+    upsert_baseline_skill,
+)
+from src.ai.worker_chat_analyser_nvidia import (
+    build_fresh_history,
+    INITIAL_GREETING,
+    get_worker_description_embedding,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +25,18 @@ router = APIRouter(prefix="/worker-onboarding", tags=["Worker Onboarding"])
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _get_own_worker_profile(user_id: int, db: Session) -> model.WorkerProfile | None:
-    return db.execute(
-        select(model.WorkerProfile)
-        .where(model.WorkerProfile.user_id == user_id)
-        .order_by(model.WorkerProfile.id.desc())
-    ).scalars().first()
+    return (
+        db.execute(
+            select(model.WorkerProfile)
+            .where(model.WorkerProfile.user_id == user_id)
+            .order_by(model.WorkerProfile.id.desc())
+        )
+        .scalars()
+        .first()
+    )
+
 
 def _require_worker_profile(user_id: int, db: Session) -> model.WorkerProfile:
     profile = _get_own_worker_profile(user_id, db)
@@ -34,7 +47,10 @@ def _require_worker_profile(user_id: int, db: Session) -> model.WorkerProfile:
         )
     return profile
 
-def require_approved_worker(current_user: model.User = Depends(get_current_user), db: Session = Depends(get_db)) -> model.WorkerProfile:
+
+def require_approved_worker(
+    current_user: model.User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> model.WorkerProfile:
     profile = _get_own_worker_profile(current_user.id, db)
     if not profile or profile.stage != "approved":
         raise HTTPException(
@@ -43,11 +59,13 @@ def require_approved_worker(current_user: model.User = Depends(get_current_user)
         )
     return profile
 
+
 def _is_admin(user: model.User) -> bool:
     return any(role.name and role.name.lower() == "admin" for role in user.roles)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/initialize",
@@ -69,7 +87,9 @@ def initialize_worker_application(
         db.add(worker_role)
         db.flush()
 
-    if not any(role.name and role.name.lower() == "worker" for role in current_user.roles):
+    if not any(
+        role.name and role.name.lower() == "worker" for role in current_user.roles
+    ):
         current_user.roles.append(worker_role)
 
     initial_history = build_fresh_history()
@@ -135,18 +155,22 @@ async def submit_worker_application(
     profile.stage = "pending_admin_review"
     profile.phone_number = payload.phone_number
     profile.address_text = payload.address_text
-    
+
     if payload.latitude is not None and payload.longitude is not None:
         profile.latitude = payload.latitude
         profile.longitude = payload.longitude
         profile.location = f"POINT({payload.longitude} {payload.latitude})"
 
     # Fetch latest valid profile session directly utilizing sorting
-    stmt = select(model.WorkerInterviewSession).where(
-        model.WorkerInterviewSession.user_id == current_user.id,
-        model.WorkerInterviewSession.profile.isnot(None)
-    ).order_by(model.WorkerInterviewSession.id.desc())
-    
+    stmt = (
+        select(model.WorkerInterviewSession)
+        .where(
+            model.WorkerInterviewSession.user_id == current_user.id,
+            model.WorkerInterviewSession.profile.isnot(None),
+        )
+        .order_by(model.WorkerInterviewSession.id.desc())
+    )
+
     session = db.execute(stmt).scalars().first()
 
     if session and session.profile:
@@ -154,7 +178,9 @@ async def submit_worker_application(
 
     if profile.job_description:
         try:
-            embedding_vec = await get_worker_description_embedding(profile.job_description)
+            embedding_vec = await get_worker_description_embedding(
+                profile.job_description
+            )
         except Exception as exc:
             logger.error("Failed to embed worker job_description: %s", exc)
             embedding_vec = None
@@ -164,7 +190,9 @@ async def submit_worker_application(
         # ran the two-layer split), so it becomes the baseline. upsert_baseline_skill
         # updates in place, so re-submitting cannot create a second baseline, and a
         # failed embedding leaves any existing good vector alone.
-        upsert_baseline_skill(db, profile.id, primary_title, profile.job_description, embedding_vec)
+        upsert_baseline_skill(
+            db, profile.id, primary_title, profile.job_description, embedding_vec
+        )
 
     try:
         db.commit()
@@ -211,22 +239,28 @@ def list_pending_applications(
 
     # Fetch strictly based on WorkerSkill stage
     stmt = (
-        select(model.WorkerProfile, model.User, model.WorkerInterviewSession, model.WorkerSkill)
+        select(
+            model.WorkerProfile,
+            model.User,
+            model.WorkerInterviewSession,
+            model.WorkerSkill,
+        )
         .join(model.User, model.WorkerProfile.user_id == model.User.id)
         .outerjoin(
-            model.WorkerInterviewSession, 
-            model.WorkerProfile.worker_chat_id == model.WorkerInterviewSession.id
+            model.WorkerInterviewSession,
+            model.WorkerProfile.worker_chat_id == model.WorkerInterviewSession.id,
         )
         .join(model.WorkerSkill, model.WorkerProfile.id == model.WorkerSkill.worker_id)
         .where(
-            model.WorkerSkill.stage == "pending_admin_review" # Strict filter on WorkerSkill
+            model.WorkerSkill.stage
+            == "pending_admin_review"  # Strict filter on WorkerSkill
         )
         .order_by(model.WorkerSkill.updated_at.desc())
     )
 
     results = db.execute(stmt).all()
     applications = []
-    
+
     for profile, user, session, skill in results:
         app_data = {
             **profile.__dict__,
@@ -245,6 +279,7 @@ def list_pending_applications(
         applications.append(app_data)
 
     return applications
+
 
 @router.post(
     "/admin/applications/{skill_id}/approve",
@@ -275,7 +310,9 @@ def approve_worker_application(
     skill.rejection_reason = None
 
     # 3. Locate and update the parent WorkerProfile
-    profile = db.scalar(select(model.WorkerProfile).where(model.WorkerProfile.id == skill.worker_id))
+    profile = db.scalar(
+        select(model.WorkerProfile).where(model.WorkerProfile.id == skill.worker_id)
+    )
     if profile:
         profile.stage = "approved"
         profile.is_complete = True
@@ -317,7 +354,9 @@ def reject_worker_application(
     skill.stage = "rejected"
     skill.rejection_reason = payload.reason
 
-    profile = db.scalar(select(model.WorkerProfile).where(model.WorkerProfile.id == skill.worker_id))
+    profile = db.scalar(
+        select(model.WorkerProfile).where(model.WorkerProfile.id == skill.worker_id)
+    )
     if profile:
         profile.stage = "rejected"
         profile.is_rejected = True
@@ -329,6 +368,7 @@ def reject_worker_application(
     db.refresh(skill)
 
     return {"message": f"Worker application skill {skill_id} rejected."}
+
 
 @router.patch(
     "/my-profile",
@@ -352,6 +392,13 @@ def update_my_worker_profile(
         db.refresh(profile)
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update worker profile.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update worker profile.",
+        )
 
-    return {**profile.__dict__, "worker_id": profile.id, "message": "Profile updated successfully."}
+    return {
+        **profile.__dict__,
+        "worker_id": profile.id,
+        "message": "Profile updated successfully.",
+    }

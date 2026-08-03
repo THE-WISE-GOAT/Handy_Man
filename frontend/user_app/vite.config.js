@@ -24,10 +24,7 @@ export default defineConfig({
     },
     // Explicitly allow Vite to serve outside the standard root for shared folders
     fs: {
-      allow: [
-        path.resolve(__dirname),
-        path.resolve(__dirname, "../shared"),
-      ],
+      allow: [path.resolve(__dirname), path.resolve(__dirname, "../shared")],
     },
   },
   resolve: {
@@ -36,8 +33,11 @@ export default defineConfig({
     alias: {
       "@shared": path.resolve(__dirname, "../shared"),
       // Explicitly direct outside files to find your core packages locally
-      "react-router-dom": path.resolve(__dirname, "node_modules/react-router-dom"),
-      "react": path.resolve(__dirname, "node_modules/react"),
+      "react-router-dom": path.resolve(
+        __dirname,
+        "node_modules/react-router-dom",
+      ),
+      react: path.resolve(__dirname, "node_modules/react"),
       "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
     },
   },

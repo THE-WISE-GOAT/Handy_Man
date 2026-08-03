@@ -17,24 +17,25 @@ export const createMoreZlice = (set, get) => ({
     main: "SystemCalendar",
     sidebar: "AccountProfiles",
     bottomLeft: "HistoricalRecordsLogs",
-    bottomRight: "SystemSettings"
+    bottomRight: "SystemSettings",
   },
 
   // ==========================================
   // 3. UNIVERSAL SWAPPING ACTION
   // ==========================================
-  swapMiscSlots: (clickedSlotName) => set((state) => {
-    if (clickedSlotName === "main") return {}; // Already active, ignore
+  swapMiscSlots: (clickedSlotName) =>
+    set((state) => {
+      if (clickedSlotName === "main") return {}; // Already active, ignore
 
-    const outgoingMainModule = state.miscSlots.main;
-    const incomingTargetModule = state.miscSlots[clickedSlotName];
+      const outgoingMainModule = state.miscSlots.main;
+      const incomingTargetModule = state.miscSlots[clickedSlotName];
 
-    return {
-      miscSlots: {
-        ...state.miscSlots,
-        main: incomingTargetModule,
-        [clickedSlotName]: outgoingMainModule
-      }
-    };
-  })
+      return {
+        miscSlots: {
+          ...state.miscSlots,
+          main: incomingTargetModule,
+          [clickedSlotName]: outgoingMainModule,
+        },
+      };
+    }),
 });

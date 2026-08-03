@@ -20,9 +20,10 @@ export default function AdminApplicationsBoard({ viewSlug }) {
       setApplications(Array.isArray(data) ? data : []);
     } catch (err) {
       const normalized = normalizeApiError(err, "Failed to load applications.");
-      const backendMsg = err.status === 404
-        ? " Worker onboarding backend not available. Restart the backend server."
-        : "";
+      const backendMsg =
+        err.status === 404
+          ? " Worker onboarding backend not available. Restart the backend server."
+          : "";
       setError(normalized.message + backendMsg);
     } finally {
       setIsLoading(false);
@@ -33,13 +34,18 @@ export default function AdminApplicationsBoard({ viewSlug }) {
     loadApplications();
   }, []);
 
-const handleApprove = async (skillId) => {
+  const handleApprove = async (skillId) => {
     setActionLoading(`approve-${skillId}`);
     try {
-      await apiClient.post(`/worker-onboarding/admin/applications/${skillId}/approve`);
+      await apiClient.post(
+        `/worker-onboarding/admin/applications/${skillId}/approve`,
+      );
       await loadApplications();
     } catch (err) {
-      const normalized = normalizeApiError(err, "Failed to approve application.");
+      const normalized = normalizeApiError(
+        err,
+        "Failed to approve application.",
+      );
       alert(normalized.message);
     } finally {
       setActionLoading(null);
@@ -51,19 +57,22 @@ const handleApprove = async (skillId) => {
     setRejectReason("");
   };
 
-const handleRejectConfirm = async () => {
+  const handleRejectConfirm = async () => {
     if (!rejectTarget || !rejectReason.trim()) return;
     setActionLoading(`reject-${rejectTarget.skill_id}`);
     try {
       await apiClient.post(
         `/worker-onboarding/admin/applications/${rejectTarget.skill_id}/reject`,
-        { reason: rejectReason.trim() }
+        { reason: rejectReason.trim() },
       );
       setRejectTarget(null);
       setRejectReason("");
       await loadApplications();
     } catch (err) {
-      const normalized = normalizeApiError(err, "Failed to reject application.");
+      const normalized = normalizeApiError(
+        err,
+        "Failed to reject application.",
+      );
       alert(normalized.message);
     } finally {
       setActionLoading(null);
@@ -85,9 +94,9 @@ const handleRejectConfirm = async () => {
           `http://127.0.0.1:8000/worker-interview/${app.worker_chat_id}/history`,
           {
             headers: {
-              "Authorization": `Bearer ${token}`,
+              Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
 
         if (response.ok) {
@@ -104,13 +113,18 @@ const handleRejectConfirm = async () => {
   };
 
   const renderHistoryPreview = (history) => {
-    if (!history || !Array.isArray(history)) return <p className="admin-section__empty">No interview history.</p>;
+    if (!history || !Array.isArray(history))
+      return <p className="admin-section__empty">No interview history.</p>;
     const visible = history.filter((m) => m.role && m.role !== "system");
-    if (visible.length === 0) return <p className="admin-section__empty">No interview history.</p>;
+    if (visible.length === 0)
+      return <p className="admin-section__empty">No interview history.</p>;
     return (
       <div className="admin-chat-preview">
         {visible.map((msg, idx) => (
-          <div key={idx} className={`admin-chat-bubble admin-chat-bubble--${msg.role}`}>
+          <div
+            key={idx}
+            className={`admin-chat-bubble admin-chat-bubble--${msg.role}`}
+          >
             <strong>{msg.role?.toUpperCase()}:</strong> {msg.content}
           </div>
         ))}
@@ -138,9 +152,14 @@ const handleRejectConfirm = async () => {
             }
           : null;
 
-    if (!profile) return <p className="admin-section__empty">Profile not yet extracted.</p>;
-    const entries = Object.entries(profile).filter(([_, v]) => v && !Array.isArray(v));
-    const arrays = Object.entries(profile).filter(([_, v]) => Array.isArray(v) && v.length > 0);
+    if (!profile)
+      return <p className="admin-section__empty">Profile not yet extracted.</p>;
+    const entries = Object.entries(profile).filter(
+      ([_, v]) => v && !Array.isArray(v),
+    );
+    const arrays = Object.entries(profile).filter(
+      ([_, v]) => Array.isArray(v) && v.length > 0,
+    );
     return (
       <div className="admin-profile-preview">
         {entries.map(([k, v]) => (
@@ -152,7 +171,9 @@ const handleRejectConfirm = async () => {
         {arrays.map(([k, v]) => (
           <div key={k} className="admin-profile-row">
             <span className="admin-profile-key">{k}:</span>
-            <span className="admin-profile-val">{Array.isArray(v) ? v.join(", ") : String(v)}</span>
+            <span className="admin-profile-val">
+              {Array.isArray(v) ? v.join(", ") : String(v)}
+            </span>
           </div>
         ))}
       </div>
@@ -199,37 +220,60 @@ const handleRejectConfirm = async () => {
                         {app.email} • ID: {app.user_id} • App ID: {app.id}
                       </p>
                       <div className="admin-application-details">
-                          <span className="admin-detail-tag">Skill: {app.skill_title || "—"}</span>
-                          <span className="admin-detail-tag">Type: {app.skill_type || "—"}</span>
-                          <span className="admin-detail-tag">Experience: {app.years_experience} yrs</span>
-                        <span className="admin-detail-tag">Specialities: {app.specialities?.length > 0 ? app.specialities.join(", ") : "—"}</span>
+                        <span className="admin-detail-tag">
+                          Skill: {app.skill_title || "—"}
+                        </span>
+                        <span className="admin-detail-tag">
+                          Type: {app.skill_type || "—"}
+                        </span>
+                        <span className="admin-detail-tag">
+                          Experience: {app.years_experience} yrs
+                        </span>
+                        <span className="admin-detail-tag">
+                          Specialities:{" "}
+                          {app.specialities?.length > 0
+                            ? app.specialities.join(", ")
+                            : "—"}
+                        </span>
                         {app.phone_number && (
-                          <span className="admin-detail-tag">Phone: {app.phone_number}</span>
+                          <span className="admin-detail-tag">
+                            Phone: {app.phone_number}
+                          </span>
                         )}
                         {app.address_text && (
-                          <span className="admin-detail-tag">Address: {app.address_text}</span>
+                          <span className="admin-detail-tag">
+                            Address: {app.address_text}
+                          </span>
                         )}
                       </div>
                     </div>
-                      <div className="admin-application-actions">
-                          <button
-                            className="admin-btn admin-btn--approve"
-                            onClick={(e) => { e.stopPropagation(); handleApprove(app.skill_id); }}
-                            disabled={actionLoading === `approve-${app.skill_id}`}
-                          >
-                            {actionLoading === `approve-${app.skill_id}` ? "Approving..." : "Approve"}
-                          </button>
-                          <button
-                            className="admin-btn admin-btn--reject"
-                            onClick={(e) => { e.stopPropagation(); handleRejectClick(app); }}
-                            disabled={actionLoading === `reject-${app.skill_id}`}
-                          >
-                            Reject
-                          </button>
-                          <span className="admin-expand-hint">
-                            {expandedId === app.id ? "▲ Hide" : "▼ View Details"}
-                          </span>
-                        </div>
+                    <div className="admin-application-actions">
+                      <button
+                        className="admin-btn admin-btn--approve"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleApprove(app.skill_id);
+                        }}
+                        disabled={actionLoading === `approve-${app.skill_id}`}
+                      >
+                        {actionLoading === `approve-${app.skill_id}`
+                          ? "Approving..."
+                          : "Approve"}
+                      </button>
+                      <button
+                        className="admin-btn admin-btn--reject"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRejectClick(app);
+                        }}
+                        disabled={actionLoading === `reject-${app.skill_id}`}
+                      >
+                        Reject
+                      </button>
+                      <span className="admin-expand-hint">
+                        {expandedId === app.id ? "▲ Hide" : "▼ View Details"}
+                      </span>
+                    </div>
                   </div>
 
                   {expandedId === app.id && (
@@ -238,18 +282,28 @@ const handleRejectConfirm = async () => {
                         <h4>Worker Details</h4>
                         {renderProfilePreview(app)}
                         {app.phone_number && (
-                          <p><strong>Phone:</strong> {app.phone_number}</p>
+                          <p>
+                            <strong>Phone:</strong> {app.phone_number}
+                          </p>
                         )}
                         {app.address_text && (
-                          <p><strong>Address:</strong> {app.address_text}</p>
+                          <p>
+                            <strong>Address:</strong> {app.address_text}
+                          </p>
                         )}
                         {app.latitude != null && app.longitude != null && (
-                          <p><strong>Location:</strong> {app.longitude.toFixed(4)}, {app.latitude.toFixed(4)}</p>
+                          <p>
+                            <strong>Location:</strong>{" "}
+                            {app.longitude.toFixed(4)},{" "}
+                            {app.latitude.toFixed(4)}
+                          </p>
                         )}
                       </div>
                       <div className="admin-detail-section">
                         <h4>AI Interview Transcript</h4>
-                        {renderHistoryPreview(expandedHistory[app.id] || app.history)}
+                        {renderHistoryPreview(
+                          expandedHistory[app.id] || app.history,
+                        )}
                       </div>
                     </div>
                   )}
@@ -262,25 +316,40 @@ const handleRejectConfirm = async () => {
 
       {/* Reject Modal */}
       {rejectTarget && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(3px)",
+          }}
+        >
           <div
             style={{
-              position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-              backgroundColor: "rgba(0, 0, 0, 0.6)", zIndex: 99999, display: "flex",
-              alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
+              background: "var(--ind-surface)",
+              border: "1px solid var(--ind-border)",
+              borderRadius: "16px",
+              boxShadow: "var(--ind-shadow-tight)",
+              width: "400px",
+              maxWidth: "90%",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              fontFamily: "inherit",
             }}
           >
-            <div
-              style={{
-                background: "var(--ind-surface)", border: "1px solid var(--ind-border)", borderRadius: "16px",
-                boxShadow: "var(--ind-shadow-tight)", width: "400px", maxWidth: "90%",
-                padding: "24px", display: "flex", flexDirection: "column", gap: "12px",
-                fontFamily: "inherit"
-              }}
-            >
             <h3 style={{ margin: 0 }}>Reject Application</h3>
             <p style={{ margin: 0, fontSize: "0.85rem" }}>
-              Rejecting application from <strong>{rejectTarget.username}</strong>.
-              Please provide a reason:
+              Rejecting application from{" "}
+              <strong>{rejectTarget.username}</strong>. Please provide a reason:
             </p>
             <textarea
               value={rejectReason}
@@ -288,19 +357,35 @@ const handleRejectConfirm = async () => {
               placeholder="Enter rejection reason..."
               rows={4}
               style={{
-                width: "100%", border: "1px solid var(--ind-border)", borderRadius: "8px",
-                padding: "10px", font: "inherit", fontSize: "0.85rem", resize: "vertical",
-                background: "var(--ind-surface-alpha-40)", color: "var(--ind-white)"
+                width: "100%",
+                border: "1px solid var(--ind-border)",
+                borderRadius: "8px",
+                padding: "10px",
+                font: "inherit",
+                fontSize: "0.85rem",
+                resize: "vertical",
+                background: "var(--ind-surface-alpha-40)",
+                color: "var(--ind-white)",
               }}
             />
             <div style={{ display: "flex", gap: "10px" }}>
               <button
                 type="button"
-                onClick={() => { setRejectTarget(null); setRejectReason(""); }}
+                onClick={() => {
+                  setRejectTarget(null);
+                  setRejectReason("");
+                }}
                 style={{
-                  flex: 1, padding: "10px", background: "rgba(31, 31, 31, 0.4)", border: "1px solid rgba(245, 245, 247, 0.14)",
-                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer", color: "#F5F5F7"
+                  flex: 1,
+                  padding: "10px",
+                  background: "rgba(31, 31, 31, 0.4)",
+                  border: "1px solid rgba(245, 245, 247, 0.14)",
+                  borderRadius: "8px",
+                  font: "inherit",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  color: "#F5F5F7",
                 }}
               >
                 Cancel
@@ -308,14 +393,26 @@ const handleRejectConfirm = async () => {
               <button
                 type="button"
                 onClick={handleRejectConfirm}
-                disabled={!rejectReason.trim() || actionLoading === `reject-${rejectTarget.skill_id}`}
+                disabled={
+                  !rejectReason.trim() ||
+                  actionLoading === `reject-${rejectTarget.skill_id}`
+                }
                 style={{
-                  flex: 1, padding: "10px", background: "rgba(220, 53, 69, 0.15)", border: "1px solid rgba(220, 53, 69, 0.3)",
-                  borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                  cursor: "pointer", color: "#ff6b6b"
+                  flex: 1,
+                  padding: "10px",
+                  background: "rgba(220, 53, 69, 0.15)",
+                  border: "1px solid rgba(220, 53, 69, 0.3)",
+                  borderRadius: "8px",
+                  font: "inherit",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  color: "#ff6b6b",
                 }}
               >
-                {actionLoading === `reject-${rejectTarget.skill_id}` ? "Rejecting..." : "Confirm Reject"}
+                {actionLoading === `reject-${rejectTarget.skill_id}`
+                  ? "Rejecting..."
+                  : "Confirm Reject"}
               </button>
             </div>
           </div>

@@ -145,7 +145,7 @@ export default function Dash3Worker({ viewSlug }) {
         setModalAddrText(addressText || "");
       } else {
         setModalLat(27.7172);
-        setModalLng(85.3240);
+        setModalLng(85.324);
         setModalAddrText("");
       }
 
@@ -183,26 +183,38 @@ export default function Dash3Worker({ viewSlug }) {
       html: `<div style="font-size: 30px; transform: translate(-3px, -24px); filter: drop-shadow(2px 3px 0px rgba(0,0,0,0.6));">📍</div>`,
       className: "cute-custom-pin",
       iconSize: [30, 30],
-      iconAnchor: [15, 30]
+      iconAnchor: [15, 30],
     });
 
-    const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([modalLat, modalLng], 14);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    const map = L.map(mapContainerRef.current, { zoomControl: false }).setView(
+      [modalLat, modalLng],
+      14,
+    );
+    L.control.zoom({ position: "bottomright" }).addTo(map);
     leafletMapRef.current = map;
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; OpenStreetMap contributors'
+      attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
-    const marker = L.marker([modalLat, modalLng], { icon: stylizedPinIcon, draggable: true }).addTo(map);
+    const marker = L.marker([modalLat, modalLng], {
+      icon: stylizedPinIcon,
+      draggable: true,
+    }).addTo(map);
     leafletMarkerRef.current = marker;
 
     const runReverseGeocode = async (lat, lng) => {
       try {
-        const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+        );
         if (resp.ok) {
           const data = await resp.json();
-          const cleanString = data.display_name.split(",").slice(0, 3).join(",").toUpperCase();
+          const cleanString = data.display_name
+            .split(",")
+            .slice(0, 3)
+            .join(",")
+            .toUpperCase();
           setModalAddrText(cleanString.trim());
         }
       } catch (err) {
@@ -235,11 +247,16 @@ export default function Dash3Worker({ viewSlug }) {
 
   const executeModalAddressSearch = async (e) => {
     e.preventDefault();
-    if (!modalSearchQuery.trim() || !leafletMapRef.current || !leafletMarkerRef.current) return;
+    if (
+      !modalSearchQuery.trim() ||
+      !leafletMapRef.current ||
+      !leafletMarkerRef.current
+    )
+      return;
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(modalSearchQuery)}&countrycodes=np&limit=1`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(modalSearchQuery)}&countrycodes=np&limit=1`,
       );
       if (response.ok) {
         const results = await response.json();
@@ -251,13 +268,19 @@ export default function Dash3Worker({ viewSlug }) {
           setModalLat(newLat);
           setModalLng(newLng);
 
-          const title = firstResult.display_name.split(",").slice(0, 3).join(",").toUpperCase();
+          const title = firstResult.display_name
+            .split(",")
+            .slice(0, 3)
+            .join(",")
+            .toUpperCase();
           setModalAddrText(title.trim());
 
           leafletMapRef.current.setView([newLat, newLng], 15);
           leafletMarkerRef.current.setLatLng([newLat, newLng]);
         } else {
-          alert("NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.");
+          alert(
+            "NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.",
+          );
         }
       }
     } catch (err) {
@@ -267,7 +290,9 @@ export default function Dash3Worker({ viewSlug }) {
 
   const handleModalLiveTracking = () => {
     if (!navigator.geolocation) {
-      alert("GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.");
+      alert(
+        "GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.",
+      );
       return;
     }
 
@@ -284,20 +309,26 @@ export default function Dash3Worker({ viewSlug }) {
 
         try {
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
           );
           if (!response.ok) throw new Error("Reverse lookup failed");
           const data = await response.json();
-          const cleanString = data.display_name.split(",").slice(0, 3).join(",").toUpperCase();
+          const cleanString = data.display_name
+            .split(",")
+            .slice(0, 3)
+            .join(",")
+            .toUpperCase();
           setModalAddrText(cleanString.trim());
         } catch (err) {
           setModalAddrText("CURRENT LIVE LOCATION");
         }
       },
       (error) => {
-        alert("LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.");
+        alert(
+          "LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.",
+        );
       },
-      { enableHighAccuracy: true, timeout: 7000 }
+      { enableHighAccuracy: true, timeout: 7000 },
     );
   };
 
@@ -316,7 +347,9 @@ export default function Dash3Worker({ viewSlug }) {
   };
 
   const confirmMapLocation = () => {
-    setAddressText(modalAddrText || `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`);
+    setAddressText(
+      modalAddrText || `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`,
+    );
     setLatitude(modalLat);
     setLongitude(modalLng);
     setIsMapOpen(false);
@@ -328,12 +361,21 @@ export default function Dash3Worker({ viewSlug }) {
   const renderChatTerminal = ({ isActive }) => {
     if (!isActive) {
       return (
-        <div className="dashboard-card module-preview" onClick={() => setActiveModule("interview")}>
+        <div
+          className="dashboard-card module-preview"
+          onClick={() => setActiveModule("interview")}
+        >
           <div className="card-header">••• AI INTERVIEW TERMINAL</div>
           <div className="main-panel">
-            <p className="panel-desc">Click to open the AI interview terminal</p>
+            <p className="panel-desc">
+              Click to open the AI interview terminal
+            </p>
             <span className="badge">
-              {isAddingSkill ? "Specialty Session" : chatMessages.length > 1 ? `${chatMessages.length} messages` : "Not started"}
+              {isAddingSkill
+                ? "Specialty Session"
+                : chatMessages.length > 1
+                  ? `${chatMessages.length} messages`
+                  : "Not started"}
             </span>
           </div>
         </div>
@@ -344,11 +386,26 @@ export default function Dash3Worker({ viewSlug }) {
     if (isAddingSkill) {
       return (
         <div className="dashboard-card slot-main">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", gap: "8px", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "12px",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
             <div className="card-header" style={{ marginBottom: 0 }}>
-              ••• AI INTERVIEW TERMINAL <span className="badge badge-highlight" style={{ marginLeft: "8px" }}>SPECIALTY INTERVIEW</span>
+              ••• AI INTERVIEW TERMINAL{" "}
+              <span
+                className="badge badge-highlight"
+                style={{ marginLeft: "8px" }}
+              >
+                SPECIALTY INTERVIEW
+              </span>
             </div>
-            
+
             <button
               type="button"
               onClick={cancelAddSession}
@@ -363,7 +420,7 @@ export default function Dash3Worker({ viewSlug }) {
                 fontSize: "12px",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "4px"
+                gap: "4px",
               }}
             >
               ✕ CANCEL INTERVIEW
@@ -371,7 +428,10 @@ export default function Dash3Worker({ viewSlug }) {
           </div>
 
           <div className="main-panel chat-terminal-panel">
-            <div className="chat-box" style={{ minHeight: "340px", maxHeight: "450px" }}>
+            <div
+              className="chat-box"
+              style={{ minHeight: "340px", maxHeight: "450px" }}
+            >
               {chatMessages.map((m) => (
                 <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
                   <strong>{m.sender.toUpperCase()}:</strong> {m.text}
@@ -404,46 +464,94 @@ export default function Dash3Worker({ viewSlug }) {
     }
 
     // STATE 2: POST-APPLICATION SUBMITTED VIEW (THE SKETCH DESIGN)
-    if (applicationSubmitted || applicantStage === "pending_admin_review" || isApplicantComplete) {
-      const jobCategory = extractedProfile?.job_category || editableProfile?.job_category || "Plumber";
-      
-    const skillsList = workerSkills && workerSkills.length > 0 
-      ? workerSkills.map(s => (typeof s === "object" ? (s.title || s.name || s.skill_name) : s))
-      : (extractedProfile?.specialities?.length > 0 ? extractedProfile.specialities : (editableProfile?.specialities || ["Speciality 1", "Speciality 2", "Speciality 3", "Speciality 4"]));
-      
+    if (
+      applicationSubmitted ||
+      applicantStage === "pending_admin_review" ||
+      isApplicantComplete
+    ) {
+      const jobCategory =
+        extractedProfile?.job_category ||
+        editableProfile?.job_category ||
+        "Plumber";
+
+      const skillsList =
+        workerSkills && workerSkills.length > 0
+          ? workerSkills.map((s) =>
+              typeof s === "object" ? s.title || s.name || s.skill_name : s,
+            )
+          : extractedProfile?.specialities?.length > 0
+            ? extractedProfile.specialities
+            : editableProfile?.specialities || [
+                "Speciality 1",
+                "Speciality 2",
+                "Speciality 3",
+                "Speciality 4",
+              ];
+
       return (
         <div className="dashboard-card slot-main">
           <div className="card-header">••• AI INTERVIEW TERMINAL</div>
-          <div className="main-panel" style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "16px" }}>
-            
-            {/* INNER CONTAINER (MATCHING SKETCH) */}
-            <div style={{
-              border: "1px solid var(--ind-border, rgba(255,255,255,0.15))",
-              borderRadius: "12px",
-              padding: "20px",
-              background: "var(--ind-surface-alpha-40, rgba(255,255,255,0.03))",
+          <div
+            className="main-panel"
+            style={{
               display: "flex",
               flexDirection: "column",
-              gap: "16px"
-            }}>
+              gap: "20px",
+              padding: "16px",
+            }}
+          >
+            {/* INNER CONTAINER (MATCHING SKETCH) */}
+            <div
+              style={{
+                border: "1px solid var(--ind-border, rgba(255,255,255,0.15))",
+                borderRadius: "12px",
+                padding: "20px",
+                background:
+                  "var(--ind-surface-alpha-40, rgba(255,255,255,0.03))",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+              }}
+            >
               <div style={{ fontSize: "16px", fontWeight: "600" }}>
-                <span style={{ color: "var(--text-secondary, #aaa)" }}>Job Category : </span> 
-                <span style={{ color: "var(--ind-white, #fff)", textTransform: "lowercase", fontWeight: "bold" }}>{jobCategory}</span>
+                <span style={{ color: "var(--text-secondary, #aaa)" }}>
+                  Job Category :{" "}
+                </span>
+                <span
+                  style={{
+                    color: "var(--ind-white, #fff)",
+                    textTransform: "lowercase",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {jobCategory}
+                </span>
               </div>
 
               <div style={{ fontSize: "14px" }}>
-                <span style={{ color: "var(--text-secondary, #aaa)", display: "block", marginBottom: "8px" }}>Specialities :</span>
+                <span
+                  style={{
+                    color: "var(--text-secondary, #aaa)",
+                    display: "block",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Specialities :
+                </span>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {skillsList.map((spec, i) => (
-                    <span key={i} style={{
-                      background: "rgba(255, 107, 26, 0.15)",
-                      color: "#FF6B1A",
-                      border: "1px solid rgba(255, 107, 26, 0.3)",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "13px",
-                      fontWeight: 500
-                    }}>
+                    <span
+                      key={i}
+                      style={{
+                        background: "rgba(255, 107, 26, 0.15)",
+                        color: "#FF6B1A",
+                        border: "1px solid rgba(255, 107, 26, 0.3)",
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                      }}
+                    >
                       {spec}
                     </span>
                   ))}
@@ -466,7 +574,7 @@ export default function Dash3Worker({ viewSlug }) {
                     fontSize: "13px",
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: "6px"
+                    gap: "6px",
                   }}
                 >
                   + Add More Specialities by taking an interview
@@ -483,7 +591,8 @@ export default function Dash3Worker({ viewSlug }) {
                 style={{
                   background: "transparent",
                   color: "var(--ind-white, #fff)",
-                  border: "1px dashed var(--ind-border, rgba(255,255,255,0.25))",
+                  border:
+                    "1px dashed var(--ind-border, rgba(255,255,255,0.25))",
                   borderRadius: "8px",
                   padding: "10px 18px",
                   fontWeight: 600,
@@ -491,20 +600,20 @@ export default function Dash3Worker({ viewSlug }) {
                   fontSize: "13px",
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "6px"
+                  gap: "6px",
                 }}
               >
                 + Add New Job Category
               </button>
             </div>
-
           </div>
         </div>
       );
     }
 
     // STATE 3: INITIAL ONBOARDING INTERVIEW (Before initial application is submitted)
-    const hasActiveChat = chatMessages.length > 1 || isChatComplete || isAiGenerating;
+    const hasActiveChat =
+      chatMessages.length > 1 || isChatComplete || isAiGenerating;
 
     return (
       <div className="dashboard-card slot-main">
@@ -515,7 +624,8 @@ export default function Dash3Worker({ viewSlug }) {
             <div className="start-interview-prompt">
               <h3>Ready to begin your onboarding interview?</h3>
               <p className="panel-desc">
-                The AI will ask about your skills, experience, and tools to build your worker profile.
+                The AI will ask about your skills, experience, and tools to
+                build your worker profile.
               </p>
               <button
                 type="button"
@@ -529,9 +639,14 @@ export default function Dash3Worker({ viewSlug }) {
           ) : (
             <>
               {turnsRemaining !== undefined && (
-                <span className="turns-badge">TURNS LEFT: {turnsRemaining}</span>
+                <span className="turns-badge">
+                  TURNS LEFT: {turnsRemaining}
+                </span>
               )}
-              <div className="chat-box" style={{ minHeight: "340px", maxHeight: "450px" }}>
+              <div
+                className="chat-box"
+                style={{ minHeight: "340px", maxHeight: "450px" }}
+              >
                 {chatMessages.map((m) => (
                   <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
                     <strong>{m.sender.toUpperCase()}:</strong> {m.text}
@@ -547,13 +662,19 @@ export default function Dash3Worker({ viewSlug }) {
                 <input
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder={isChatComplete ? "Conversation finalized." : "Instruct AI..."}
+                  placeholder={
+                    isChatComplete
+                      ? "Conversation finalized."
+                      : "Instruct AI..."
+                  }
                   disabled={isChatComplete || isAiGenerating}
                 />
                 <button
                   type="submit"
                   className="chat-btn"
-                  disabled={isChatComplete || isAiGenerating || !chatInput.trim()}
+                  disabled={
+                    isChatComplete || isAiGenerating || !chatInput.trim()
+                  }
                 >
                   Send
                 </button>
@@ -571,12 +692,19 @@ export default function Dash3Worker({ viewSlug }) {
   const renderExtractionModule = ({ isActive }) => {
     if (!isActive) {
       return (
-        <div className="dashboard-card module-preview" onClick={() => setActiveModule("extraction")}>
+        <div
+          className="dashboard-card module-preview"
+          onClick={() => setActiveModule("extraction")}
+        >
           <div className="card-header">••• EXTRACTION & SUBMISSION</div>
           <div className="main-panel">
-            <p className="panel-desc">Click to view extraction details and submit</p>
+            <p className="panel-desc">
+              Click to view extraction details and submit
+            </p>
             <span className="badge">
-              {extractedProfile ? extractedProfile.job_category || "Profile ready" : "Awaiting extraction"}
+              {extractedProfile
+                ? extractedProfile.job_category || "Profile ready"
+                : "Awaiting extraction"}
             </span>
           </div>
         </div>
@@ -593,11 +721,15 @@ export default function Dash3Worker({ viewSlug }) {
               <div className="extracted-data">
                 <div className="extracted-row">
                   <span className="extracted-label">Job Category:</span>
-                  <span className="extracted-value">{extractedProfile.job_category || "—"}</span>
+                  <span className="extracted-value">
+                    {extractedProfile.job_category || "—"}
+                  </span>
                 </div>
                 <div className="extracted-row">
                   <span className="extracted-label">Category Tag:</span>
-                  <span className="extracted-value">{extractedProfile.category_tag || "—"}</span>
+                  <span className="extracted-value">
+                    {extractedProfile.category_tag || "—"}
+                  </span>
                 </div>
                 <div className="extracted-row">
                   <span className="extracted-label">Specialities:</span>
@@ -609,19 +741,25 @@ export default function Dash3Worker({ viewSlug }) {
                 </div>
                 <div className="extracted-row">
                   <span className="extracted-label">Years Experience:</span>
-                  <span className="extracted-value">{extractedProfile.years_experience ?? "—"}</span>
+                  <span className="extracted-value">
+                    {extractedProfile.years_experience ?? "—"}
+                  </span>
                 </div>
                 <div className="extracted-row">
                   <span className="extracted-label">Tools:</span>
                   <span className="extracted-value">
                     {extractedProfile.specialized_tools_or_equipment?.length > 0
-                      ? extractedProfile.specialized_tools_or_equipment.join(", ")
+                      ? extractedProfile.specialized_tools_or_equipment.join(
+                          ", ",
+                        )
                       : "—"}
                   </span>
                 </div>
                 <div className="extracted-row">
                   <span className="extracted-label">License:</span>
-                  <span className="extracted-value">{extractedProfile.license_or_certification || "—"}</span>
+                  <span className="extracted-value">
+                    {extractedProfile.license_or_certification || "—"}
+                  </span>
                 </div>
               </div>
             ) : (
@@ -684,13 +822,22 @@ export default function Dash3Worker({ viewSlug }) {
   // RENDER: Worker Profile Module
   // ====================================================
   const renderProfileModule = ({ isActive }) => {
-    const displayName = [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" ") || userProfile.username || "Worker";
-    const locationLine = [addressText, phoneNumber].filter(Boolean).join(" | ") || "No location set";
-    const primaryTag = extractedProfile?.job_category || editableProfile.job_category || "";
+    const displayName =
+      [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" ") ||
+      userProfile.username ||
+      "Worker";
+    const locationLine =
+      [addressText, phoneNumber].filter(Boolean).join(" | ") ||
+      "No location set";
+    const primaryTag =
+      extractedProfile?.job_category || editableProfile.job_category || "";
 
     if (!isActive) {
       return (
-        <div className="dashboard-card module-preview" onClick={() => setActiveModule("profile")}>
+        <div
+          className="dashboard-card module-preview"
+          onClick={() => setActiveModule("profile")}
+        >
           <div className="card-header">••• WORKER PROFILE</div>
           <div className="main-panel">
             <p className="panel-desc">Click to view full profile</p>
@@ -708,7 +855,9 @@ export default function Dash3Worker({ viewSlug }) {
     const renderEmpty = (label, value) => (
       <div className="profile-detail-row">
         <span className="profile-detail-label">{label}:</span>
-        <span className="profile-detail-value profile-detail-value--empty">{value || "None"}</span>
+        <span className="profile-detail-value profile-detail-value--empty">
+          {value || "None"}
+        </span>
       </div>
     );
 
@@ -752,19 +901,27 @@ export default function Dash3Worker({ viewSlug }) {
                 </div>
                 <div className="profile-detail-row">
                   <span className="profile-detail-label">User ID:</span>
-                  <span className="profile-detail-value">{userProfile.id || "—"}</span>
+                  <span className="profile-detail-value">
+                    {userProfile.id || "—"}
+                  </span>
                 </div>
                 <div className="profile-detail-row">
                   <span className="profile-detail-label">Email:</span>
-                  <span className="profile-detail-value">{userProfile.email || "—"}</span>
+                  <span className="profile-detail-value">
+                    {userProfile.email || "—"}
+                  </span>
                 </div>
                 <div className="profile-detail-row">
                   <span className="profile-detail-label">Address:</span>
-                  <span className="profile-detail-value">{addressText || "—"}</span>
+                  <span className="profile-detail-value">
+                    {addressText || "—"}
+                  </span>
                 </div>
                 <div className="profile-detail-row">
                   <span className="profile-detail-label">Phone:</span>
-                  <span className="profile-detail-value">{phoneNumber || "—"}</span>
+                  <span className="profile-detail-value">
+                    {phoneNumber || "—"}
+                  </span>
                 </div>
               </div>
             ) : (
@@ -774,7 +931,12 @@ export default function Dash3Worker({ viewSlug }) {
                   <input
                     type="text"
                     value={userProfile.firstName}
-                    onChange={(e) => setUserProfile((prev) => ({ ...prev, firstName: e.target.value }))}
+                    onChange={(e) =>
+                      setUserProfile((prev) => ({
+                        ...prev,
+                        firstName: e.target.value,
+                      }))
+                    }
                   />
                 </div>
                 <div className="profile-field">
@@ -782,7 +944,12 @@ export default function Dash3Worker({ viewSlug }) {
                   <input
                     type="text"
                     value={userProfile.lastName}
-                    onChange={(e) => setUserProfile((prev) => ({ ...prev, lastName: e.target.value }))}
+                    onChange={(e) =>
+                      setUserProfile((prev) => ({
+                        ...prev,
+                        lastName: e.target.value,
+                      }))
+                    }
                   />
                 </div>
                 <div className="profile-field">
@@ -790,7 +957,12 @@ export default function Dash3Worker({ viewSlug }) {
                   <input
                     type="email"
                     value={userProfile.email}
-                    onChange={(e) => setUserProfile((prev) => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) =>
+                      setUserProfile((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
                   />
                 </div>
                 <div className="profile-field">
@@ -798,7 +970,12 @@ export default function Dash3Worker({ viewSlug }) {
                   <input
                     type="text"
                     value={userProfile.username}
-                    onChange={(e) => setUserProfile((prev) => ({ ...prev, username: e.target.value }))}
+                    onChange={(e) =>
+                      setUserProfile((prev) => ({
+                        ...prev,
+                        username: e.target.value,
+                      }))
+                    }
                   />
                 </div>
 
@@ -812,7 +989,9 @@ export default function Dash3Worker({ viewSlug }) {
                     {isSavingUserInfo ? "Saving..." : "Save Changes"}
                   </button>
                   {userInfoSaveMessage && (
-                    <span className={`profile-save-message ${userInfoSaveMessage.includes("Failed") ? "profile-save-message--error" : "profile-save-message--success"}`}>
+                    <span
+                      className={`profile-save-message ${userInfoSaveMessage.includes("Failed") ? "profile-save-message--error" : "profile-save-message--success"}`}
+                    >
                       {userInfoSaveMessage}
                     </span>
                   )}
@@ -854,18 +1033,34 @@ export default function Dash3Worker({ viewSlug }) {
             </div>
 
             <div className="profile-read-only-grid">
-              <div className="profile-detail-row" style={{ gridColumn: "1 / -1" }}>
+              <div
+                className="profile-detail-row"
+                style={{ gridColumn: "1 / -1" }}
+              >
                 <span className="profile-detail-label">Active Skills:</span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "6px",
+                    marginTop: "4px",
+                  }}
+                >
                   {workerSkills && workerSkills.length > 0 ? (
                     workerSkills.map((skill, index) => (
-                      <span key={skill.id || index} className="badge badge-highlight">
-                        {typeof skill === "object" ? (skill.title || skill.name || skill.skill_name) : skill}
+                      <span
+                        key={skill.id || index}
+                        className="badge badge-highlight"
+                      >
+                        {typeof skill === "object"
+                          ? skill.title || skill.name || skill.skill_name
+                          : skill}
                       </span>
                     ))
                   ) : (
                     <span className="profile-detail-value profile-detail-value--empty">
-                      No additional skills added yet. Click "+ Specialty" to perform an AI skill assessment.
+                      No additional skills added yet. Click "+ Specialty" to
+                      perform an AI skill assessment.
                     </span>
                   )}
                 </div>
@@ -880,13 +1075,57 @@ export default function Dash3Worker({ viewSlug }) {
               <span className="badge badge--readonly">Read-Only</span>
             </div>
             <div className="profile-read-only-grid">
-              {renderEmpty("Job Category", extractedProfile?.job_category || editableProfile.job_category)}
-              {renderEmpty("Category Tag", extractedProfile?.category_tag || editableProfile.category_tag)}
-              {renderEmpty("Specialities", (extractedProfile?.specialities || editableProfile.specialities || [])?.length > 0 ? (extractedProfile?.specialities || editableProfile.specialities || []).join(", ") : "None")}
-              {renderEmpty("Tools", (extractedProfile?.specialized_tools_or_equipment || editableProfile.specialized_tools_or_equipment || [])?.length > 0 ? (extractedProfile?.specialized_tools_or_equipment || editableProfile.specialized_tools_or_equipment || []).join(", ") : "None")}
-              {renderEmpty("Years Experience", extractedProfile?.years_experience ?? editableProfile.years_experience)}
-              {renderEmpty("License / Certification", extractedProfile?.license_or_certification || editableProfile.license_or_certification)}
-              {renderEmpty("Job Description", extractedProfile?.job_description || editableProfile.job_description)}
+              {renderEmpty(
+                "Job Category",
+                extractedProfile?.job_category || editableProfile.job_category,
+              )}
+              {renderEmpty(
+                "Category Tag",
+                extractedProfile?.category_tag || editableProfile.category_tag,
+              )}
+              {renderEmpty(
+                "Specialities",
+                (
+                  extractedProfile?.specialities ||
+                  editableProfile.specialities ||
+                  []
+                )?.length > 0
+                  ? (
+                      extractedProfile?.specialities ||
+                      editableProfile.specialities ||
+                      []
+                    ).join(", ")
+                  : "None",
+              )}
+              {renderEmpty(
+                "Tools",
+                (
+                  extractedProfile?.specialized_tools_or_equipment ||
+                  editableProfile.specialized_tools_or_equipment ||
+                  []
+                )?.length > 0
+                  ? (
+                      extractedProfile?.specialized_tools_or_equipment ||
+                      editableProfile.specialized_tools_or_equipment ||
+                      []
+                    ).join(", ")
+                  : "None",
+              )}
+              {renderEmpty(
+                "Years Experience",
+                extractedProfile?.years_experience ??
+                  editableProfile.years_experience,
+              )}
+              {renderEmpty(
+                "License / Certification",
+                extractedProfile?.license_or_certification ||
+                  editableProfile.license_or_certification,
+              )}
+              {renderEmpty(
+                "Job Description",
+                extractedProfile?.job_description ||
+                  editableProfile.job_description,
+              )}
             </div>
           </div>
         </div>
@@ -897,7 +1136,10 @@ export default function Dash3Worker({ viewSlug }) {
   const renderStatusModule = ({ isActive }) => {
     if (!isActive) {
       return (
-        <div className="dashboard-card module-preview" onClick={() => setActiveModule("status")}>
+        <div
+          className="dashboard-card module-preview"
+          onClick={() => setActiveModule("status")}
+        >
           <div className="card-header">••• INTERVIEW STATUS</div>
           <div className="main-panel">
             <p className="panel-desc">Click to view interview status</p>
@@ -913,8 +1155,12 @@ export default function Dash3Worker({ viewSlug }) {
         <div className="main-panel">
           <h3>Current Stage: {applicantStage}</h3>
           <div className="status-badges">
-            {isApplicantComplete && <span className="badge badge-highlight">Complete</span>}
-            {isApplicantRejected && <span className="badge badge--rejected">Rejected</span>}
+            {isApplicantComplete && (
+              <span className="badge badge-highlight">Complete</span>
+            )}
+            {isApplicantRejected && (
+              <span className="badge badge--rejected">Rejected</span>
+            )}
             {!isApplicantComplete && !isApplicantRejected && (
               <span className="badge">In Progress</span>
             )}
@@ -980,44 +1226,88 @@ export default function Dash3Worker({ viewSlug }) {
     return (
       <div
         style={{
-          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-          backgroundColor: "rgba(0, 0, 0, 0.6)", zIndex: 99999, display: "flex",
-          alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          backgroundColor: "rgba(0, 0, 0, 0.6)",
+          zIndex: 99999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backdropFilter: "blur(3px)",
         }}
       >
         <div
           style={{
-            background: "var(--ind-surface)", border: "1px solid var(--ind-border)", borderRadius: "16px",
-            boxShadow: "var(--ind-shadow-tight)", width: "450px", maxWidth: "90%",
-            padding: "20px", display: "flex", flexDirection: "column", gap: "12px",
-            fontFamily: "inherit"
+            background: "var(--ind-surface)",
+            border: "1px solid var(--ind-border)",
+            borderRadius: "16px",
+            boxShadow: "var(--ind-shadow-tight)",
+            width: "450px",
+            maxWidth: "90%",
+            padding: "20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            fontFamily: "inherit",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-            <span style={{ fontWeight: "bold", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              width: "100%",
+            }}
+          >
+            <span
+              style={{
+                fontWeight: "bold",
+                fontSize: "14px",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+              }}
+            >
               🗺️ CHOOSE DELIVERY PIN (NEPAL)
             </span>
           </div>
 
           <div style={{ display: "flex", gap: "6px", width: "100%" }}>
-            <form onSubmit={executeModalAddressSearch} style={{ display: "flex", gap: "6px", flex: 1 }}>
+            <form
+              onSubmit={executeModalAddressSearch}
+              style={{ display: "flex", gap: "6px", flex: 1 }}
+            >
               <input
                 type="text"
                 placeholder="SEARCH LALITPUR, THAMEL, ETC..."
                 value={modalSearchQuery}
                 onChange={(e) => setModalSearchQuery(e.target.value)}
                 style={{
-                  flex: 1, border: "1px solid var(--ind-border)", borderRadius: "6px",
-                  padding: "6px 10px", outline: "none", font: "inherit", fontSize: "11px",
-                  background: "var(--ind-surface-alpha-40)", color: "var(--ind-white)"
+                  flex: 1,
+                  border: "1px solid var(--ind-border)",
+                  borderRadius: "6px",
+                  padding: "6px 10px",
+                  outline: "none",
+                  font: "inherit",
+                  fontSize: "11px",
+                  background: "var(--ind-surface-alpha-40)",
+                  color: "var(--ind-white)",
                 }}
               />
               <button
                 type="submit"
                 style={{
-                  background: "#FF6B1A", color: "#0D0D0D", border: "none",
-                  borderRadius: "6px", padding: "0 12px", font: "inherit",
-                  fontSize: "11px", fontWeight: 700, cursor: "pointer"
+                  background: "#FF6B1A",
+                  color: "#0D0D0D",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "0 12px",
+                  font: "inherit",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  cursor: "pointer",
                 }}
               >
                 FIND
@@ -1029,9 +1319,15 @@ export default function Dash3Worker({ viewSlug }) {
               onClick={handleModalLiveTracking}
               title="Snap to My Current Position"
               style={{
-                background: "var(--k-wash)", border: "1px solid rgba(255, 107, 26, 0.4)", borderRadius: "6px",
-                padding: "0 10px", cursor: "pointer", fontSize: "14px", display: "flex",
-                alignItems: "center", justifyContent: "center"
+                background: "var(--k-wash)",
+                border: "1px solid rgba(255, 107, 26, 0.4)",
+                borderRadius: "6px",
+                padding: "0 10px",
+                cursor: "pointer",
+                fontSize: "14px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               📍
@@ -1041,14 +1337,35 @@ export default function Dash3Worker({ viewSlug }) {
           <div
             ref={mapContainerRef}
             style={{
-              width: "100%", height: "260px", border: "1px solid var(--ind-border)",
-              borderRadius: "8px", background: "var(--ind-surface-alpha-40)", position: "relative",
+              width: "100%",
+              height: "260px",
+              border: "1px solid var(--ind-border)",
+              borderRadius: "8px",
+              background: "var(--ind-surface-alpha-40)",
+              position: "relative",
             }}
           />
 
-          <div style={{ fontSize: "11px", background: "var(--ind-surface-alpha-40)", padding: "8px", border: "1px dashed var(--ind-border)", borderRadius: "6px" }}>
-            <strong style={{ color: "var(--text-secondary)" }}>SELECTED ADDRESS:</strong>
-            <div style={{ textTransform: "uppercase", marginTop: "2px", fontWeight: "bold", wordBreak: "break-word" }}>
+          <div
+            style={{
+              fontSize: "11px",
+              background: "var(--ind-surface-alpha-40)",
+              padding: "8px",
+              border: "1px dashed var(--ind-border)",
+              borderRadius: "6px",
+            }}
+          >
+            <strong style={{ color: "var(--text-secondary)" }}>
+              SELECTED ADDRESS:
+            </strong>
+            <div
+              style={{
+                textTransform: "uppercase",
+                marginTop: "2px",
+                fontWeight: "bold",
+                wordBreak: "break-word",
+              }}
+            >
               {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
             </div>
           </div>
@@ -1058,9 +1375,16 @@ export default function Dash3Worker({ viewSlug }) {
               type="button"
               onClick={() => setIsMapOpen(false)}
               style={{
-                flex: 1, padding: "8px", background: "var(--ind-surface-alpha-40)", border: "1px solid var(--ind-border)",
-                borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: "bold",
-                cursor: "pointer", color: "var(--text-secondary)"
+                flex: 1,
+                padding: "8px",
+                background: "var(--ind-surface-alpha-40)",
+                border: "1px solid var(--ind-border)",
+                borderRadius: "8px",
+                font: "inherit",
+                fontSize: "13px",
+                fontWeight: "bold",
+                cursor: "pointer",
+                color: "var(--text-secondary)",
               }}
             >
               CANCEL
@@ -1070,9 +1394,16 @@ export default function Dash3Worker({ viewSlug }) {
               type="button"
               onClick={confirmMapLocation}
               style={{
-                flex: 1, padding: "8px", background: "#FF6B1A", border: "1px solid #FF6B1A",
-                borderRadius: "8px", font: "inherit", fontSize: "13px", fontWeight: 700,
-                cursor: "pointer", color: "#0D0D0D"
+                flex: 1,
+                padding: "8px",
+                background: "#FF6B1A",
+                border: "1px solid #FF6B1A",
+                borderRadius: "8px",
+                font: "inherit",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: "pointer",
+                color: "#0D0D0D",
               }}
             >
               CONFIRM LOCATION
@@ -1088,9 +1419,7 @@ export default function Dash3Worker({ viewSlug }) {
   // ====================================================
   return (
     <div className="worker-me-canvas-grid">
-      <div className="grid-area-main">
-        {renderActiveModule()}
-      </div>
+      <div className="grid-area-main">{renderActiveModule()}</div>
 
       <div className="grid-area-sidebar">
         {inactiveModules.map((mod) => (

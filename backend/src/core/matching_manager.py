@@ -9,7 +9,12 @@ from sqlalchemy.orm import Session
 from geoalchemy2 import Geography
 from geoalchemy2.elements import WKBElement
 from src.core import model
-from src.core.schema import MatchingResult, MatchDetail, WorkerMatchingResult, MatchedJobDetail
+from src.core.schema import (
+    MatchingResult,
+    MatchDetail,
+    WorkerMatchingResult,
+    MatchedJobDetail,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,7 +34,7 @@ MAX_CANDIDATES_FOR_RERANK = 25
 
 def _ensure_geography(location: Any):
     """
-    Safely normalizes dictionaries, Pydantic objects, or GeoAlchemy elements 
+    Safely normalizes dictionaries, Pydantic objects, or GeoAlchemy elements
     into a valid PostGIS Geography Point with guaranteed (Longitude, Latitude) order.
     """
     if location is None:
@@ -47,10 +52,9 @@ def _ensure_geography(location: Any):
         lon = location.get("longitude") or location.get("lng") or location.get("lon")
 
     if lat is not None and lon is not None:
-        return func.ST_SetSRID(
-            func.ST_MakePoint(float(lon), float(lat)), 
-            4326
-        ).cast(Geography)
+        return func.ST_SetSRID(func.ST_MakePoint(float(lon), float(lat)), 4326).cast(
+            Geography
+        )
 
     return location
 
@@ -58,7 +62,13 @@ def _ensure_geography(location: Any):
 def calculate_match_score(distance: float) -> float:
     """The system's single source of truth scoring mechanism (Sigmoid)."""
     try:
-        return max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2)))
+        return max(
+            0.0,
+            min(
+                100.0,
+                round((1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2),
+            ),
+        )
     except Exception:
         return 0.0
 
@@ -91,20 +101,26 @@ def _search_workers(
     )
 
     if spatial_point is not None:
-        stmt = stmt.where(func.ST_DWithin(model.WorkerProfile.location, spatial_point, radius_meters))
+        stmt = stmt.where(
+            func.ST_DWithin(model.WorkerProfile.location, spatial_point, radius_meters)
+        )
 
     stmt = stmt.order_by(distance_expr.asc())
     return db.execute(stmt).all()
 
 
 def _deduplicate_by_user(
-    search_results: list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]
+    search_results: list[
+        tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]
+    ],
 ) -> list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]:
     seen_user_ids: set[int] = set()
     deduped: list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]] = []
 
     for worker, user, skill, distance in search_results:
-        user_key = getattr(user, "id", None) or getattr(worker, "user_id", None) or worker.id
+        user_key = (
+            getattr(user, "id", None) or getattr(worker, "user_id", None) or worker.id
+        )
 
         if user_key in seen_user_ids:
             continue
@@ -158,13 +174,28 @@ def _llm_rerank_matches(
             messages=[{"role": "user", "content": prompt}],
         )
         raw_text = (response.choices[0].message.content or "").strip()
-        raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        raw_text = (
+            raw_text.removeprefix("```json")
+            .removeprefix("```")
+            .removesuffix("```")
+            .strip()
+        )
 
         parsed_ids = json.loads(raw_text)
         if isinstance(parsed_ids, dict):
-            parsed_ids = next((v for v in parsed_ids.values() if isinstance(v, list)), [])
+            parsed_ids = next(
+                (v for v in parsed_ids.values() if isinstance(v, list)), []
+            )
 
-        ordered_ids = [int(x) for x in parsed_ids if isinstance(x, (int, str)) and str(x).isdigit()] if isinstance(parsed_ids, list) else []
+        ordered_ids = (
+            [
+                int(x)
+                for x in parsed_ids
+                if isinstance(x, (int, str)) and str(x).isdigit()
+            ]
+            if isinstance(parsed_ids, list)
+            else []
+        )
 
     except Exception as e:
         logger.error(f"LLM reranker exception, using vector fallback: {e}")
@@ -188,14 +219,17 @@ def _llm_rerank_matches(
     return reranked + leftover
 
 
-def _build_job_candidate_summary(job: model.Job, skill: model.WorkerSkill, score: float, rank: int) -> dict:
+def _build_job_candidate_summary(
+    job: model.Job, skill: model.WorkerSkill, score: float, rank: int
+) -> dict:
     return {
         "job_id": job.id,
         "vector_rank": rank,
         "vector_score": score,
         "job_title": getattr(job, "title", None) or "General Task",
         "job_description": job.description,
-        "categories": getattr(job, "categories", None) or getattr(job, "job_category", None),
+        "categories": getattr(job, "categories", None)
+        or getattr(job, "job_category", None),
         "matched_worker_skill_title": skill.title,
         "matched_worker_skill_description": skill.description,
     }
@@ -217,7 +251,9 @@ def _llm_rerank_jobs_for_worker(
         "category_tag": getattr(worker_profile, "category_tag", "Unknown"),
         "profile_summary": getattr(worker_profile, "job_description", ""),
         "active_skills": [
-            {"title": s.title, "description": s.description} for s in worker_skills if s.is_active
+            {"title": s.title, "description": s.description}
+            for s in worker_skills
+            if s.is_active
         ],
     }
 
@@ -241,13 +277,28 @@ def _llm_rerank_jobs_for_worker(
             messages=[{"role": "user", "content": prompt}],
         )
         raw_text = (response.choices[0].message.content or "").strip()
-        raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        raw_text = (
+            raw_text.removeprefix("```json")
+            .removeprefix("```")
+            .removesuffix("```")
+            .strip()
+        )
 
         parsed_ids = json.loads(raw_text)
         if isinstance(parsed_ids, dict):
-            parsed_ids = next((v for v in parsed_ids.values() if isinstance(v, list)), [])
+            parsed_ids = next(
+                (v for v in parsed_ids.values() if isinstance(v, list)), []
+            )
 
-        ordered_ids = [int(x) for x in parsed_ids if isinstance(x, (int, str)) and str(x).isdigit()] if isinstance(parsed_ids, list) else []
+        ordered_ids = (
+            [
+                int(x)
+                for x in parsed_ids
+                if isinstance(x, (int, str)) and str(x).isdigit()
+            ]
+            if isinstance(parsed_ids, list)
+            else []
+        )
 
     except Exception as e:
         logger.error(f"LLM worker reranker exception, using vector fallback: {e}")
@@ -293,16 +344,18 @@ def create_matches_for_job(
     for worker, user, skill, distance in search_results:
         score = calculate_match_score(float(distance))
         if score > SCORE_THRESHOLD:
-            rich_matches.append({
-                "worker_profile": worker,
-                "user": user,
-                "score": score,
-                "rank": vector_rank,
-                "worker_chat_id": getattr(worker, "worker_chat_id", None),
-                "matched_skill_id": skill.id,
-                "matched_skill_title": skill.title,
-                "matched_skill_description": skill.description,
-            })
+            rich_matches.append(
+                {
+                    "worker_profile": worker,
+                    "user": user,
+                    "score": score,
+                    "rank": vector_rank,
+                    "worker_chat_id": getattr(worker, "worker_chat_id", None),
+                    "matched_skill_id": skill.id,
+                    "matched_skill_title": skill.title,
+                    "matched_skill_description": skill.description,
+                }
+            )
             distance_by_worker_id[worker.id] = float(distance)
             vector_rank += 1
 
@@ -310,7 +363,10 @@ def create_matches_for_job(
 
     # Fetch existing matches to preserve user response state
     existing_matches = {
-        m.worker_id: m for m in db.query(model.JobWorkerMatch).filter(model.JobWorkerMatch.job_id == job_id).all()
+        m.worker_id: m
+        for m in db.query(model.JobWorkerMatch)
+        .filter(model.JobWorkerMatch.job_id == job_id)
+        .all()
     }
 
     matched_worker_ids = set()
@@ -319,7 +375,7 @@ def create_matches_for_job(
     for match in rich_matches:
         worker = match["worker_profile"]
         matched_worker_ids.add(worker.id)
-        
+
         if worker.id in existing_matches:
             # Update existing record, preserving user flags
             match_row = existing_matches[worker.id]
@@ -367,18 +423,30 @@ def create_matches_for_worker(
     worker_location: Any,
     radius_meters: int = 60_000,
 ) -> WorkerMatchingResult:
-    
-    worker_profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
-    worker_skills = db.query(model.WorkerSkill).filter(
-        model.WorkerSkill.worker_id == worker_id,
-        model.WorkerSkill.is_active.is_(True)
-    ).all()
+
+    worker_profile = (
+        db.query(model.WorkerProfile)
+        .filter(model.WorkerProfile.id == worker_id)
+        .first()
+    )
+    worker_skills = (
+        db.query(model.WorkerSkill)
+        .filter(
+            model.WorkerSkill.worker_id == worker_id,
+            model.WorkerSkill.is_active.is_(True),
+        )
+        .all()
+    )
 
     if not worker_skills:
         return {"matched_jobs": [], "count": 0}
 
-    distance_expr = model.Job.description_vector.cosine_distance(model.WorkerSkill.embedding)
-    spatial_point = _ensure_geography(worker_location or getattr(worker_profile, "location", None))
+    distance_expr = model.Job.description_vector.cosine_distance(
+        model.WorkerSkill.embedding
+    )
+    spatial_point = _ensure_geography(
+        worker_location or getattr(worker_profile, "location", None)
+    )
 
     # ✅ FIXED SQL QUERY: Explicit cross-select between Job and WorkerSkill
     stmt = (
@@ -389,18 +457,21 @@ def create_matches_for_worker(
         )
         .select_from(model.Job)
         .join(
-            model.WorkerSkill, 
-            (model.WorkerSkill.worker_id == worker_id) & (model.WorkerSkill.is_active.is_(True))
+            model.WorkerSkill,
+            (model.WorkerSkill.worker_id == worker_id)
+            & (model.WorkerSkill.is_active.is_(True)),
         )
         .where(
             model.WorkerSkill.embedding.isnot(None),
             model.Job.description_vector.isnot(None),
-            model.Job.status.ilike("pending"), 
+            model.Job.status.ilike("pending"),
         )
     )
 
     if spatial_point is not None:
-        stmt = stmt.where(func.ST_DWithin(model.Job.location, spatial_point, radius_meters))
+        stmt = stmt.where(
+            func.ST_DWithin(model.Job.location, spatial_point, radius_meters)
+        )
 
     stmt = stmt.order_by(distance_expr.asc())
     search_results = db.execute(stmt).all()
@@ -416,19 +487,26 @@ def create_matches_for_worker(
 
         score = calculate_match_score(float(distance))
         if score > SCORE_THRESHOLD:
-            candidate_jobs.append({
-                "job": job,
-                "skill": skill,
-                "distance": float(distance),
-                "score": score,
-                "rank": vector_rank,
-            })
+            candidate_jobs.append(
+                {
+                    "job": job,
+                    "skill": skill,
+                    "distance": float(distance),
+                    "score": score,
+                    "rank": vector_rank,
+                }
+            )
             vector_rank += 1
 
-    candidate_jobs = _llm_rerank_jobs_for_worker(worker_profile, worker_skills, candidate_jobs)
+    candidate_jobs = _llm_rerank_jobs_for_worker(
+        worker_profile, worker_skills, candidate_jobs
+    )
 
     existing_matches = {
-        m.job_id: m for m in db.query(model.JobWorkerMatch).filter(model.JobWorkerMatch.worker_id == worker_id).all()
+        m.job_id: m
+        for m in db.query(model.JobWorkerMatch)
+        .filter(model.JobWorkerMatch.worker_id == worker_id)
+        .all()
     }
 
     matched_job_ids = set()
@@ -465,14 +543,16 @@ def create_matches_for_worker(
             )
             db.add(match_row)
 
-        matched_jobs_payload.append({
-            "booking_chat_id": getattr(job, "booking_chat_id", None),
-            "title": getattr(job, "title", "General Task"),
-            "description": job.description,
-            "score": score,
-            "rank": rank,
-            "matched_skill_title": skill.title,
-        })
+        matched_jobs_payload.append(
+            {
+                "booking_chat_id": getattr(job, "booking_chat_id", None),
+                "title": getattr(job, "title", "General Task"),
+                "description": job.description,
+                "score": score,
+                "rank": rank,
+                "matched_skill_title": skill.title,
+            }
+        )
 
     # Deactivate matches that no longer meet the threshold
     for j_id, old_match in existing_matches.items():

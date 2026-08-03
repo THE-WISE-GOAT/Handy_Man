@@ -119,7 +119,8 @@ export default function Dash1Board({ viewSlug }) {
     return () => scrollContainer.removeEventListener("wheel", handleWheel);
   }, [slots.main]);
 
-  const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false);
+  const [hasNavigatedForCompletion, setHasNavigatedForCompletion] =
+    useState(false);
 
   useEffect(() => {
     if (is_complete && !hasNavigatedForCompletion) {
@@ -274,7 +275,9 @@ export default function Dash1Board({ viewSlug }) {
           leafletMapRef.current.setView([newLat, newLng], 15);
           leafletMarkerRef.current.setLatLng([newLat, newLng]);
         } else {
-          alert("NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.");
+          alert(
+            "NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.",
+          );
         }
       }
     } catch (err) {
@@ -284,7 +287,9 @@ export default function Dash1Board({ viewSlug }) {
 
   const handleModalLiveTracking = () => {
     if (!navigator.geolocation) {
-      alert("GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.");
+      alert(
+        "GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.",
+      );
       return;
     }
 
@@ -316,7 +321,9 @@ export default function Dash1Board({ viewSlug }) {
         }
       },
       (error) => {
-        alert("LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.");
+        alert(
+          "LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.",
+        );
       },
       { enableHighAccuracy: true, timeout: 7000 },
     );
@@ -348,9 +355,17 @@ export default function Dash1Board({ viewSlug }) {
         <div className="dashboard-card main-view">
           <span className="card-flag">
             INTERACTIVE DISPATCH MANAGER
-            {turns_remaining !== undefined && ` — TURNS LEFT: ${turns_remaining}`}
+            {turns_remaining !== undefined &&
+              ` — TURNS LEFT: ${turns_remaining}`}
           </span>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "12px",
+            }}
+          >
             <h2 style={{ margin: 0 }}>AI CHAT TERMINAL</h2>
             <button
               type="button"
@@ -424,7 +439,9 @@ export default function Dash1Board({ viewSlug }) {
               <input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder={is_complete ? "Conversation finalized." : "Instruct AI..."}
+                placeholder={
+                  is_complete ? "Conversation finalized." : "Instruct AI..."
+                }
                 disabled={is_complete}
               />
             )}
@@ -448,7 +465,9 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• AI CHAT TERMINAL</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge badge-highlight">Live Dispatch — Active Session</span>
+            <span className="badge badge-highlight">
+              Live Dispatch — Active Session
+            </span>
             <p className="card-summary">Logs Captured: {chatMessages.length}</p>
           </>
         ) : (
@@ -482,9 +501,22 @@ export default function Dash1Board({ viewSlug }) {
           />
 
           {/* ⬅️ LEFT SIDE COLUMN */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
-            <span className="card-flag" style={{ marginTop: "-14px" }}>EDIT OR CREATE JOB POSTING</span>
-            <h3 className="title" style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              minWidth: 0,
+            }}
+          >
+            <span className="card-flag" style={{ marginTop: "-14px" }}>
+              EDIT OR CREATE JOB POSTING
+            </span>
+            <h3
+              className="title"
+              style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}
+            >
               <span>·•TITLE:</span>
               <input
                 type="text"
@@ -523,14 +555,36 @@ export default function Dash1Board({ viewSlug }) {
           </div>
 
           {/* ➡️ RIGHT SIDE COLUMN */}
-          <div style={{ width: "35%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, flexShrink: 0 }}>
-            <h3 className="title" dir="rtl" style={{ marginBottom: "4px" }}>AttACHMENTs</h3>
+          <div
+            style={{
+              width: "35%",
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              flexShrink: 0,
+            }}
+          >
+            <h3 className="title" dir="rtl" style={{ marginBottom: "4px" }}>
+              AttACHMENTs
+            </h3>
 
-            <div style={{ position: "relative", display: "flex", alignItems: "center", width: "100%" }}>
+            <div
+              style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
               <button
                 type="button"
                 onClick={() => {
-                  if (scrollRef.current) scrollRef.current.scrollBy({ left: -120, behavior: "smooth" });
+                  if (scrollRef.current)
+                    scrollRef.current.scrollBy({
+                      left: -120,
+                      behavior: "smooth",
+                    });
                 }}
                 style={{
                   position: "absolute",
@@ -579,11 +633,13 @@ export default function Dash1Board({ viewSlug }) {
                 }}
                 onMouseLeave={() => {
                   isDown.current = false;
-                  if (scrollRef.current) scrollRef.current.style.cursor = "grab";
+                  if (scrollRef.current)
+                    scrollRef.current.style.cursor = "grab";
                 }}
                 onMouseUp={() => {
                   isDown.current = false;
-                  if (scrollRef.current) scrollRef.current.style.cursor = "grab";
+                  if (scrollRef.current)
+                    scrollRef.current.style.cursor = "grab";
                 }}
                 onMouseMove={(e) => {
                   if (!isDown.current || !scrollRef.current) return;
@@ -595,7 +651,9 @@ export default function Dash1Board({ viewSlug }) {
               >
                 {/* ➕ ADD ATTACHMENT CARD */}
                 <div
-                  onClick={() => !isUploadingAttachment && fileInputRef.current?.click()}
+                  onClick={() =>
+                    !isUploadingAttachment && fileInputRef.current?.click()
+                  }
                   style={{
                     display: "inline-flex",
                     flexDirection: "column",
@@ -616,11 +674,29 @@ export default function Dash1Board({ viewSlug }) {
                   }}
                 >
                   {isUploadingAttachment ? (
-                    <span style={{ fontSize: "10px", fontWeight: "bold" }}>...</span>
+                    <span style={{ fontSize: "10px", fontWeight: "bold" }}>
+                      ...
+                    </span>
                   ) : (
                     <>
-                      <span style={{ fontSize: "18px", fontWeight: "bold", lineHeight: 1 }}>+</span>
-                      <span style={{ fontSize: "9px", marginTop: "2px", fontWeight: 600 }}>ADD FILE</span>
+                      <span
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                          lineHeight: 1,
+                        }}
+                      >
+                        +
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          marginTop: "2px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ADD FILE
+                      </span>
                     </>
                   )}
                 </div>
@@ -678,7 +754,9 @@ export default function Dash1Board({ viewSlug }) {
                       ×
                     </button>
 
-                    <span style={{ fontWeight: 700, color: "var(--k-orange-ink)" }}>
+                    <span
+                      style={{ fontWeight: 700, color: "var(--k-orange-ink)" }}
+                    >
                       [{file.type || "FILE"}]
                     </span>
                     <span
@@ -701,7 +779,11 @@ export default function Dash1Board({ viewSlug }) {
               <button
                 type="button"
                 onClick={() => {
-                  if (scrollRef.current) scrollRef.current.scrollBy({ left: 120, behavior: "smooth" });
+                  if (scrollRef.current)
+                    scrollRef.current.scrollBy({
+                      left: 120,
+                      behavior: "smooth",
+                    });
                 }}
                 style={{
                   position: "absolute",
@@ -725,7 +807,10 @@ export default function Dash1Board({ viewSlug }) {
               </button>
             </div>
 
-            <h3 className="title" dir="rtl" style={{ marginTop: "10px" }}> UsER INFo </h3>
+            <h3 className="title" dir="rtl" style={{ marginTop: "10px" }}>
+              {" "}
+              UsER INFo{" "}
+            </h3>
             <div className="user-info" style={{ lineHeight: "35px" }}>
               <span style={{ display: "inline-flex", alignItems: "baseline" }}>
                 <span>NAME:</span>
@@ -839,7 +924,8 @@ export default function Dash1Board({ viewSlug }) {
                 if (!isSubmitting) e.currentTarget.style.opacity = 1;
               }}
               onMouseDown={(e) => {
-                if (!isSubmitting) e.currentTarget.style.transform = "scale(0.95)";
+                if (!isSubmitting)
+                  e.currentTarget.style.transform = "scale(0.95)";
               }}
               onMouseUp={(e) => {
                 if (!isSubmitting) e.currentTarget.style.transform = "scale(1)";
@@ -860,11 +946,14 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• JOB DESCRIPTION WORKSPACE</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge">Sidebar: Description Live Glance — Draft Mode</span>
+            <span className="badge">
+              Sidebar: Description Live Glance — Draft Mode
+            </span>
           </>
         ) : (
           <span className="badge">
-            Footer: Draft character footprint: {jobDescriptionDraft.length} chars
+            Footer: Draft character footprint: {jobDescriptionDraft.length}{" "}
+            chars
           </span>
         )}
       </div>
@@ -874,7 +963,10 @@ export default function Dash1Board({ viewSlug }) {
   const renderActivePosts = (slotKey) => {
     if (slotKey === "main") {
       return (
-        <div className="dashboard-card main-view" style={{ overflow: "scroll", maxHeight: "33vw" }}>
+        <div
+          className="dashboard-card main-view"
+          style={{ overflow: "scroll", maxHeight: "33vw" }}
+        >
           <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
           <h2>ACTIVE PENDING POSTS</h2>
           <button
@@ -894,9 +986,17 @@ export default function Dash1Board({ viewSlug }) {
             🔄 REFRESH LIVE PIPELINE
           </button>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
             {fetchedJobs.length === 0 ? (
-              <p style={{ fontFamily: "Courier New", color: "var(--k-ink-3)", fontSize: "0.9rem" }}>
+              <p
+                style={{
+                  fontFamily: "Courier New",
+                  color: "var(--k-ink-3)",
+                  fontSize: "0.9rem",
+                }}
+              >
                 No active pending jobs found in your database instance.
               </p>
             ) : (
@@ -914,12 +1014,33 @@ export default function Dash1Board({ viewSlug }) {
                       boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                      <span style={{ fontFamily: "Courier New", fontWeight: "bold", fontSize: "1.1rem" }}>
-                        {job.title ? job.title.toUpperCase() : "NEW JOB REQUEST"}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: "Courier New",
+                          fontWeight: "bold",
+                          fontSize: "1.1rem",
+                        }}
+                      >
+                        {job.title
+                          ? job.title.toUpperCase()
+                          : "NEW JOB REQUEST"}
                       </span>
                       {/* 🛠️ EDIT AND PENDING BUTTON GROUP */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
                         <button
                           type="button"
                           onClick={() => {
@@ -927,11 +1048,15 @@ export default function Dash1Board({ viewSlug }) {
                               exitEditMode();
                             } else {
                               loadJobForEdit(job);
-                              navigate("/customer/bookings/JobDescriptionWorkspace");
+                              navigate(
+                                "/customer/bookings/JobDescriptionWorkspace",
+                              );
                             }
                           }}
                           style={{
-                            background: isThisJobEditing ? "#ff4d4d" : "#FF6B1A",
+                            background: isThisJobEditing
+                              ? "#ff4d4d"
+                              : "#FF6B1A",
                             color: isThisJobEditing ? "#ffffff" : "#0D0D0D",
                             border: "none",
                             borderRadius: "8px",
@@ -939,22 +1064,45 @@ export default function Dash1Board({ viewSlug }) {
                             fontWeight: 700,
                             cursor: "pointer",
                             fontSize: "0.75rem",
-                            transition: "transform 120ms ease, opacity 120ms ease",
+                            transition:
+                              "transform 120ms ease, opacity 120ms ease",
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.85)}
-                          onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}
-                          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
-                          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.opacity = 0.85)
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.opacity = 1)
+                          }
+                          onMouseDown={(e) =>
+                            (e.currentTarget.style.transform = "scale(0.95)")
+                          }
+                          onMouseUp={(e) =>
+                            (e.currentTarget.style.transform = "scale(1)")
+                          }
                         >
                           {isThisJobEditing ? "❌ EXIT EDIT" : "✏️ EDIT"}
                         </button>
 
-                        <span className="badge badge-highlight" style={{ textTransform: "uppercase", fontSize: "0.75rem", padding: "4px 8px" }}>
+                        <span
+                          className="badge badge-highlight"
+                          style={{
+                            textTransform: "uppercase",
+                            fontSize: "0.75rem",
+                            padding: "4px 8px",
+                          }}
+                        >
                           ⚙️ {job.status || "PENDING"}
                         </span>
                       </div>
                     </div>
-                    <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "var(--k-ink-3)", lineHeight: "1.4" }}>
+                    <p
+                      style={{
+                        margin: "4px 0",
+                        fontSize: "0.9rem",
+                        color: "var(--k-ink-3)",
+                        lineHeight: "1.4",
+                      }}
+                    >
                       {job.description}
                     </p>
                   </div>
@@ -974,8 +1122,12 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• YOUR ACTIVE POSTS</div>
         {slotKey === "sidebar" ? (
           <>
-            <span className="badge badge-highlight">Network Pipeline Active</span>
-            <p className="card-summary">Live Trackable: {activePostsCount} Positions</p>
+            <span className="badge badge-highlight">
+              Network Pipeline Active
+            </span>
+            <p className="card-summary">
+              Live Trackable: {activePostsCount} Positions
+            </p>
           </>
         ) : (
           <span className="badge">
@@ -1038,14 +1190,31 @@ export default function Dash1Board({ viewSlug }) {
               fontFamily: "inherit",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-              <span style={{ fontWeight: "bold", fontSize: "14px", textTransform: "uppercase", letterSpacing: "1px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  textTransform: "uppercase",
+                  letterSpacing: "1px",
+                }}
+              >
                 🗺️ CHOOSE DELIVERY PIN (NEPAL)
               </span>
             </div>
 
             <div style={{ display: "flex", gap: "6px", width: "100%" }}>
-              <form onSubmit={executeModalAddressSearch} style={{ display: "flex", gap: "6px", flex: 1 }}>
+              <form
+                onSubmit={executeModalAddressSearch}
+                style={{ display: "flex", gap: "6px", flex: 1 }}
+              >
                 <input
                   type="text"
                   placeholder="SEARCH LALITPUR, THAMEL, ETC..."
@@ -1123,7 +1292,9 @@ export default function Dash1Board({ viewSlug }) {
                 borderRadius: "6px",
               }}
             >
-              <strong style={{ color: "var(--text-secondary)" }}>SELECTED ADDRESS:</strong>
+              <strong style={{ color: "var(--text-secondary)" }}>
+                SELECTED ADDRESS:
+              </strong>
               <div
                 style={{
                   textTransform: "uppercase",
@@ -1132,7 +1303,8 @@ export default function Dash1Board({ viewSlug }) {
                   wordBreak: "break-word",
                 }}
               >
-                {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
+                {modalAddrText ||
+                  "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
               </div>
             </div>
 
@@ -1159,7 +1331,10 @@ export default function Dash1Board({ viewSlug }) {
               <button
                 type="button"
                 onClick={() => {
-                  setUserAddrText(modalAddrText || `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`);
+                  setUserAddrText(
+                    modalAddrText ||
+                      `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`,
+                  );
                   setUserCoordinates(modalLng, modalLat);
                   setIsMapOpen(false);
                 }}
