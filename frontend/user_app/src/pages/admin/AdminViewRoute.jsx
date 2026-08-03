@@ -1,6 +1,9 @@
 import React from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { getDefaultAdminPath, getAdminViewBySlug } from "@shared/config/viewRoutes";
+import {
+  getDefaultAdminPath,
+  getAdminViewBySlug,
+} from "@shared/config/viewRoutes";
 
 // Direct component layout imports
 import AdminUsersBoard from "../../components/admin-dashboard/AdminUsersBoard";
