@@ -867,55 +867,94 @@ async def complete_worker_chat(
 # 6. List skills
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# @router.get(
+#     "/{worker_chat_id}/skills",
+#     response_model=schema.WorkerSkillsListOut,
+#     summary="List all independently matchable skills across all of the user's worker profiles",
+# )
+# def list_worker_skills(
+#     worker_chat_id: int,
+#     db: Session = Depends(get_db),
+#     current_user: model.User = Depends(get_current_user),
+# ):
+#     # 1. Fetch ALL worker profiles associated with this user account
+#     worker_profiles = db.execute(
+#         select(model.WorkerProfile).where(
+#             model.WorkerProfile.user_id == current_user.id
+#         )
+#     ).scalars().all()
+
+#     if not worker_profiles:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="No active worker profile associated with this account.",
+#         )
+
+#     # Extract all IDs (e.g., [19, 21])
+#     worker_ids = [wp.id for wp in worker_profiles]
+
+#     # 2. Fetch skills belonging to ANY of those profiles
+#     skills = db.execute(
+#         select(model.WorkerSkill)
+#         .where(model.WorkerSkill.worker_id.in_(worker_ids))
+#         .order_by(model.WorkerSkill.skill_type.asc(), model.WorkerSkill.created_at.asc())
+#     ).scalars().all()
+
+#     # 3. Identify the specific profile requested in the path to satisfy the root schema requirements,
+#     # or fallback to the first profile if there's a mismatch.
+#     primary_profile = next(
+#         (wp for wp in worker_profiles if wp.worker_chat_id == worker_chat_id), 
+#         worker_profiles[0]
+#     )
+
+#     return {
+#         "worker_chat_id": primary_profile.worker_chat_id,
+#         "worker_id": primary_profile.id,
+#         "job_category": primary_profile.job_category,
+#         "skills": [
+#             {
+#                 "id": s.id,
+#                 # Consider adding 'worker_id': s.worker_id to your Pydantic schema 
+#                 # so the frontend knows which profile this specific skill belongs to!
+#                 "skill_type": (
+#                     s.skill_type.value if hasattr(s.skill_type, "value") else str(s.skill_type)
+#                 ),
+#                 "title": s.title,
+#                 "description": s.description,
+#                 "scenario_score": s.scenario_score,
+#                 "is_active": s.is_active,
+#                 "has_vector": s.embedding is not None,
+#                 "stage": s.stage
+#             }
+#             for s in skills
+#         ],
+#     }
+
 @router.get(
     "/{worker_chat_id}/skills",
     response_model=schema.WorkerSkillsListOut,
-    summary="List all independently matchable skills across all of the user's worker profiles",
+    summary="List the worker's independently matchable skills",
 )
 def list_worker_skills(
     worker_chat_id: int,
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    # 1. Fetch ALL worker profiles associated with this user account
-    worker_profiles = db.execute(
-        select(model.WorkerProfile).where(
-            model.WorkerProfile.user_id == current_user.id
-        )
-    ).scalars().all()
+    db_profile = _get_own_worker_profile(worker_chat_id, db, current_user)
 
-    if not worker_profiles:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No active worker profile associated with this account.",
-        )
-
-    # Extract all IDs (e.g., [19, 21])
-    worker_ids = [wp.id for wp in worker_profiles]
-
-    # 2. Fetch skills belonging to ANY of those profiles
     skills = db.execute(
         select(model.WorkerSkill)
-        .where(model.WorkerSkill.worker_id.in_(worker_ids))
+        .where(model.WorkerSkill.worker_id == db_profile.id)
         .order_by(model.WorkerSkill.skill_type.asc(), model.WorkerSkill.created_at.asc())
     ).scalars().all()
 
-    # 3. Identify the specific profile requested in the path to satisfy the root schema requirements,
-    # or fallback to the first profile if there's a mismatch.
-    primary_profile = next(
-        (wp for wp in worker_profiles if wp.worker_chat_id == worker_chat_id), 
-        worker_profiles[0]
-    )
-
     return {
-        "worker_chat_id": primary_profile.worker_chat_id,
-        "worker_id": primary_profile.id,
-        "job_category": primary_profile.job_category,
+        "worker_chat_id": worker_chat_id,
+        "worker_id": db_profile.id,
+        "job_category": db_profile.job_category,
         "skills": [
             {
                 "id": s.id,
-                # Consider adding 'worker_id': s.worker_id to your Pydantic schema 
-                # so the frontend knows which profile this specific skill belongs to!
                 "skill_type": (
                     s.skill_type.value if hasattr(s.skill_type, "value") else str(s.skill_type)
                 ),
@@ -929,6 +968,7 @@ def list_worker_skills(
             for s in skills
         ],
     }
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
