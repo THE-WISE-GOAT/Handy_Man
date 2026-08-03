@@ -61,6 +61,12 @@ export default function Dash1Board({ viewSlug }) {
     isUploadingAttachment,
     uploadAttachment,
     removeAttachment,
+
+    loadJobForEdit,
+    // ✏️ EDIT MODE STATE & ACTIONS FROM ZUSTAND
+    isEditMode,
+    editingJobId,
+    exitEditMode,
   } = useCustomerDashboardData();
 
   const scrollRef = useRef(null);
@@ -333,7 +339,7 @@ export default function Dash1Board({ viewSlug }) {
     if (slotKey === "main") {
       const handleSend = (e) => {
         e.preventDefault();
-        if (!chatInput.trim() || is_complete) return;
+        if (!chatInput.trim() || is_complete || isEditMode) return;
         sendCustomerMessage(chatInput);
         setChatInput("");
       };
@@ -386,16 +392,46 @@ export default function Dash1Board({ viewSlug }) {
             ))}
           </div>
           <form onSubmit={handleSend} className="chat-form">
-            <input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder={is_complete ? "Conversation finalized." : "Instruct AI..."}
-              disabled={is_complete}
-            />
+            {isEditMode ? (
+              <div
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  background: "var(--k-raise, #1a1a1a)",
+                  border: "1px solid var(--k-line, #333)",
+                  borderRadius: "8px",
+                  color: "#888",
+                  fontSize: "0.85rem",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <span
+                  onClick={() => handleModuleSelect("YourActivePosts")}
+                  style={{
+                    color: "#FF6B1A",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    marginRight: "4px",
+                  }}
+                >
+                  exit out of edit mode
+                </span>{" "}
+                to start new chat
+              </div>
+            ) : (
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder={is_complete ? "Conversation finalized." : "Instruct AI..."}
+                disabled={is_complete}
+              />
+            )}
             <button
               type="submit"
               className="chat-btn"
-              disabled={is_complete || !chatInput.trim()}
+              disabled={is_complete || isEditMode || !chatInput.trim()}
             >
               Send
             </button>
@@ -864,31 +900,66 @@ export default function Dash1Board({ viewSlug }) {
                 No active pending jobs found in your database instance.
               </p>
             ) : (
-              fetchedJobs.map((job) => (
-                <div
-                  key={job.id}
-                  style={{
-                    border: "1px solid var(--k-line)",
-                    borderRadius: "16px",
-                    padding: "16px",
-                    background: "var(--k-raise)",
-                    color: "var(--k-ink)",
-                    boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <span style={{ fontFamily: "Courier New", fontWeight: "bold", fontSize: "1.1rem" }}>
-                      {job.title ? job.title.toUpperCase() : "NEW JOB REQUEST"}
-                    </span>
-                    <span className="badge badge-highlight" style={{ textTransform: "uppercase", fontSize: "0.75rem", padding: "4px 8px" }}>
-                      ⚙️ {job.status || "PENDING"}
-                    </span>
+              fetchedJobs.map((job) => {
+                const isThisJobEditing = isEditMode && editingJobId === job.id;
+                return (
+                  <div
+                    key={job.id}
+                    style={{
+                      border: "1px solid var(--k-line)",
+                      borderRadius: "16px",
+                      padding: "16px",
+                      background: "var(--k-raise)",
+                      color: "var(--k-ink)",
+                      boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <span style={{ fontFamily: "Courier New", fontWeight: "bold", fontSize: "1.1rem" }}>
+                        {job.title ? job.title.toUpperCase() : "NEW JOB REQUEST"}
+                      </span>
+                      {/* 🛠️ EDIT AND PENDING BUTTON GROUP */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isThisJobEditing) {
+                              exitEditMode();
+                            } else {
+                              loadJobForEdit(job);
+                              navigate("/customer/bookings/JobDescriptionWorkspace");
+                            }
+                          }}
+                          style={{
+                            background: isThisJobEditing ? "#ff4d4d" : "#FF6B1A",
+                            color: isThisJobEditing ? "#ffffff" : "#0D0D0D",
+                            border: "none",
+                            borderRadius: "8px",
+                            padding: "4px 12px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            fontSize: "0.75rem",
+                            transition: "transform 120ms ease, opacity 120ms ease",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.85)}
+                          onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}
+                          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
+                          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                        >
+                          {isThisJobEditing ? "❌ EXIT EDIT" : "✏️ EDIT"}
+                        </button>
+
+                        <span className="badge badge-highlight" style={{ textTransform: "uppercase", fontSize: "0.75rem", padding: "4px 8px" }}>
+                          ⚙️ {job.status || "PENDING"}
+                        </span>
+                      </div>
+                    </div>
+                    <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "var(--k-ink-3)", lineHeight: "1.4" }}>
+                      {job.description}
+                    </p>
                   </div>
-                  <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "var(--k-ink-3)", lineHeight: "1.4" }}>
-                    {job.description}
-                  </p>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
