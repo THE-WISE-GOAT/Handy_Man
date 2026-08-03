@@ -218,6 +218,7 @@ def _parse_add_skill_signal(reply: str) -> tuple[str, str | None]:
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def _get_own_worker_session(
     worker_chat_id: int,
     db: Session,
@@ -279,7 +280,9 @@ async def _get_address_from_coords(lat: float, lng: float) -> str:
     """Reverse-geocode lat/lng to a human-readable address via Nominatim."""
     url = "https://nominatim.openstreetmap.org/reverse"
     params = {"lat": lat, "lon": lng, "format": "json", "addressdetails": 1}
-    headers = {"User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"}
+    headers = {
+        "User-Agent": "WorkerVerificationApp/1.0 (contact: admin@yourdomain.com)"
+    }
 
     try:
         async with httpx.AsyncClient() as client:
@@ -325,12 +328,15 @@ async def _broadcast_live_alerts(worker_chat_id: int, matched_jobs: list[dict]) 
                 },
             )
         except Exception as exc:
-            logger.warning("Customer alert failed (booking=%s): %s", booking_chat_id, exc)
+            logger.warning(
+                "Customer alert failed (booking=%s): %s", booking_chat_id, exc
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. Start a new session
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @router.post(
     "/session",
@@ -372,6 +378,7 @@ def start_worker_session(
 # 2. Main interview chat
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @router.post(
     "/chat",
     response_model=schema.WorkerChatMessageOut,
@@ -411,6 +418,7 @@ def worker_chat(
 
 # ── 2a. Grade a scenario answer ───────────────────────────────────────────────
 
+
 def _handle_scenario_answer(
     chat_session: model.WorkerInterviewSession,
     answer: str,
@@ -436,13 +444,15 @@ def _handle_scenario_answer(
     chat_session.scenario_passed = passed
 
     if passed:
-        history.append({
-            "role": "assistant",
-            "content": (
-                f"[TEST_REQUIRED: {chat_session.pending_sub_skill}]\n"
-                f"System record: scenario answered. Score: {score}/100. PASS. {COMPLETE_TOKEN}"
-            ),
-        })
+        history.append(
+            {
+                "role": "assistant",
+                "content": (
+                    f"[TEST_REQUIRED: {chat_session.pending_sub_skill}]\n"
+                    f"System record: scenario answered. Score: {score}/100. PASS. {COMPLETE_TOKEN}"
+                ),
+            }
+        )
         chat_session.history = history
 
         try:
@@ -454,7 +464,9 @@ def _handle_scenario_answer(
                 model_name=MODEL_NAME,
             )
             chat_session.profile = profile.model_dump()
-            ai_response = "Technical verification complete. Your profile has been registered."
+            ai_response = (
+                "Technical verification complete. Your profile has been registered."
+            )
         except Exception as exc:
             chat_session.profile = None
             ai_response = (
@@ -464,7 +476,8 @@ def _handle_scenario_answer(
             )
             logger.error(
                 "[WorkerInterview] Profile extraction failed for worker_chat_id=%s: %s",
-                chat_session.id, exc,
+                chat_session.id,
+                exc,
             )
 
         chat_session.stage = "complete"
@@ -472,13 +485,15 @@ def _handle_scenario_answer(
         chat_session.is_rejected = False
 
     else:
-        history.append({
-            "role": "assistant",
-            "content": (
-                f"[TEST_REQUIRED: {chat_session.pending_sub_skill}]\n"
-                f"System record: scenario answered. Score: {score}/100. FAIL. {REJECTION_TOKEN}"
-            ),
-        })
+        history.append(
+            {
+                "role": "assistant",
+                "content": (
+                    f"[TEST_REQUIRED: {chat_session.pending_sub_skill}]\n"
+                    f"System record: scenario answered. Score: {score}/100. FAIL. {REJECTION_TOKEN}"
+                ),
+            }
+        )
         chat_session.history = history
         chat_session.stage = "complete"
         chat_session.is_complete = True
@@ -509,6 +524,7 @@ def _handle_scenario_answer(
 
 # ── 2b. Regular interview turn ────────────────────────────────────────────────
 
+
 def _handle_interview_turn(
     chat_session: model.WorkerInterviewSession,
     message: str,
@@ -519,12 +535,16 @@ def _handle_interview_turn(
     turns_used = count_user_turns(history)
 
     try:
-        ai_reply: str = _nvidia_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=history,
-            temperature=0.0,
-            max_tokens=200,
-        ).choices[0].message.content.strip()
+        ai_reply: str = (
+            _nvidia_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=history,
+                temperature=0.0,
+                max_tokens=200,
+            )
+            .choices[0]
+            .message.content.strip()
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -538,22 +558,28 @@ def _handle_interview_turn(
         and not TEST_TOKEN_RE.search(ai_reply)
     ):
         history.append({"role": "assistant", "content": ai_reply})
-        history.append({
-            "role": "system",
-            "content": (
-                "The interview has run long. Based on everything discussed, "
-                f"respond with ONLY one of: {REJECTION_TOKEN}, or "
-                "[TEST_REQUIRED: <speciality, or '<job> — general competency'>]. "
-                "No other text."
-            ),
-        })
+        history.append(
+            {
+                "role": "system",
+                "content": (
+                    "The interview has run long. Based on everything discussed, "
+                    f"respond with ONLY one of: {REJECTION_TOKEN}, or "
+                    "[TEST_REQUIRED: <speciality, or '<job> — general competency'>]. "
+                    "No other text."
+                ),
+            }
+        )
         try:
-            ai_reply = _nvidia_client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=history,
-                temperature=0.0,
-                max_tokens=60,
-            ).choices[0].message.content.strip()
+            ai_reply = (
+                _nvidia_client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=history,
+                    temperature=0.0,
+                    max_tokens=60,
+                )
+                .choices[0]
+                .message.content.strip()
+            )
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -646,6 +672,7 @@ def _handle_interview_turn(
 # 3. Conversation history
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @router.get(
     "/{worker_chat_id}/history",
     response_model=schema.WorkerChatHistoryOut,
@@ -686,6 +713,7 @@ def get_worker_history(
 # 4. Structured summary
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @router.get(
     "/{worker_chat_id}/summary",
     response_model=schema.WorkerSummaryOut,
@@ -716,6 +744,7 @@ def get_worker_summary(
 # ═══════════════════════════════════════════════════════════════════════════════
 # 5. Complete registration & run matching engine
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @router.post(
     "/{worker_chat_id}/complete",
@@ -773,15 +802,20 @@ async def complete_worker_chat(
             logger.error(
                 "Speciality embedding failed for worker_chat_id=%s (%s); "
                 "storing row unvectorised.",
-                worker_chat_id, exc,
+                worker_chat_id,
+                exc,
             )
 
     address_text = await _get_address_from_coords(lat, lng)
 
-    db_profile = db.query(model.WorkerProfile).filter(
-        model.WorkerProfile.worker_chat_id == worker_chat_id,
-        model.WorkerProfile.user_id == current_user.id,
-    ).first()
+    db_profile = (
+        db.query(model.WorkerProfile)
+        .filter(
+            model.WorkerProfile.worker_chat_id == worker_chat_id,
+            model.WorkerProfile.user_id == current_user.id,
+        )
+        .first()
+    )
 
     core_fields = {
         "stage": "pending_admin_review",
@@ -844,7 +878,9 @@ async def complete_worker_chat(
         db.commit()
     except Exception as exc:
         db.rollback()
-        logger.error("Matching engine failure for worker_chat_id=%s: %s", worker_chat_id, exc)
+        logger.error(
+            "Matching engine failure for worker_chat_id=%s: %s", worker_chat_id, exc
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to run the matching engine after registration.",
@@ -903,7 +939,7 @@ async def complete_worker_chat(
 #     # 3. Identify the specific profile requested in the path to satisfy the root schema requirements,
 #     # or fallback to the first profile if there's a mismatch.
 #     primary_profile = next(
-#         (wp for wp in worker_profiles if wp.worker_chat_id == worker_chat_id), 
+#         (wp for wp in worker_profiles if wp.worker_chat_id == worker_chat_id),
 #         worker_profiles[0]
 #     )
 
@@ -914,7 +950,7 @@ async def complete_worker_chat(
 #         "skills": [
 #             {
 #                 "id": s.id,
-#                 # Consider adding 'worker_id': s.worker_id to your Pydantic schema 
+#                 # Consider adding 'worker_id': s.worker_id to your Pydantic schema
 #                 # so the frontend knows which profile this specific skill belongs to!
 #                 "skill_type": (
 #                     s.skill_type.value if hasattr(s.skill_type, "value") else str(s.skill_type)
@@ -930,6 +966,7 @@ async def complete_worker_chat(
 #         ],
 #     }
 
+
 @router.get(
     "/{worker_chat_id}/skills",
     response_model=schema.WorkerSkillsListOut,
@@ -942,11 +979,17 @@ def list_worker_skills(
 ):
     db_profile = _get_own_worker_profile(worker_chat_id, db, current_user)
 
-    skills = db.execute(
-        select(model.WorkerSkill)
-        .where(model.WorkerSkill.worker_id == db_profile.id)
-        .order_by(model.WorkerSkill.skill_type.asc(), model.WorkerSkill.created_at.asc())
-    ).scalars().all()
+    skills = (
+        db.execute(
+            select(model.WorkerSkill)
+            .where(model.WorkerSkill.worker_id == db_profile.id)
+            .order_by(
+                model.WorkerSkill.skill_type.asc(), model.WorkerSkill.created_at.asc()
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     return {
         "worker_chat_id": worker_chat_id,
@@ -956,24 +999,26 @@ def list_worker_skills(
             {
                 "id": s.id,
                 "skill_type": (
-                    s.skill_type.value if hasattr(s.skill_type, "value") else str(s.skill_type)
+                    s.skill_type.value
+                    if hasattr(s.skill_type, "value")
+                    else str(s.skill_type)
                 ),
                 "title": s.title,
                 "description": s.description,
                 "scenario_score": s.scenario_score,
                 "is_active": s.is_active,
                 "has_vector": s.embedding is not None,
-                "stage": s.stage
+                "stage": s.stage,
             }
             for s in skills
         ],
     }
 
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # 7. Start adding a speciality
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @router.post(
     "/{worker_chat_id}/add-skill",
@@ -1013,6 +1058,7 @@ def start_add_skill(
 # 8. Add-skill conversation turn
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @router.post(
     "/{worker_chat_id}/add-skill/chat",
     response_model=schema.AddSkillMessageOut,
@@ -1042,7 +1088,11 @@ async def add_skill_chat(
     # ── Branch: grading a scenario answer ────────────────────────────────
     if chat_session.stage == "awaiting_skill_scenario":
         return await _handle_add_skill_scenario_answer(
-            chat_session, db_profile, turns, payload.message.strip(), db,
+            chat_session,
+            db_profile,
+            turns,
+            payload.message.strip(),
+            db,
         )
 
     # ── Branch: deciding whether the claim warrants a test ────────────────
@@ -1050,12 +1100,16 @@ async def add_skill_chat(
     messages = _build_add_skill_messages(db_profile.job_category, existing, turns)
 
     try:
-        raw_reply: str = _nvidia_client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            temperature=0.0,
-            max_tokens=120,
-        ).choices[0].message.content.strip()
+        raw_reply: str = (
+            _nvidia_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                temperature=0.0,
+                max_tokens=120,
+            )
+            .choices[0]
+            .message.content.strip()
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -1064,7 +1118,8 @@ async def add_skill_chat(
 
     logger.debug(
         "[add-skill] worker_chat_id=%s raw_reply=%r",
-        worker_chat_id, raw_reply,
+        worker_chat_id,
+        raw_reply,
     )
 
     signal, sub_skill = _parse_add_skill_signal(raw_reply)
@@ -1076,7 +1131,8 @@ async def add_skill_chat(
         logger.warning(
             "[add-skill] Forcing rejection after %d user turns without decision "
             "(worker_chat_id=%s).",
-            user_turns_so_far, worker_chat_id,
+            user_turns_so_far,
+            worker_chat_id,
         )
         signal = "rejected"
 
@@ -1156,6 +1212,7 @@ async def add_skill_chat(
 # 8a. Grade an add-skill scenario answer
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 async def _handle_add_skill_scenario_answer(
     chat_session: model.WorkerInterviewSession,
     db_profile: model.WorkerProfile,
@@ -1186,13 +1243,15 @@ async def _handle_add_skill_scenario_answer(
             detail=f"NVIDIA NIM evaluation error: {exc}",
         )
 
-    turns.append({
-        "role": "assistant",
-        "content": (
-            f"System record: add-skill scenario for '{sub_skill}' answered. "
-            f"Score: {score}/100. Result: {'PASS' if passed else 'FAIL'}."
-        ),
-    })
+    turns.append(
+        {
+            "role": "assistant",
+            "content": (
+                f"System record: add-skill scenario for '{sub_skill}' answered. "
+                f"Score: {score}/100. Result: {'PASS' if passed else 'FAIL'}."
+            ),
+        }
+    )
     chat_session.add_skill_turns = turns
     chat_session.scenario_score = score
     chat_session.scenario_passed = passed
@@ -1239,7 +1298,9 @@ async def _handle_add_skill_scenario_answer(
         logger.error(
             "Embedding failed for new speciality %r on worker_id=%s (%s); "
             "row stored unvectorised.",
-            sub_skill, db_profile.id, exc,
+            sub_skill,
+            db_profile.id,
+            exc,
         )
 
     upsert_speciality_skill(
@@ -1255,7 +1316,10 @@ async def _handle_add_skill_scenario_answer(
 
     # Keep the parent profile's human-readable fields consistent.
     db_profile.has_verified_specialty = True
-    if description and description.lower() not in (db_profile.job_description or "").lower():
+    if (
+        description
+        and description.lower() not in (db_profile.job_description or "").lower()
+    ):
         db_profile.job_description = (
             f"{(db_profile.job_description or '').rstrip('.')}. {description}".strip()
         )
@@ -1267,7 +1331,11 @@ async def _handle_add_skill_scenario_answer(
 
     # Re-run matching so the new skill is applied to jobs already on the
     # marketplace (not just future ones). Non-fatal — skill is already stored.
-    if skill_vector is not None and db_profile.is_complete and db_profile.location is not None:
+    if (
+        skill_vector is not None
+        and db_profile.is_complete
+        and db_profile.location is not None
+    ):
         try:
             matching_manager.create_matches_for_worker(
                 db=db,
@@ -1280,11 +1348,13 @@ async def _handle_add_skill_scenario_answer(
             db.rollback()
             logger.error(
                 "Re-match after add-skill for worker_id=%s failed: %s",
-                db_profile.id, exc,
+                db_profile.id,
+                exc,
             )
 
     vector_note = (
-        "" if skill_vector
+        ""
+        if skill_vector
         else " It is saved but will start matching once its vector is generated."
     )
     return {
@@ -1299,10 +1369,8 @@ async def _handle_add_skill_scenario_answer(
         "skill_title": sub_skill,
         "scenario_score": score,
     }
-    
-    
-    
-    
+
+
 # ___________________________ To  find job post by the worker_________________
 @router.get(
     "/match/worker/find-jobs",
@@ -1313,11 +1381,15 @@ def find_jobs_for_worker(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    worker_profiles = db.execute(
-        select(model.WorkerProfile).where(
-            model.WorkerProfile.user_id == current_user.id
+    worker_profiles = (
+        db.execute(
+            select(model.WorkerProfile).where(
+                model.WorkerProfile.user_id == current_user.id
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     if not worker_profiles:
         raise HTTPException(
@@ -1342,7 +1414,7 @@ def find_jobs_for_worker(
             model.JobWorkerMatch.is_active == True,
             # Ensure this matches whatever status your customer jobs actually have!
             # If your jobs aren't "pending", change this.
-            model.Job.status.ilike("pending"), 
+            model.Job.status.ilike("pending"),
         )
         .order_by(model.JobWorkerMatch.match_rank.asc())
     )
@@ -1352,7 +1424,7 @@ def find_jobs_for_worker(
     # 4. Deduplicate by job_id while keeping track of which profile matched
     seen_job_ids = set()
     jobs = []
-    
+
     for match, job, skill in matches:
         if job.id in seen_job_ids:
             continue
@@ -1360,28 +1432,31 @@ def find_jobs_for_worker(
 
         # Extract category strings
         extracted_categories = [
-            cat["category"] for cat in (job.categories or []) 
+            cat["category"]
+            for cat in (job.categories or [])
             if isinstance(cat, dict) and "category" in cat
         ]
 
-        jobs.append({
-            "job_id": job.id,
-            "booking_chat_id": job.booking_chat_id,
-            "title": getattr(job, "title", None) or "General Task",
-            "description": job.description,
-            "categories": extracted_categories, 
-            "matched_worker_id": match.worker_id,  # <-- Tells UI if profile 19 or 21 matched this job!
-            "match_score": match.match_score,
-            "match_rank": match.match_rank,
-            "matched_skill": skill.title if skill is not None else None,
-            "matched_skill_description": (
-                skill.description if skill is not None else None
-            ),
-        })
+        jobs.append(
+            {
+                "job_id": job.id,
+                "booking_chat_id": job.booking_chat_id,
+                "title": getattr(job, "title", None) or "General Task",
+                "description": job.description,
+                "categories": extracted_categories,
+                "matched_worker_id": match.worker_id,  # <-- Tells UI if profile 19 or 21 matched this job!
+                "match_score": match.match_score,
+                "match_rank": match.match_rank,
+                "matched_skill": skill.title if skill is not None else None,
+                "matched_skill_description": (
+                    skill.description if skill is not None else None
+                ),
+            }
+        )
 
     return {
         "worker_id": worker_ids[0],  # Satisfies Pydantic schema expectation
-        "worker_ids": worker_ids,    # Multi-profile list [19, 21]
+        "worker_ids": worker_ids,  # Multi-profile list [19, 21]
         "count": len(jobs),
         "jobs": jobs,
     }

@@ -20,7 +20,8 @@ import "./app-layout.css";
 export default function AppLayout({ role = "customer" }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, canAccessWorker, canAccessAdmin, refreshUser } = useAuth();
+  const { user, logout, canAccessWorker, canAccessAdmin, refreshUser } =
+    useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const [isWorkerApplicant, setIsWorkerApplicant] = useState(false);
@@ -51,7 +52,7 @@ export default function AppLayout({ role = "customer" }) {
           console.error("[AppLayout] Applicant status check failed:", error);
           if (error.status === 404) {
             setJoinError(
-              "Worker onboarding backend is not available. Please restart the backend server."
+              "Worker onboarding backend is not available. Please restart the backend server.",
             );
           }
           // Keep isWorkerApplicant = true on error (fail closed)
@@ -60,7 +61,9 @@ export default function AppLayout({ role = "customer" }) {
       .finally(() => {
         if (active) setCheckingApplicant(false);
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [role]);
 
   const filteredWorkerNavItems = isWorkerApplicant
@@ -88,7 +91,9 @@ export default function AppLayout({ role = "customer" }) {
       await apiClient.post("/worker-onboarding/initialize");
       console.log("[Join as Worker] initialize succeeded");
       await refreshUser();
-      console.log("[Join as Worker] refreshUser succeeded, navigating to worker dashboard");
+      console.log(
+        "[Join as Worker] refreshUser succeeded, navigating to worker dashboard",
+      );
       navigate(getDefaultWorkerPath());
     } catch (error) {
       console.log("[Join as Worker] primary endpoint failed:", error);
@@ -96,8 +101,10 @@ export default function AppLayout({ role = "customer" }) {
       setJoinError(normalized.message);
       alert(
         "Failed to join as worker.\n\n" +
-        "Error: " + normalized.message + "\n\n" +
-        "Please ensure the backend is running and restarted after the latest code changes."
+          "Error: " +
+          normalized.message +
+          "\n\n" +
+          "Please ensure the backend is running and restarted after the latest code changes.",
       );
     } finally {
       setIsJoining(false);
@@ -220,16 +227,34 @@ export default function AppLayout({ role = "customer" }) {
 
       <main className="fixfast-shell app-layout-shell">
         {joinError && (
-          <div style={{
-            position: "fixed", top: "1rem", right: "1rem", zIndex: 99999,
-            background: "var(--k-alert-wash)", border: "1px solid rgba(229, 72, 77, 0.45)", borderRadius: "8px",
-            padding: "0.8rem 1rem", maxWidth: "400px", font: "inherit", fontSize: "0.85rem", color: "var(--k-alert-ink)"
-          }}>
+          <div
+            style={{
+              position: "fixed",
+              top: "1rem",
+              right: "1rem",
+              zIndex: 99999,
+              background: "var(--k-alert-wash)",
+              border: "1px solid rgba(229, 72, 77, 0.45)",
+              borderRadius: "8px",
+              padding: "0.8rem 1rem",
+              maxWidth: "400px",
+              font: "inherit",
+              fontSize: "0.85rem",
+              color: "var(--k-alert-ink)",
+            }}
+          >
             <strong>Error:</strong> {joinError}
             <button
               type="button"
               onClick={() => setJoinError("")}
-              style={{ marginLeft: "0.8rem", border: "none", background: "transparent", cursor: "pointer", fontWeight: 700, color: "var(--k-alert-ink)" }}
+              style={{
+                marginLeft: "0.8rem",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                fontWeight: 700,
+                color: "var(--k-alert-ink)",
+              }}
             >
               ✕
             </button>
