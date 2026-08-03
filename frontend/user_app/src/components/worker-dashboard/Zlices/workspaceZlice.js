@@ -50,8 +50,8 @@ export const createWorkspaceZlice = (set, get) => ({
       const response = await fetch("http://127.0.0.1:8000/jobs/for-worker", {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
@@ -70,7 +70,9 @@ export const createWorkspaceZlice = (set, get) => ({
 
   connectToDispatch: (workerChatId, token) => {
     // Connect using the token as a query param
-    const socket = new WebSocket(`ws://127.0.0.1:8000/ws/${workerChatId}?token=${token}`);
+    const socket = new WebSocket(
+      `ws://127.0.0.1:8000/ws/${workerChatId}?token=${token}`,
+    );
 
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
@@ -79,17 +81,21 @@ export const createWorkspaceZlice = (set, get) => ({
         set({ activeJob: message.data });
       }
     };
-    
+
     set({ socket });
   },
-  
+
   expressInterest: async (jobId, workerChatId) => {
     const newInterestState = !get().isInterested;
     set({ isInterested: newInterestState });
 
     const payload = {
       type: "TOGGLE_INTEREST",
-      data: { job_id: jobId, worker_chat_id: workerChatId, interested: newInterestState }
+      data: {
+        job_id: jobId,
+        worker_chat_id: workerChatId,
+        interested: newInterestState,
+      },
     };
 
     const socket = get().socket;
@@ -102,17 +108,16 @@ export const createWorkspaceZlice = (set, get) => ({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ worker_chat_id: workerChatId, interested: newInterestState })
+          body: JSON.stringify({
+            worker_chat_id: workerChatId,
+            interested: newInterestState,
+          }),
         });
       } catch (error) {
         console.error("❌ Failed to express interest:", error);
       }
     }
   },
-  
-
 });
-
-
