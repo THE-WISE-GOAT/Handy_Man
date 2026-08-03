@@ -1,15 +1,14 @@
 export const createBookingsZlice = (set, get) => ({
-
-  userAddrText: "Bhaktapur, Nepal", 
-  userLng: 85.4280, 
-  userLat: 27.6710, 
+  userAddrText: "Bhaktapur, Nepal",
+  userLng: 85.4280,
+  userLat: 27.6710,
 
   setUserAddrText: (text) => set({ userAddrText: text }),
   setUserCoordinates: (lng, lat) => set({ userLng: lng, userLat: lat }),
-  setUserLocation: (address, lng, lat) => set({ 
-    userAddrText: address, 
-    userLng: lng, 
-    userLat: lat 
+  setUserLocation: (address, lng, lat) => set({
+    userAddrText: address,
+    userLng: lng,
+    userLat: lat
   }),
 
   jobDescriptionDraft: "I want to install a smart home manager like alexa....",
@@ -31,15 +30,113 @@ export const createBookingsZlice = (set, get) => ({
   userAddr: "BHAKTAPUR",
   userCont: "+977 9814737741",
 
+  longitude: 27.671,
+  latitude: 85.428,
+
   jobProfessional: "plumber",
   cust_id: 1,
   isSubmitting: false,
 
+  // -------------------------------------------------------------
+  // EDIT MODE STATE & ACTIONS
+  // -------------------------------------------------------------
+  isEditMode: false,
+  editingJobId: null,
+
+  loadJobForEdit: (job) => set({
+    isEditMode: true,
+    editingJobId: job.id,
+    booking_chat_id: job.booking_chat_id,
+    jobTitleDraft: job.title || "",
+    jobDescriptionDraft: job.description || "",
+    attachments: job.attachments || [],
+    userName: job.contact_name,
+    userAddrText: job.address_text,
+    userLat: job.latitude,
+    userLng: job.longitude,
+    userCont: job.contact_phone,
+  }),
+
+  exitEditMode: async () => {
+    set({ isEditMode: false, editingJobId: null });
+    await get().startNewSession();
+  },
+
+  // -------------------------------------------------------------
+  // ATTACHMENTS STATE & ACTIONS
+  // -------------------------------------------------------------
+  attachments: [],
+  isUploadingAttachment: false,
+
+  setAttachments: (attachments) => set({ attachments }),
+
+  addAttachment: (attachmentObj) =>
+    set((state) => ({
+      attachments: [attachmentObj, ...state.attachments],
+    })),
+
+  removeAttachment: (indexToRemove) =>
+    set((state) => ({
+      attachments: state.attachments.filter((_, idx) => idx !== indexToRemove),
+    })),
+
+  clearAttachments: () => set({ attachments: [] }),
+
+  uploadAttachment: async (file) => {
+    if (!file) return;
+
+    const CLOUD_NAME = "nruqb6fd";
+    const UPLOAD_PRESET = "wrfvhynr";
+
+    set({ isUploadingAttachment: true });
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", UPLOAD_PRESET);
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Cloudinary upload failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      const newAttachment = {
+        url: data.secure_url,
+        name: file.name,
+        type: "IMG",
+      };
+
+      set((state) => ({
+        attachments: [newAttachment, ...state.attachments],
+      }));
+
+      return newAttachment;
+    } catch (error) {
+      console.error("❌ Failed to upload image to Cloudinary:", error);
+      throw error;
+    } finally {
+      set({ isUploadingAttachment: false });
+    }
+  },
+
+  // -------------------------------------------------------------
+  // SLOTS & JOB POSTING
+  // -------------------------------------------------------------
   slots: {
     main: "AiChatTerminal",
     sidebar: "JobDescriptionWorkspace",
     bottom: "YourActivePosts",
   },
+
   fetchBookingsPendingJobs: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
@@ -74,6 +171,7 @@ export const createBookingsZlice = (set, get) => ({
       userLat,
       userName,
       userCont,
+      attachments,
       fetchBookingsPendingJobs 
     } = get();
 
@@ -104,7 +202,7 @@ export const createBookingsZlice = (set, get) => ({
           contact_phone: userCont || "",
           status: "pending",
           mode: "regular",
-          attachments: [] 
+          attachments: attachments || []
         }),
       });
 
@@ -115,7 +213,8 @@ export const createBookingsZlice = (set, get) => ({
       const data = await response.json();
       if (data.status === "success") {
         console.log("🚀 Success! Job verified, vectorized by Nvidia, and stored securely.");
-        
+        set({ attachments: [], isEditMode: false, editingJobId: null });
+
         const { fetchPendingJobs, fetchMatchedWorkersForJob } = get();
         if (typeof fetchPendingJobs === "function") {
           await fetchPendingJobs();
@@ -168,6 +267,9 @@ export const createBookingsZlice = (set, get) => ({
   setProfessional: (text) => set({ jobProfessional: text }),
 
   booking_chat_id: null,
+
+  setBookingChatId: (id) => set({ booking_chat_id: id }),
+
   ai_response: "",
   is_complete: false,
   categories: [],
@@ -178,7 +280,7 @@ export const createBookingsZlice = (set, get) => ({
   turns_remaining: 5,
 
   startNewSession: async () => {
-    set({ isAiGenerating: true });
+    set({ isAiGenerating: true, attachments: [], isEditMode: false, editingJobId: null });
     try {
       const token = localStorage.getItem("handy_man_access_token"); 
       const response = await fetch("http://127.0.0.1:8000/dispatch/session", {
@@ -205,6 +307,7 @@ export const createBookingsZlice = (set, get) => ({
         current_tags: [],
         is_job_request: false,
         is_custom_category: false,
+        attachments: [],
         chatMessages: [
           {
             id: "init-1",

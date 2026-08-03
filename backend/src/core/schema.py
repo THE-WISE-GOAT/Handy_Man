@@ -1,4 +1,3 @@
-# this page is for the validation of data that is sent to database
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
@@ -489,3 +488,24 @@ class MatchedJobDetail(_MatchedJobDetailRequired, total=False):
 class WorkerMatchingResult(TypedDict):
     matched_jobs: list[MatchedJobDetail]
     count: int
+    
+    
+    
+# _____ schema for the worker to see what job were matched with them and the details of the job request____
+class WorkerMatchedJobDetail(BaseModel):
+    job_id: int
+    booking_chat_id: int
+    title: str
+    description: str
+    categories: Optional[List[str]] = None
+    matched_worker_id: Optional[int] = None  # <--- ADD THIS (e.g., 22)
+    match_score: float
+    match_rank: int
+    matched_skill: Optional[str] = None
+    matched_skill_description: Optional[str] = None
+
+class WorkerMatchedJobsOut(BaseModel):
+    worker_id: int
+    worker_ids: Optional[List[int]] = None   # <--- ADD THIS (e.g., [19, 22])
+    count: int
+    jobs: List[WorkerMatchedJobDetail]

@@ -6,6 +6,7 @@ import "./dash1board.css";
 export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
+  const fileInputRef = useRef(null);
 
   // 🗺️ MAP STATES
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -55,6 +56,17 @@ export default function Dash1Board({ viewSlug }) {
     is_complete,
     createJobDirect,
     isSubmitting,
+    // 📁 ATTACHMENTS STATE & ACTIONS FROM ZUSTAND
+    attachments,
+    isUploadingAttachment,
+    uploadAttachment,
+    removeAttachment,
+
+    loadJobForEdit,
+    // ✏️ EDIT MODE STATE & ACTIONS FROM ZUSTAND
+    isEditMode,
+    editingJobId,
+    exitEditMode,
   } = useCustomerDashboardData();
 
   const scrollRef = useRef(null);
@@ -62,18 +74,18 @@ export default function Dash1Board({ viewSlug }) {
   const startX = useRef(0);
   const scrollLeftState = useRef(0);
 
-  const attachments = [
-    { id: 1, name: "Plan.pdf", type: "PDF" },
-    { id: 2, name: "Invoice.jpg", type: "IMG" },
-    { id: 3, name: "Wiring.png", type: "IMG" },
-    { id: 4, name: "Specs.txt", type: "DOC" },
-    { id: 5, name: "Setup.log", type: "LOG" },
-    { id: 6, name: "Plan.pdf", type: "PDF" },
-    { id: 7, name: "Invoice.jpg", type: "IMG" },
-    { id: 8, name: "Wiring.png", type: "IMG" },
-    { id: 9, name: "Specs.txt", type: "DOC" },
-    { id: 10, name: "Setup.log", type: "LOG" },
-  ];
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      await uploadAttachment(file);
+    } catch (err) {
+      alert("Failed to upload image. Please check Cloudinary config.");
+    } finally {
+      e.target.value = ""; // Reset input after upload attempt
+    }
+  };
 
   useEffect(() => {
     startNewSession();
@@ -107,14 +119,13 @@ export default function Dash1Board({ viewSlug }) {
     return () => scrollContainer.removeEventListener("wheel", handleWheel);
   }, [slots.main]);
 
-const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false);
+  const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false);
 
   useEffect(() => {
     if (is_complete && !hasNavigatedForCompletion) {
       setHasNavigatedForCompletion(true);
       navigate("/customer/bookings/JobDescriptionWorkspace");
     } else if (!is_complete && hasNavigatedForCompletion) {
-      // Reset the flag when a new chat session starts and is_complete goes back to false
       setHasNavigatedForCompletion(false);
     }
   }, [is_complete, hasNavigatedForCompletion, navigate]);
@@ -315,7 +326,6 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
     navigate(`/customer/bookings/${targetSlug}`);
   };
 
-  // Safe wrapper execution to refresh list instantly upon new creations
   const handleCreateJobFinalize = async () => {
     await createJob();
     fetchBookingsPendingJobs();
@@ -329,7 +339,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
     if (slotKey === "main") {
       const handleSend = (e) => {
         e.preventDefault();
-        if (!chatInput.trim() || is_complete) return;
+        if (!chatInput.trim() || is_complete || isEditMode) return;
         sendCustomerMessage(chatInput);
         setChatInput("");
       };
@@ -382,16 +392,46 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
             ))}
           </div>
           <form onSubmit={handleSend} className="chat-form">
-            <input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder={is_complete ? "Conversation finalized." : "Instruct AI..."}
-              disabled={is_complete}
-            />
+            {isEditMode ? (
+              <div
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  background: "var(--k-raise, #1a1a1a)",
+                  border: "1px solid var(--k-line, #333)",
+                  borderRadius: "8px",
+                  color: "#888",
+                  fontSize: "0.85rem",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <span
+                  onClick={() => handleModuleSelect("YourActivePosts")}
+                  style={{
+                    color: "#FF6B1A",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    marginRight: "4px",
+                  }}
+                >
+                  exit out of edit mode
+                </span>{" "}
+                to start new chat
+              </div>
+            ) : (
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder={is_complete ? "Conversation finalized." : "Instruct AI..."}
+                disabled={is_complete}
+              />
+            )}
             <button
               type="submit"
               className="chat-btn"
-              disabled={is_complete || !chatInput.trim()}
+              disabled={is_complete || isEditMode || !chatInput.trim()}
             >
               Send
             </button>
@@ -418,8 +458,6 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
     );
   };
 
- 
-
   const renderJobDescription = (slotKey) => {
     if (slotKey === "main") {
       return (
@@ -434,6 +472,15 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
             minWidth: 0,
           }}
         >
+          {/* Hidden file input for Cloudinary upload */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            style={{ display: "none" }}
+          />
+
           {/* ⬅️ LEFT SIDE COLUMN */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
             <span className="card-flag" style={{ marginTop: "-14px" }}>EDIT OR CREATE JOB POSTING</span>
@@ -546,10 +593,44 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                   scrollRef.current.scrollLeft = scrollLeftState.current - walk;
                 }}
               >
-                {attachments.map((file) => (
+                {/* ➕ ADD ATTACHMENT CARD */}
+                <div
+                  onClick={() => !isUploadingAttachment && fileInputRef.current?.click()}
+                  style={{
+                    display: "inline-flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: "65px",
+                    maxWidth: "65px",
+                    height: "65px",
+                    border: "1px dashed #FF6B1A",
+                    borderRadius: "8px",
+                    background: "rgba(255, 107, 26, 0.08)",
+                    color: "#FF6B1A",
+                    cursor: isUploadingAttachment ? "not-allowed" : "pointer",
+                    fontSize: "11px",
+                    padding: "4px",
+                    boxSizing: "border-box",
+                    flexShrink: 0,
+                  }}
+                >
+                  {isUploadingAttachment ? (
+                    <span style={{ fontSize: "10px", fontWeight: "bold" }}>...</span>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: "18px", fontWeight: "bold", lineHeight: 1 }}>+</span>
+                      <span style={{ fontSize: "9px", marginTop: "2px", fontWeight: 600 }}>ADD FILE</span>
+                    </>
+                  )}
+                </div>
+
+                {/* 🖼️ DYNAMIC ATTACHMENTS LIST FROM ZUSTAND */}
+                {attachments.map((file, idx) => (
                   <div
-                    key={file.id}
+                    key={idx}
                     style={{
+                      position: "relative",
                       display: "inline-flex",
                       flexDirection: "column",
                       alignItems: "center",
@@ -564,10 +645,53 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                       fontSize: "11px",
                       padding: "4px",
                       boxSizing: "border-box",
+                      flexShrink: 0,
                     }}
                   >
-                    <span style={{ fontWeight: 700, color: "var(--k-orange-ink)" }}>[{file.type}]</span>
-                    <span style={{ fontSize: "9px", textOverflow: "ellipsis", overflow: "hidden", width: "100%", textAlign: "center" }}>
+                    {/* Delete Attachment Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeAttachment(idx);
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: "2px",
+                        right: "2px",
+                        background: "rgba(255, 0, 0, 0.2)",
+                        color: "#ff4d4d",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "14px",
+                        height: "14px",
+                        fontSize: "10px",
+                        lineHeight: "1",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0,
+                      }}
+                      title="Remove attachment"
+                    >
+                      ×
+                    </button>
+
+                    <span style={{ fontWeight: 700, color: "var(--k-orange-ink)" }}>
+                      [{file.type || "FILE"}]
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        textOverflow: "ellipsis",
+                        overflow: "hidden",
+                        width: "100%",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={file.name}
+                    >
                       {file.name}
                     </span>
                   </div>
@@ -692,6 +816,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
             <button
               type="button"
               onClick={handleCreateJobFinalize}
+              disabled={isSubmitting}
               className="title"
               dir="rtl"
               name="post"
@@ -702,24 +827,25 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                 borderRadius: "8px",
                 padding: "10px 18px",
                 fontWeight: "bold",
-                cursor: "pointer",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
                 fontSize: "13px",
                 transition: "transform 120ms ease, opacity 120ms ease",
+                opacity: isSubmitting ? 0.6 : 1,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = 0.85;
+                if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = 1;
+                if (!isSubmitting) e.currentTarget.style.opacity = 1;
               }}
               onMouseDown={(e) => {
-                e.currentTarget.style.transform = "scale(0.95)";
+                if (!isSubmitting) e.currentTarget.style.transform = "scale(0.95)";
               }}
               onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
+                if (!isSubmitting) e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              {"<-"} Post Job
+              {isSubmitting ? "Posting..." : "<- Post Job"}
             </button>
           </div>
         </div>
@@ -748,10 +874,10 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
   const renderActivePosts = (slotKey) => {
     if (slotKey === "main") {
       return (
-        <div className="dashboard-card main-view" style={{ overflow: "scroll", maxHeight:"33vw" }}>
+        <div className="dashboard-card main-view" style={{ overflow: "scroll", maxHeight: "33vw" }}>
           <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
           <h2>ACTIVE PENDING POSTS</h2>
-          <button 
+          <button
             onClick={fetchBookingsPendingJobs}
             style={{
               background: "transparent",
@@ -762,43 +888,78 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
               fontWeight: 600,
               cursor: "pointer",
               marginBottom: "16px",
-              width: "fit-content"
+              width: "fit-content",
             }}
           >
             🔄 REFRESH LIVE PIPELINE
           </button>
-          
+
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {fetchedJobs.length === 0 ? (
               <p style={{ fontFamily: "Courier New", color: "var(--k-ink-3)", fontSize: "0.9rem" }}>
                 No active pending jobs found in your database instance.
               </p>
             ) : (
-              fetchedJobs.map((job) => (
-                <div 
-                  key={job.id} 
-                  style={{
-                    border: "1px solid var(--k-line)",
-                    borderRadius: "16px",
-                    padding: "16px",
-                    background: "var(--k-raise)",
-                    color: "var(--k-ink)",
-                    boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)"
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <span style={{ fontFamily: "Courier New", fontWeight: "bold", fontSize: "1.1rem" }}>
-                      {job.title ? job.title.toUpperCase() : "NEW JOB REQUEST"}
-                    </span>
-                    <span className="badge badge-highlight" style={{ textTransform: "uppercase", fontSize: "0.75rem", padding: "4px 8px" }}>
-                      ⚙️ {job.status || "PENDING"}
-                    </span>
+              fetchedJobs.map((job) => {
+                const isThisJobEditing = isEditMode && editingJobId === job.id;
+                return (
+                  <div
+                    key={job.id}
+                    style={{
+                      border: "1px solid var(--k-line)",
+                      borderRadius: "16px",
+                      padding: "16px",
+                      background: "var(--k-raise)",
+                      color: "var(--k-ink)",
+                      boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <span style={{ fontFamily: "Courier New", fontWeight: "bold", fontSize: "1.1rem" }}>
+                        {job.title ? job.title.toUpperCase() : "NEW JOB REQUEST"}
+                      </span>
+                      {/* 🛠️ EDIT AND PENDING BUTTON GROUP */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isThisJobEditing) {
+                              exitEditMode();
+                            } else {
+                              loadJobForEdit(job);
+                              navigate("/customer/bookings/JobDescriptionWorkspace");
+                            }
+                          }}
+                          style={{
+                            background: isThisJobEditing ? "#ff4d4d" : "#FF6B1A",
+                            color: isThisJobEditing ? "#ffffff" : "#0D0D0D",
+                            border: "none",
+                            borderRadius: "8px",
+                            padding: "4px 12px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            fontSize: "0.75rem",
+                            transition: "transform 120ms ease, opacity 120ms ease",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.85)}
+                          onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}
+                          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.95)")}
+                          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                        >
+                          {isThisJobEditing ? "❌ EXIT EDIT" : "✏️ EDIT"}
+                        </button>
+
+                        <span className="badge badge-highlight" style={{ textTransform: "uppercase", fontSize: "0.75rem", padding: "4px 8px" }}>
+                          ⚙️ {job.status || "PENDING"}
+                        </span>
+                      </div>
+                    </div>
+                    <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "var(--k-ink-3)", lineHeight: "1.4" }}>
+                      {job.description}
+                    </p>
                   </div>
-                  <p style={{ margin: "4px 0", fontSize: "0.9rem", color: "var(--k-ink-3)", lineHeight: "1.4" }}>
-                    {job.description}
-                  </p>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -899,7 +1060,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                     font: "inherit",
                     fontSize: "11px",
                     background: "var(--ind-surface-alpha-40)",
-                    color: "var(--ind-white)"
+                    color: "var(--ind-white)",
                   }}
                 />
                 <button
@@ -913,7 +1074,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                     font: "inherit",
                     fontSize: "11px",
                     fontWeight: "bold",
-                    cursor: "pointer"
+                    cursor: "pointer",
                   }}
                 >
                   FIND
@@ -971,8 +1132,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                   wordBreak: "break-word",
                 }}
               >
-                {modalAddrText ||
-                  "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
+                {modalAddrText || "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
               </div>
             </div>
 
@@ -990,7 +1150,7 @@ const [hasNavigatedForCompletion, setHasNavigatedForCompletion] = useState(false
                   fontSize: "13px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  color: "var(--text-secondary)"
+                  color: "var(--text-secondary)",
                 }}
               >
                 CANCEL
