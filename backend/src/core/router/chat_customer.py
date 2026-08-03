@@ -329,7 +329,7 @@ def get_booking_summary(
 
 @router.post(
     "/{booking_chat_id}/complete",
-    summary="Complete booking session, save Cloudinary attachments, vectorize request, and perform worker matching",
+    summary="Complete booking session, save Cloudinary attachments, vectorize request, and perform worker matching", # //att-change
 )
 async def complete_customer_chat(
     booking_chat_id: int, 
@@ -376,7 +376,7 @@ async def complete_customer_chat(
         "contact_name": payload.contact_name,
         "contact_phone": payload.contact_phone,
         "mode": payload.mode,
-        "attachments": payload.attachments,  # Direct array of Cloudinary attachments from frontend
+        "attachments": payload.attachments,  # //att-change
         "latitude": lat,
         "longitude": lng,
         "location": wkt_point,
@@ -419,7 +419,7 @@ async def complete_customer_chat(
 
     return {
         "status": "success", 
-        "message": f"Job registered successfully with {len(payload.attachments)} attachment(s). Found {matching_result.get('count', 0)} matches."
+        "message": f"Job registered successfully with {len(payload.attachments)} attachment(s). Found {matching_result.get('count', 0)} matches." # //att-change
     }
 
 
