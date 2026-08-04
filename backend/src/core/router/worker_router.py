@@ -1,8 +1,7 @@
-# routers/worker_router.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, cast
+from sqlalchemy import select, func, cast, or_
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model
@@ -57,23 +56,28 @@ def get_worker_job_bids(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    job_exists = db.execute(
-        select(model.Job).where(model.Job.id == job_id)
+    job = db.execute(
+        select(model.Job).where(
+            or_(
+                model.Job.id == job_id,
+                model.Job.booking_chat_id == str(job_id),
+            )
+        )
     ).scalar_one_or_none()
 
-    if not job_exists:
+    if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Job not found."
         )
 
+    actual_job_id = job.id
+
     stmt = (
-        select(model.JobWorkerMatch, model.WorkerProfile)
-        .join(
-            model.WorkerProfile,
-            model.JobWorkerMatch.worker_id == model.WorkerProfile.id,
-        )
+        select(model.JobWorkerMatch, model.WorkerProfile, model.User)
+        .join(model.WorkerProfile, model.JobWorkerMatch.worker_id == model.WorkerProfile.id)
+        .join(model.User, model.WorkerProfile.user_id == model.User.id)
         .where(
-            model.JobWorkerMatch.job_id == job_id,
+            model.JobWorkerMatch.job_id == actual_job_id,
             model.JobWorkerMatch.is_active == True,
             model.JobWorkerMatch.bid_amount.isnot(None),
         )
@@ -86,6 +90,7 @@ def get_worker_job_bids(
             "id": match.id,
             "worker_id": match.worker_id,
             "worker_chat_id": worker.worker_chat_id,
+            "worker_name": f"{user.firstName or ''} {user.lastName or ''}".strip() or user.username,
             "amount": float(match.bid_amount),
             "proposal_text": match.bid_message,
             "is_interested": match.is_interested,
@@ -96,7 +101,7 @@ def get_worker_job_bids(
             ),
             "created_at": match.created_at,
         }
-        for match, worker in results
+        for match, worker, user in results
     ]
 
     return {"status": "success", "bids": formatted_bids}

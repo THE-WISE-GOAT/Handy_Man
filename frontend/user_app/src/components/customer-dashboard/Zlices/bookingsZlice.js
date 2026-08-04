@@ -1,3 +1,5 @@
+import { apiClient } from "@shared/api/client";
+
 export const createBookingsZlice = (set, get) => ({
   userAddrText: "Bhaktapur, Nepal",
   userLng: 85.428,
@@ -38,9 +40,6 @@ export const createBookingsZlice = (set, get) => ({
   cust_id: 1,
   isSubmitting: false,
 
-  // -------------------------------------------------------------
-  // EDIT MODE STATE & ACTIONS
-  // -------------------------------------------------------------
   isEditMode: false,
   editingJobId: null,
 
@@ -64,9 +63,6 @@ export const createBookingsZlice = (set, get) => ({
     await get().startNewSession();
   },
 
-  // -------------------------------------------------------------
-  // ATTACHMENTS STATE & ACTIONS
-  // -------------------------------------------------------------
   attachments: [],
   isUploadingAttachment: false,
 
@@ -130,9 +126,6 @@ export const createBookingsZlice = (set, get) => ({
     }
   },
 
-  // -------------------------------------------------------------
-  // SLOTS & JOB POSTING
-  // -------------------------------------------------------------
   slots: {
     main: "AiChatTerminal",
     sidebar: "JobDescriptionWorkspace",
@@ -141,22 +134,7 @@ export const createBookingsZlice = (set, get) => ({
 
   fetchBookingsPendingJobs: async () => {
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch(
-        "http://127.0.0.1:8000/jobs/status/pending",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP Error Status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.get("/jobs/status/pending");
 
       if (data.status === "success") {
         set({ fetchedJobs: data.tasks });
@@ -188,39 +166,20 @@ export const createBookingsZlice = (set, get) => ({
     set({ isSubmitting: true });
 
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-
-      const response = await fetch(
-        `http://127.0.0.1:8000/dispatch/${booking_chat_id}/complete`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            edited_description: jobDescriptionDraft || "",
-            location: {
-              longitude: parseFloat(userLng) || 0.0,
-              latitude: parseFloat(userLat) || 0.0,
-            },
-            title: jobTitleDraft || "NEW JOB REQUEST",
-            contact_name: userName || "",
-            contact_phone: userCont || "",
-            status: "pending",
-            mode: "regular",
-            attachments: attachments || [],
-          }),
+      const data = await apiClient.post(`/dispatch/${booking_chat_id}/complete`, {
+        edited_description: jobDescriptionDraft || "",
+        location: {
+          longitude: parseFloat(userLng) || 0.0,
+          latitude: parseFloat(userLat) || 0.0
         },
-      );
+        title: jobTitleDraft || "NEW JOB REQUEST",
+        contact_name: userName || "",
+        contact_phone: userCont || "",
+        status: "pending",
+        mode: "regular",
+        attachments: attachments || []
+      });
 
-      if (!response.ok) {
-        throw new Error(
-          `Posting pipeline rejected by server: ${response.status}`,
-        );
-      }
-
-      const data = await response.json();
       if (data.status === "success") {
         console.log(
           "🚀 Success! Job verified, vectorized by Nvidia, and stored securely.",
@@ -305,20 +264,7 @@ export const createBookingsZlice = (set, get) => ({
       editingJobId: null,
     });
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/dispatch/session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Session authorization failed: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.post("/dispatch/session", {});
 
       set({
         booking_chat_id: data.booking_chat_id,
@@ -366,28 +312,14 @@ export const createBookingsZlice = (set, get) => ({
     addChatMessage(userMessage, "user");
 
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/dispatch/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          booking_chat_id: parseInt(booking_chat_id),
-          message: userMessage,
-        }),
+      const data = await apiClient.post("/dispatch/chat", {
+        booking_chat_id: parseInt(booking_chat_id, 10),
+        message: userMessage,
       });
 
-      if (!response.ok) {
-        throw new Error(`Chat turn rejected by server: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const primaryCategory =
-        data.categories && data.categories.length > 0
-          ? data.categories[0].category
-          : "";
+      const primaryCategory = data.categories && data.categories.length > 0
+        ? data.categories[0].category
+        : "";
 
       set({
         booking_chat_id: data.booking_chat_id,

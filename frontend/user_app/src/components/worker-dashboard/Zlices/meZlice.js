@@ -1,7 +1,4 @@
 export const createMeZlice = (set, get) => ({
-  // ==========================================
-  // 0. ME SLOTS (required by Dash3Worker layout)
-  // ==========================================
   meSlots: {
     main: "MeInterview",
     sidebar: "MeProfile",
@@ -23,9 +20,6 @@ export const createMeZlice = (set, get) => ({
       };
     }),
 
-  // ==========================================
-  // 1. ONBOARDING STATE
-  // ==========================================
   applicantStage: "pending_interview",
   isApplicantComplete: false,
   isApplicantRejected: false,
@@ -42,9 +36,6 @@ export const createMeZlice = (set, get) => ({
   isSubmittingApplication: false,
   applicationSubmitted: false,
 
-  // ==========================================
-  // 2. CHAT STATE
-  // ==========================================
   chatMessages: [
     {
       id: "init-1",
@@ -60,15 +51,9 @@ export const createMeZlice = (set, get) => ({
   turnsRemaining: 5,
   scenarioQuestion: null,
 
-  // ==========================================
-  // 2.5 SKILLS & CATEGORY STATE
-  // ==========================================
   workerSkills: [],
-  isAddingSkill: false, // Tracks if user is in an active specialty interview
+  isAddingSkill: false,
 
-  // ==========================================
-  // 3. MAP STATE
-  // ==========================================
   isMapOpen: false,
   mapReady: false,
   modalSearchQuery: "",
@@ -76,9 +61,6 @@ export const createMeZlice = (set, get) => ({
   modalLng: 85.324,
   modalAddrText: "",
 
-  // ==========================================
-  // 4. EDITABLE PROFILE STATE
-  // ==========================================
   editableProfile: {
     job_category: "",
     category_tag: "",
@@ -94,9 +76,6 @@ export const createMeZlice = (set, get) => ({
   isSavingProfile: false,
   profileSaveMessage: null,
 
-  // ==========================================
-  // 5. USER BASE INFO STATE
-  // ==========================================
   userProfile: {
     firstName: "",
     lastName: "",
@@ -107,10 +86,6 @@ export const createMeZlice = (set, get) => ({
   isEditingUserInfo: false,
   isSavingUserInfo: false,
   userInfoSaveMessage: null,
-
-  // ==========================================
-  // 6. ACTIONS & SETTERS
-  // ==========================================
 
   setApplicantStage: (stage) => set({ applicantStage: stage }),
   setWorkerChatId: (id) => set({ workerChatId: id }),
@@ -159,11 +134,6 @@ export const createMeZlice = (set, get) => ({
       ],
     })),
 
-  // ====================================================
-  // SKILLS & CATEGORY ENDPOINTS
-  // ====================================================
-
-  // GET /{worker_chat_id}/skills
   fetchWorkerSkills: async () => {
     const { workerChatId } = get();
     if (!workerChatId) return;
@@ -184,14 +154,12 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // POST /{worker_chat_id}/add-skill
   startAddSkill: async () => {
     const { workerChatId, meSlots } = get();
     if (!workerChatId) return;
     try {
       set({ isAiGenerating: true, isAddingSkill: true });
 
-      // Bring interview panel to main slot if not already
       if (meSlots.main !== "MeInterview") {
         const slots = { ...meSlots };
         const slotKeyWithInterview = Object.keys(slots).find(
@@ -235,13 +203,10 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // PLACEHOLDER: Add New Category Button (Backend not implemented yet)
   startAddCategory: () => {
     console.log("Add new category clicked: Placeholder action.");
-    // Unmanaged in backend currently, left intentionally empty.
   },
 
-  // CANCEL SESSION: Exits specialty interview chat and restores main UI view
   cancelAddSession: () => {
     set({
       isAddingSkill: false,
@@ -255,10 +220,6 @@ export const createMeZlice = (set, get) => ({
       isChatComplete: true,
     });
   },
-
-  // ==========================================
-  // CORE CHAT / INTERVIEW ACTIONS
-  // ==========================================
 
   startWorkerInterview: async () => {
     set({ isAiGenerating: true });
@@ -309,7 +270,6 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // ROUTER: Checks isAddingSkill to choose appropriate chat endpoint
   sendWorkerMessage: async (userMessage) => {
     const { workerChatId, addChatMessage, isAddingSkill } = get();
 
@@ -325,7 +285,6 @@ export const createMeZlice = (set, get) => ({
       const token = localStorage.getItem("handy_man_access_token");
 
       if (isAddingSkill) {
-        // ENDPOINT: POST /{worker_chat_id}/add-skill/chat
         const response = await fetch(
           `http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill/chat`,
           {
@@ -368,7 +327,6 @@ export const createMeZlice = (set, get) => ({
           set({ isAddingSkill: false });
         }
       } else {
-        // ENDPOINT: POST /worker-interview/chat (Initial category interview)
         const response = await fetch(
           "http://127.0.0.1:8000/worker-interview/chat",
           {
@@ -512,7 +470,7 @@ export const createMeZlice = (set, get) => ({
         applicationSubmitted: true,
       });
 
-      await get().loadApplicantStatus();
+      await get().loadApplicantStatus(true);
     } catch (error) {
       console.error("Failed to complete application process:", error);
     } finally {
@@ -620,7 +578,11 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  loadApplicantStatus: async () => {
+  _statusCheckInProgress: false,
+  _statusChecked: false,
+  loadApplicantStatus: async (force = false) => {
+    if (!force && (get()._statusCheckInProgress || get()._statusChecked)) return;
+    set({ _statusCheckInProgress: true });
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
@@ -646,8 +608,7 @@ export const createMeZlice = (set, get) => ({
         });
 
         if (data.worker_chat_id) {
-          get().fetchChatHistory(data.worker_chat_id);
-          get().fetchWorkerSkills();
+          get().fetchWorkerInterviewHistory(data.worker_chat_id);
         }
 
         if (
@@ -688,10 +649,12 @@ export const createMeZlice = (set, get) => ({
       }
     } catch (error) {
       console.error("Failed to load applicant status:", error);
+    } finally {
+      set({ _statusCheckInProgress: false, _statusChecked: true });
     }
   },
 
-  fetchChatHistory: async (workerChatId) => {
+  fetchWorkerInterviewHistory: async (workerChatId) => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(

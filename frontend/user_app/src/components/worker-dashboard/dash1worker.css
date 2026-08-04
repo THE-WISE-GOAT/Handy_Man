@@ -138,9 +138,6 @@
   margin: 8px 0 0;
 }
 
-/* ==========================================================================
-   4. COMPONENT MAP STYLES
-   ========================================================================== */
 .map-mock {
   margin-top: 16px;
   padding: 20px;
@@ -157,8 +154,6 @@
   background: #F4F5F7;
 }
 
-/* Was green (#4ade80). Online/available now reads as brand orange, matching
-   the filled-vs-hollow state language used across the dashboards. */
 .status-dot {
   width: 10px;
   height: 10px;
@@ -175,4 +170,42 @@
 
 .light .status-text {
   color: #0D0D0D;
+}
+
+.chat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  padding-bottom: 10px;
+  border-radius: 8px;
+  background: var(--k-raise);
+  max-height: 400px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.chat-msg {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  max-width: 80%;
+  word-break: break-word;
+}
+
+.chat-msg--worker {
+  align-self: flex-end;
+  background: var(--k-orange-ink);
+  color: #0D0D0D;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-msg--customer {
+  align-self: flex-start;
+  background: var(--k-wash);
+  color: var(--k-ink);
+  border-bottom-left-radius: 2px;
 }
