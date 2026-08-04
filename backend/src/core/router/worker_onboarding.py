@@ -263,7 +263,44 @@ def get_my_application_status(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    return _require_worker_profile(current_user.id, db)
+    profile = _get_own_worker_profile(current_user.id, db)
+    if not profile:
+        has_worker_role = any(
+            r.name and r.name.lower() == "worker"
+            for r in current_user.roles
+        )
+        if has_worker_role:
+            session = model.WorkerInterviewSession(
+                user_id=current_user.id,
+                history=[],
+                stage="approved",
+                is_complete=True,
+                is_rejected=False,
+            )
+            db.add(session)
+            db.flush()
+
+            profile = model.WorkerProfile(
+                user_id=current_user.id,
+                worker_chat_id=session.id,
+                stage="approved",
+                is_complete=True,
+                is_rejected=False,
+                job_category="general",
+                category_tag="general",
+                specialities=[],
+                specialized_tools_or_equipment=[],
+                years_experience=0,
+                license_or_certification=None,
+                job_description="",
+                scenario_score=0,
+            )
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+            return profile
+        return _require_worker_profile(current_user.id, db)
+    return profile
 
 
 @router.get(

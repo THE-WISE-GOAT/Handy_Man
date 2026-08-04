@@ -16,24 +16,41 @@ export default function WorkerViewRoute() {
 
   useEffect(() => {
     let active = true;
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (active && !settled) {
+        setLoading(false);
+        setIsApplicant(false);
+      }
+    }, 15000);
     const checkApplicantStatus = async () => {
       try {
         const data = await apiClient.get("/worker-onboarding/my-status");
+        settled = true;
         if (active) {
-          setIsApplicant(!data.is_complete);
+          const isVerified =
+            data.is_complete === true ||
+            (typeof data.stage === "string" &&
+              data.stage.toLowerCase() === "approved");
+          setIsApplicant(!isVerified);
         }
       } catch (error) {
+        settled = true;
         if (active) {
           console.error("[WorkerViewRoute] Applicant status check failed:", error);
           // Keep isApplicant = true on error (fail closed)
           setIsApplicant(true);
         }
       } finally {
-        if (active) setLoading(false);
+        settled = true;
+        if (active) {
+          clearTimeout(timeout);
+          setLoading(false);
+        }
       }
     };
     checkApplicantStatus();
-    return () => { active = false; };
+    return () => { active = false; clearTimeout(timeout); };
   }, []);
 
   if (loading) {

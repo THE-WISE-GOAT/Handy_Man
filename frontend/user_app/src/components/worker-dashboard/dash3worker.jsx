@@ -111,21 +111,21 @@ export default function Dash3Worker({ viewSlug }) {
 
   // Load applicant status on mount
   useEffect(() => {
-    loadApplicantStatus();
-  }, [loadApplicantStatus]);
+    useWorkerDashboardData.getState().loadApplicantStatus();
+  }, []);
 
   // Load user base info on mount
   useEffect(() => {
-    loadUserProfile();
-  }, [loadUserProfile]);
+    useWorkerDashboardData.getState().loadUserProfile();
+  }, []);
 
   // Refetch status after application is submitted
   useEffect(() => {
     if (applicationSubmitted) {
-      const timer = setTimeout(() => loadApplicantStatus(), 1500);
+      const timer = setTimeout(() => useWorkerDashboardData.getState().loadApplicantStatus(true), 1500);
       return () => clearTimeout(timer);
     }
-  }, [applicationSubmitted, loadApplicantStatus]);
+  }, [applicationSubmitted]);
 
   // Sync activeModule with URL slug
   useEffect(() => {

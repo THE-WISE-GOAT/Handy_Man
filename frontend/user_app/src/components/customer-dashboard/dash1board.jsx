@@ -8,18 +8,16 @@ export default function Dash1Board({ viewSlug }) {
   const [chatInput, setChatInput] = useState("");
   const fileInputRef = useRef(null);
 
-  // 🗺️ MAP STATES
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState("");
-  const [modalLat, setModalLat] = useState(27.7172); // Default to Kathmandu
+  const [modalLat, setModalLat] = useState(27.7172);
   const [modalLng, setModalLng] = useState(85.324);
   const [modalAddrText, setModalAddrText] = useState("");
   const mapContainerRef = useRef(null);
   const leafletMapRef = useRef(null);
   const leafletMarkerRef = useRef(null);
 
-  // Bring in items from Zustand store
   const {
     slots,
     swapSlots,
@@ -32,7 +30,6 @@ export default function Dash1Board({ viewSlug }) {
     activePostsCount,
     userCont,
     fetchBookingsPendingJobs,
-    // Spatial state parameters from Zustand configuration
     userAddrText,
     userLng,
     userLat,
@@ -56,14 +53,12 @@ export default function Dash1Board({ viewSlug }) {
     is_complete,
     createJobDirect,
     isSubmitting,
-    // 📁 ATTACHMENTS STATE & ACTIONS FROM ZUSTAND
     attachments,
     isUploadingAttachment,
     uploadAttachment,
     removeAttachment,
 
     loadJobForEdit,
-    // ✏️ EDIT MODE STATE & ACTIONS FROM ZUSTAND
     isEditMode,
     editingJobId,
     exitEditMode,
@@ -83,13 +78,13 @@ export default function Dash1Board({ viewSlug }) {
     } catch (err) {
       alert("Failed to upload image. Please check Cloudinary config.");
     } finally {
-      e.target.value = ""; // Reset input after upload attempt
+      e.target.value = "";
     }
   };
 
   useEffect(() => {
-    startNewSession();
-  }, [startNewSession]);
+    useCustomerDashboardData.getState().startNewSession();
+  }, []);
 
   useEffect(() => {
     if (!viewSlug) return;
@@ -131,9 +126,6 @@ export default function Dash1Board({ viewSlug }) {
     }
   }, [is_complete, hasNavigatedForCompletion, navigate]);
 
-  // ====================================================
-  // 🗺️ OPENSTREETMAP ASYNC ASSET LOADER
-  // ====================================================
   useEffect(() => {
     if (isMapOpen) {
       if (userLat && userLng) {
@@ -169,9 +161,6 @@ export default function Dash1Board({ viewSlug }) {
     }
   }, [isMapOpen]);
 
-  // ====================================================
-  // 🗺️ MAP ENGINE INITIALIZATION AND CONTROLS
-  // ====================================================
   useEffect(() => {
     if (!mapReady || !mapContainerRef.current || !window.L) return;
     const L = window.L;
@@ -338,10 +327,6 @@ export default function Dash1Board({ viewSlug }) {
     fetchBookingsPendingJobs();
   };
 
-  // ====================================================
-  // SUB-MODULE RENDERS
-  // ====================================================
-
   const renderAiChat = (slotKey) => {
     if (slotKey === "main") {
       const handleSend = (e) => {
@@ -491,7 +476,6 @@ export default function Dash1Board({ viewSlug }) {
             minWidth: 0,
           }}
         >
-          {/* Hidden file input for Cloudinary upload */}
           <input
             type="file"
             ref={fileInputRef}
@@ -500,7 +484,6 @@ export default function Dash1Board({ viewSlug }) {
             style={{ display: "none" }}
           />
 
-          {/* ⬅️ LEFT SIDE COLUMN */}
           <div
             style={{
               flex: 1,
@@ -554,7 +537,6 @@ export default function Dash1Board({ viewSlug }) {
             />
           </div>
 
-          {/* ➡️ RIGHT SIDE COLUMN */}
           <div
             style={{
               width: "35%",
@@ -649,7 +631,6 @@ export default function Dash1Board({ viewSlug }) {
                   scrollRef.current.scrollLeft = scrollLeftState.current - walk;
                 }}
               >
-                {/* ➕ ADD ATTACHMENT CARD */}
                 <div
                   onClick={() =>
                     !isUploadingAttachment && fileInputRef.current?.click()
@@ -701,7 +682,6 @@ export default function Dash1Board({ viewSlug }) {
                   )}
                 </div>
 
-                {/* 🖼️ DYNAMIC ATTACHMENTS LIST FROM ZUSTAND */}
                 {attachments.map((file, idx) => (
                   <div
                     key={idx}
@@ -724,7 +704,6 @@ export default function Dash1Board({ viewSlug }) {
                       flexShrink: 0,
                     }}
                   >
-                    {/* Delete Attachment Button */}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -921,14 +900,14 @@ export default function Dash1Board({ viewSlug }) {
                 if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
               }}
               onMouseLeave={(e) => {
-                if (!isSubmitting) e.currentTarget.style.opacity = 1;
+                e.currentTarget.style.opacity = 1;
               }}
               onMouseDown={(e) => {
                 if (!isSubmitting)
                   e.currentTarget.style.transform = "scale(0.95)";
               }}
               onMouseUp={(e) => {
-                if (!isSubmitting) e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.transform = "scale(1)";
               }}
             >
               {isSubmitting ? "Posting..." : "<- Post Job"}
@@ -1033,7 +1012,6 @@ export default function Dash1Board({ viewSlug }) {
                           ? job.title.toUpperCase()
                           : "NEW JOB REQUEST"}
                       </span>
-                      {/* 🛠️ EDIT AND PENDING BUTTON GROUP */}
                       <div
                         style={{
                           display: "flex",
@@ -1158,7 +1136,6 @@ export default function Dash1Board({ viewSlug }) {
       <div className="grid-bottom">{resolveAndRenderModule("bottom")}</div>
       <div className="grid-sidebar">{resolveAndRenderModule("sidebar")}</div>
 
-      {/* 🎯 NEO-BRUTALIST CUTE MAP PICKER POPUP MODAL */}
       {isMapOpen && (
         <div
           style={{
@@ -1282,7 +1259,6 @@ export default function Dash1Board({ viewSlug }) {
               }}
             />
 
-            {/* Resolved Preview Description Output Text Block */}
             <div
               style={{
                 fontSize: "11px",

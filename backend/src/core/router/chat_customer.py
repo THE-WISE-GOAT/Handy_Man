@@ -19,8 +19,7 @@ Endpoints
 
 import logging
 import os
-import httpx  # Swapped requests for httpx
-import asyncio
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
@@ -44,13 +43,10 @@ from src.ai.customer_chat_analyser_nvidia import (
 )
 
 router = APIRouter(prefix="/dispatch", tags=["Dispatch"])
-match_router = APIRouter(tags=["Matching"])  # Separate router for matching endpoints
+match_router = APIRouter(tags=["Matching"])
 logger = logging.getLogger(__name__)
 
-DEFAULT_SEARCH_RADIUS_METERS = 600_000  # 60 km — hard cutoff
-
-
-# ── Helper ───────────────────────────────────────────────────────────────────
+DEFAULT_SEARCH_RADIUS_METERS = 600_000
 
 
 def _get_own_session(
@@ -58,7 +54,6 @@ def _get_own_session(
     db: Session,
     current_user: model.User,
 ) -> model.BookingChat:
-    """Fetch a BookingChat that belongs to the current user; 404 if missing."""
     session = db.execute(
         select(model.BookingChat).where(
             model.BookingChat.id == booking_chat_id,
@@ -74,8 +69,123 @@ def _get_own_session(
     return session
 
 
+def _get_booking_or_worker_access(
+    booking_chat_id: int,
+    db: Session,
+    current_user: model.User,
+) -> model.BookingChat | None:
+    session = db.execute(
+        select(model.BookingChat).where(
+            model.BookingChat.id == booking_chat_id,
+        )
+    ).scalar_one_or_none()
+
+    if not session:
+        return None
+
+    if session.user_id == current_user.id:
+        return session
+
+    job = db.execute(
+        select(model.Job).where(
+            model.Job.booking_chat_id == booking_chat_id,
+            model.Job.worker_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+    if job:
+        return session
+
+    matched_job = db.execute(
+        select(model.Job).where(model.Job.booking_chat_id == booking_chat_id)
+    ).scalar_one_or_none()
+
+    if matched_job:
+        worker_profile = db.execute(
+            select(model.WorkerProfile).where(
+                model.WorkerProfile.user_id == current_user.id
+            )
+        ).scalar_one_or_none()
+
+        if worker_profile:
+            match = db.execute(
+                select(model.JobWorkerMatch).where(
+                    model.JobWorkerMatch.job_id == matched_job.id,
+                    model.JobWorkerMatch.worker_id == worker_profile.id,
+                    model.JobWorkerMatch.is_active == True,
+                )
+            ).scalar_one_or_none()
+
+            if match:
+                return session
+
+    return None
+
+
+def _user_display_name(user: model.User) -> str:
+    parts = [user.firstName, user.lastName]
+    name = " ".join(p for p in parts if p).strip()
+    return name or user.username or "User"
+
+
+def _resolve_booking_chat(
+    booking_chat_id: int,
+    db: Session,
+    current_user: model.User,
+) -> model.BookingChat | None:
+    session = _get_booking_or_worker_access(booking_chat_id, db, current_user)
+    if session is not None:
+        return session
+
+    job = db.execute(
+        select(model.Job).where(model.Job.id == booking_chat_id)
+    ).scalar_one_or_none()
+
+    if not job:
+        return None
+
+    is_owner = job.customer_id == current_user.id
+    is_assigned_worker = (
+        job.worker_id is not None and job.worker_id == current_user.id
+    )
+
+    is_matched_worker = False
+    if not is_assigned_worker:
+        worker_profile = db.execute(
+            select(model.WorkerProfile).where(
+                model.WorkerProfile.user_id == current_user.id
+            )
+        ).scalar_one_or_none()
+        if worker_profile:
+            match = db.execute(
+                select(model.JobWorkerMatch).where(
+                    model.JobWorkerMatch.job_id == job.id,
+                    model.JobWorkerMatch.worker_id == worker_profile.id,
+                    model.JobWorkerMatch.is_active == True,
+                )
+            ).scalar_one_or_none()
+            if match:
+                is_matched_worker = True
+
+    if not is_owner and not is_assigned_worker and not is_matched_worker:
+        return None
+
+    new_chat = model.BookingChat(
+        user_id=job.customer_id,
+        history=[],
+        is_complete=False,
+        is_job_request=False,
+    )
+    db.add(new_chat)
+    db.flush()
+
+    job.booking_chat_id = new_chat.id
+    db.flush()
+
+    return new_chat
+
+
 async def _get_address_from_coords(lat: float, lng: float) -> str:
-    """Detects the physical location address text from latitude and longitude coordinates."""
     url = "https://nominatim.openstreetmap.org/reverse"
     params = {"lat": lat, "lon": lng, "format": "json", "addressdetails": 1}
     headers = {
@@ -104,7 +214,6 @@ async def _get_address_from_coords(lat: float, lng: float) -> str:
 
 
 async def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
-    """Requests a vector embedding from the Nvidia NIM API for a given job description."""
     api_key = os.getenv("NVIDIA_API_KEY")
     if not api_key:
         logger.error("NVIDIA_API_KEY environment variable is missing.")
@@ -149,7 +258,6 @@ async def _fetch_nvidia_embedding(job_desc: str) -> list[float]:
 
 
 async def _broadcast_notifications(worker_chat_ids: list[int], job_payload: dict):
-    """Helper to run async websocket broadcasts from a sync endpoint in the background."""
     for worker_chat_id in worker_chat_ids:
         try:
             await manager.send_worker_notification(worker_chat_id, job_payload)
@@ -157,9 +265,6 @@ async def _broadcast_notifications(worker_chat_ids: list[int], job_payload: dict
             logger.warning(
                 f"Failed live alert broadcast to worker {worker_chat_id}: {ws_err}"
             )
-
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
 @router.post(
@@ -300,6 +405,93 @@ def dispatch_chat(
     }
 
 
+@router.post(
+    "/chat/{booking_chat_id}/message",
+    response_model=schema.HumanChatMessageOut,
+    summary="Send a human message in a booking chat and broadcast to the other party",
+)
+async def send_human_message(
+    booking_chat_id: int,
+    payload: schema.HumanChatMessageIn,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    chat_session = _resolve_booking_chat(booking_chat_id, db, current_user)
+
+    if chat_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat session not found.",
+        )
+
+    sender_name = _user_display_name(current_user)
+
+    updated_history = list(chat_session.history)
+    updated_history.append(
+        {"role": payload.sender, "content": payload.message, "sender_name": sender_name}
+    )
+    chat_session.history = updated_history
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database write failure.",
+        )
+
+    message_payload = {
+        "type": "HUMAN_MESSAGE",
+        "data": {
+            "booking_chat_id": chat_session.id,
+            "sender": payload.sender,
+            "sender_name": sender_name,
+            "message": payload.message,
+        }
+    }
+
+    if payload.sender == "customer":
+        job = db.execute(
+            select(model.Job).where(model.Job.booking_chat_id == chat_session.id)
+        ).scalar_one_or_none()
+        if job:
+            if job.worker_id:
+                worker_session = db.execute(
+                    select(model.WorkerInterviewSession).where(
+                        model.WorkerInterviewSession.user_id == job.worker_id
+                    )
+                ).scalar_one_or_none()
+                if worker_session:
+                    await manager.send_worker_notification(worker_session.id, message_payload)
+
+            matched_profiles = db.execute(
+                select(model.WorkerProfile).join(
+                    model.JobWorkerMatch,
+                    model.JobWorkerMatch.worker_id == model.WorkerProfile.id,
+                ).where(
+                    model.JobWorkerMatch.job_id == job.id,
+                    model.JobWorkerMatch.is_active == True,
+                )
+            ).scalars().all()
+            for profile in matched_profiles:
+                if profile.worker_chat_id:
+                    await manager.send_worker_notification(profile.worker_chat_id, message_payload)
+
+            await manager.send_worker_notification(
+                chat_session.id, message_payload
+            )
+    elif payload.sender == "worker":
+        await manager.send_customer_notification(chat_session.id, message_payload)
+
+    return {
+        "booking_chat_id": chat_session.id,
+        "message": payload.message,
+        "sender": payload.sender,
+        "sender_name": sender_name,
+    }
+
+
 @router.get(
     "/{booking_chat_id}/history",
     response_model=schema.ChatHistoryOut,
@@ -310,7 +502,17 @@ def get_history(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    chat_session = _get_own_session(booking_chat_id, db, current_user)
+    chat_session = _resolve_booking_chat(booking_chat_id, db, current_user)
+
+    if chat_session is None:
+        return {
+            "booking_chat_id": booking_chat_id,
+            "history": [],
+            "is_complete": False,
+            "turns_used": 0,
+            "turns_remaining": MAX_TURNS,
+        }
+
     visible_history = [
         {
             "role": msg["role"],
@@ -319,9 +521,10 @@ def get_history(
                 if msg["role"] == "assistant"
                 else msg["content"]
             ),
+            "sender_name": msg.get("sender_name"),
         }
         for msg in chat_session.history
-        if msg["role"] != "system"
+        if msg["role"] not in ("user", "assistant")
     ]
 
     return {
@@ -360,10 +563,6 @@ def get_booking_summary(
 
 
 async def _refine_job_description_with_ai(raw_description: str) -> Dict[str, Any]:
-    """
-    Acts as a secondary intelligence layer to sanitize customer inputs
-    and automatically extract categories for manual job entries.
-    """
     prompt = f"""
     You are a backend data processor for a service marketplace. Your job is to clean up a customer's raw task description and categorize it.
     
@@ -391,14 +590,12 @@ async def _refine_job_description_with_ai(raw_description: str) -> Dict[str, Any
                 max_tokens=300,
                 response_format={
                     "type": "json_object"
-                },  # Force JSON output if supported by your NVIDIA model version
+                },
             )
         )
 
-        # Parse the JSON string returned by the AI
         content = response.choices[0].message.content.strip()
 
-        # Sometimes LLMs wrap JSON in markdown blocks (```json ... ```). Strip them if present.
         if content.startswith("```json"):
             content = content[7:-3]
 
@@ -408,7 +605,6 @@ async def _refine_job_description_with_ai(raw_description: str) -> Dict[str, Any
         logger.error(
             f"AI description refinement & categorization failed: {e}. Falling back to raw text."
         )
-        # Fallback dictionary if the AI fails
         return {
             "refined_description": raw_description,
             "categories": [
@@ -419,6 +615,15 @@ async def _refine_job_description_with_ai(raw_description: str) -> Dict[str, Any
                 }
             ],
         }
+
+
+async def _broadcast_customer_bid(booking_chat_id: int, bid_payload: dict):
+    """Send a SYSTEM_BID notification to the customer's WebSocket connection."""
+    from src.core.manager import manager
+    try:
+        await manager.send_customer_notification(booking_chat_id, bid_payload)
+    except Exception as ws_err:
+        logger.warning(f"Failed SYSTEM_BID broadcast to booking {booking_chat_id}: {ws_err}")
 
 
 @router.post(
@@ -440,7 +645,6 @@ async def complete_customer_chat(
 
     chat_session = _get_own_session(booking_chat_id, db, current_user)
 
-    # 1. Get the raw text from the frontend submission
     raw_job_desc = payload.edited_description.strip()
     if not raw_job_desc:
         raw_job_desc = f"{payload.title}: {payload.contact_name or ''}".strip()
@@ -451,13 +655,9 @@ async def complete_customer_chat(
             detail="Cannot process summary. The AI chat session is not complete yet. Please provide a job description.",
         )
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 2. CONDITIONAL AI REFINEMENT & CATEGORY EXTRACTION
-    # ══════════════════════════════════════════════════════════════════════════
     original_ai_desc = (chat_session.problem_description or "").strip()
     existing_categories = getattr(chat_session, "categories", [])
 
-    # Check if manual entry (no original desc), edited text, OR missing categories
     if (
         not original_ai_desc
         or raw_job_desc != original_ai_desc
@@ -469,10 +669,6 @@ async def complete_customer_chat(
 
         ai_data = await _refine_job_description_with_ai(raw_job_desc)
         final_job_desc = ai_data.get("refined_description", raw_job_desc)
-
-        # If the chat already had categories (but text was edited), you can choose to keep them
-        # or overwrite them with the new AI-generated ones. Overwriting is usually safer
-        # if the customer completely changed the job requirement.
         final_categories = ai_data.get("categories", [])
 
         if not final_categories and existing_categories:
@@ -484,16 +680,14 @@ async def complete_customer_chat(
         )
         final_job_desc = raw_job_desc
         final_categories = existing_categories
-    # ══════════════════════════════════════════════════════════════════════════
 
-    # 3. Use the final description for vectorization and saving
     embedding_vector = await _fetch_nvidia_embedding(final_job_desc)
     address_text = await _get_address_from_coords(lat, lng)
 
     customer_fields = {
         "is_complete": getattr(chat_session, "is_complete", False),
         "is_job_request": getattr(chat_session, "is_job_request", False),
-        "categories": final_categories,  # <-- USING THE NEW EXTRACTED CATEGORIES
+        "categories": final_categories,
         "problem_description": final_job_desc,
     }
 
@@ -502,7 +696,7 @@ async def complete_customer_chat(
         "description": final_job_desc,
         "status": payload.status,
         "is_job_request": getattr(chat_session, "is_job_request", True),
-        "categories": final_categories,  # <-- USING THE NEW EXTRACTED CATEGORIES
+        "categories": final_categories,
         "contact_name": payload.contact_name,
         "contact_phone": payload.contact_phone,
         "mode": payload.mode,
@@ -547,24 +741,15 @@ async def complete_customer_chat(
         )
 
     job_payload = {
-        "booking_chat_id": booking_chat_id,
-        "title": payload.title,
-        "description": final_job_desc,
+        "type": "NEW_JOB_NOTIFICATION",
+        "data": {
+            "booking_chat_id": booking_chat_id,
+            "title": payload.title,
+            "description": final_job_desc,
+        }
     }
 
     if worker_chat_ids := matching_result.get("worker_chat_ids", []):
-        background_tasks.add_task(
-            _broadcast_notifications, worker_chat_ids, job_payload
-        )
-
-    return {
-        "status": "success",
-        "message": f"Job registered. Established {matching_result.get('count', 0)} matches successfully.",
-    }
-
-    # Broadcast asynchronously without blocking the main event loop
-    worker_chat_ids = matching_result.get("worker_chat_ids", [])
-    if worker_chat_ids:
         background_tasks.add_task(
             _broadcast_notifications, worker_chat_ids, job_payload
         )
@@ -620,9 +805,6 @@ def find_help(
             model.WorkerProfile.id == model.JobWorkerMatch.worker_id,
         )
         .join(model.User, model.User.id == model.WorkerProfile.user_id)
-        # OUTER: matched_skill_id is nullable (SET NULL on skill removal, and rows
-        # written before multi-vector matching have none), so an inner join would
-        # silently drop otherwise-valid matches.
         .outerjoin(
             model.WorkerSkill,
             model.WorkerSkill.id == model.JobWorkerMatch.matched_skill_id,
@@ -649,13 +831,11 @@ def find_help(
             "category_tag": worker.category_tag,
             "job_description": worker.job_description,
             "match_score": match.match_score,
-            # The specific capability that surfaced this worker — a plumber can be
-            # here for their general plumbing baseline or for a tested speciality,
-            # and the customer should be able to tell which.
             "matched_skill": skill.title if skill is not None else None,
             "matched_skill_description": (
                 skill.description if skill is not None else None
             ),
+            "is_interested": match.is_interested,
         }
         for match, worker, username, skill in matches
     ]
@@ -682,7 +862,6 @@ def validate_vectors(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    # 1. Fetch the job request data exactly like your find_help route
     job_data = db.execute(
         select(model.Job).where(
             model.Job.booking_chat_id == booking_chat_id,
@@ -695,10 +874,6 @@ def validate_vectors(
             status_code=400, detail="Invalid job data or missing vector."
         )
 
-    # 2. Grab a wider pool of workers (limit=50) to evaluate the model distribution.
-    #    This mirrors matching_manager._search_workers deliberately: it scores each
-    #    worker on their single closest SKILL vector, not on the abandoned blended
-    #    profile vector, so the chart reflects what matching actually does.
     distance = model.WorkerSkill.embedding.cosine_distance(job_data.description_vector)
 
     best_skill = (
@@ -738,13 +913,11 @@ def validate_vectors(
             status_code=404, detail="No regional workers found to validate against."
         )
 
-    # 3. Extract the math data points
     raw_distances = []
     calculated_scores = []
 
     for worker, dist in results:
         raw_distances.append(dist)
-        # FIXED: Changed 'distance' to 'dist', and removed trailing comma
         score = max(
             0.0,
             min(
@@ -753,10 +926,8 @@ def validate_vectors(
         )
         calculated_scores.append(score)
 
-    # 4. Generate the graph purely in memory
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    # Graph A: Score vs Distance Curve Validation
     ax1.scatter(
         raw_distances,
         calculated_scores,
@@ -766,7 +937,6 @@ def validate_vectors(
         s=60,
         label="Worker Matches",
     )
-    # UPDATED: Moved line to 0.90 to match new formula
     ax1.axvline(
         x=0.90, color="red", linestyle="--", label="Inflection Threshold (0.90)"
     )
@@ -777,7 +947,6 @@ def validate_vectors(
     ax1.grid(True, alpha=0.3)
     ax1.legend()
 
-    # Graph B: Score Density Spread
     sns.kdeplot(calculated_scores, fill=True, color="teal", ax=ax2, bw_adjust=0.5)
     ax2.set_title("Distribution Spectrum of Match Scores")
     ax2.set_xlabel("Match Score Output")
@@ -791,7 +960,6 @@ def validate_vectors(
     )
     plt.tight_layout()
 
-    # 5. Stream the chart binary image directly to your browser
     buf = io.BytesIO()
     plt.savefig(buf, format="png", bbox_inches="tight")
     plt.close(fig)

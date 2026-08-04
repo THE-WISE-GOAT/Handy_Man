@@ -309,10 +309,12 @@ async def _broadcast_live_alerts(worker_chat_id: int, matched_jobs: list[dict]) 
             await manager.send_worker_notification(
                 worker_chat_id,
                 {
-                    "event": "new_job_match",
-                    "booking_chat_id": booking_chat_id,
-                    "title": job.get("title"),
-                    "description": job.get("description"),
+                    "type": "NEW_JOB_NOTIFICATION",
+                    "data": {
+                        "booking_chat_id": booking_chat_id,
+                        "title": job.get("title"),
+                        "description": job.get("description"),
+                    }
                 },
             )
         except Exception as exc:
@@ -322,9 +324,11 @@ async def _broadcast_live_alerts(worker_chat_id: int, matched_jobs: list[dict]) 
             await manager.send_customer_notification(
                 booking_chat_id,
                 {
-                    "event": "new_worker_match",
-                    "message": "A new worker matching your job requirements just joined the platform.",
-                    "worker_chat_id": worker_chat_id,
+                    "type": "NEW_WORKER_MATCH",
+                    "data": {
+                        "message": "A new worker matching your job requirements just joined the platform.",
+                        "worker_chat_id": worker_chat_id,
+                    }
                 },
             )
         except Exception as exc:
