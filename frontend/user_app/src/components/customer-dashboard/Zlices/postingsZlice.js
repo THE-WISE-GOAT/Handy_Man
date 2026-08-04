@@ -1,7 +1,6 @@
+import { apiClient } from "@shared/api/client";
+
 export const createPostingsZlice = (set, get) => ({
-  // ==========================================
-  // 1. DYNAMIC LAYOUT POSITIONS (4-Slot Map)
-  // ==========================================
   postingsSlots: {
     main: "ActiveBiddingsEngine",
     sidebar: "GeospatialLiveMap",
@@ -23,9 +22,6 @@ export const createPostingsZlice = (set, get) => ({
       };
     }),
 
-  // ==========================================
-  // 2. BUSINESS CONTENT DATA & SELECTOR STATE
-  // ==========================================
   pendingJobs: [],
   selectedJob: null,
   selectedWorkerId: null,
@@ -37,32 +33,19 @@ export const createPostingsZlice = (set, get) => ({
   pipelineStatus: "Post Network Pipeline Monitor Active",
 
   customerSocket: null,
+  chatSocket: null,
+  chatMessages: [],
+  chatBookingChatId: null,
+  isChatConnected: false,
 
-  // ==========================================
-  // 3. ACTIONS AND INTEGRATION PIPELINES
-  // ==========================================
   fetchPendingJobs: async () => {
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch(
-        "http://127.0.0.1:8000/jobs/status/pending",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-
-      const data = await response.json();
+      const data = await apiClient.get("/jobs/status/pending");
 
       if (data.status === "success") {
         const jobs = data.tasks || [];
-
-        // Flatten nested backend location parameters safely
-        const mappedJobs = jobs.map((job) => {
+        
+        const mappedJobs = jobs.map(job => {
           const lat = job.latitude ?? job.location?.latitude;
           const lng = job.longitude ?? job.location?.longitude;
           return {
@@ -70,14 +53,13 @@ export const createPostingsZlice = (set, get) => ({
             id: job.booking_chat_id,
             latitude: lat,
             longitude: lng,
-            matchedCount: job.matchedCount || 0,
-            interestedCount: job.interestedCount || 0,
+            matchedCount: job.matched_count || 0,
+            interestedCount: job.interested_count || 0
           };
         });
 
         set({ pendingJobs: mappedJobs });
-
-        // Ensure active selections automatically receive fresh data values
+        
         const currentSelected = get().selectedJob;
         if (mappedJobs.length > 0) {
           const matchingActiveJob = currentSelected
@@ -98,21 +80,27 @@ export const createPostingsZlice = (set, get) => ({
   fetchJobBids: async (jobId) => {
     if (!jobId) return;
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      // Updated endpoint path to match worker_router.py prefix
-      const response = await fetch(
-        `http://127.0.0.1:8000/workers/jobs/${jobId}/bids`,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const data = await apiClient.get(`/workers/jobs/${jobId}/bids`);
 
-      if (!response.ok) throw new Error("Failed to fetch existing bids");
-
-      const data = await response.json();
       if (data.status === "success") {
-        set({ biddingsStream: data.bids || [] });
+        const rawBids = data.bids || [];
+        const normalizedBids = rawBids.map((bid, idx) => {
+          const workerId = bid.worker_chat_id || bid.worker_id;
+          const bidAmount = bid.bid_amount || bid.offer || bid.amount || 0;
+          return {
+            id: bid.id || crypto.randomUUID(),
+            worker_chat_id: workerId,
+            worker_name: bid.worker_name || bid.provider || `Worker ${workerId}`,
+            provider: bid.worker_name || bid.provider || `Worker ${workerId}`,
+            bid_amount: bidAmount,
+            amount: bidAmount,
+            offer: bidAmount,
+            message: bid.message || bid.proposal_text || bid.bid_message || "",
+            status: bid.status || "Received",
+            created_at: bid.created_at,
+          };
+        });
+        set({ biddingsStream: normalizedBids });
       }
     } catch (error) {
       console.error(`❌ Failed to fetch bids for Job ${jobId}:`, error);
@@ -141,20 +129,8 @@ export const createPostingsZlice = (set, get) => ({
     if (!workerChatIds || workerChatIds.length === 0) return;
 
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/workers/locations", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ worker_chat_ids: workerChatIds }),
-      });
-
-      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-
-      const data = await response.json();
-
+      const data = await apiClient.post("/workers/locations", { worker_chat_ids: workerChatIds });
+      
       if (data.status === "success") {
         const locationsMap = { ...get().workerLocations };
         data.locations.forEach((loc) => {
@@ -190,26 +166,7 @@ export const createPostingsZlice = (set, get) => ({
     if (!jobId) return;
 
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch(
-        `http://127.0.0.1:8000/dispatch/match/${jobId}/find-help`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      if (!response.ok) {
-        get().updateJobMetrics(jobId, { matchedCount: 0 });
-        set((state) => ({
-          matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] },
-        }));
-        return;
-      }
-
-      const data = await response.json();
+      const data = await apiClient.get(`/dispatch/match/${jobId}/find-help`);
       const workers = data.workers || [];
 
       get().updateJobMetrics(jobId, {
@@ -230,10 +187,11 @@ export const createPostingsZlice = (set, get) => ({
         get().fetchWorkerLocations(workerIds);
       }
     } catch (error) {
-      console.error(
-        `❌ Failed to fetch matched workers for Job ${jobId}:`,
-        error,
-      );
+      console.error(`❌ Failed to fetch matched workers for Job ${jobId}:`, error);
+      get().updateJobMetrics(jobId, { matchedCount: 0 });
+      set((state) => ({
+        matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] }
+      }));
     }
   },
 
@@ -243,6 +201,10 @@ export const createPostingsZlice = (set, get) => ({
     set({ selectedJob: job, selectedWorkerId: null });
     if (job && job.id) {
       get().fetchJobBids(job.id);
+      if (job.booking_chat_id) {
+        const token = localStorage.getItem("handy_man_access_token");
+        get().connectCustomerDispatch(job.booking_chat_id, token);
+      }
     }
   },
 
@@ -295,15 +257,147 @@ export const createPostingsZlice = (set, get) => ({
 
       if (message.type === "NEW_BID") {
         const { job_id, bid } = message.data;
-        set((state) => ({
-          biddingsStream: [
-            ...state.biddingsStream,
-            { ...bid, id: crypto.randomUUID(), status: "Incoming" },
-          ],
-        }));
+        set((state) => {
+          const newBid = { ...bid, id: crypto.randomUUID(), status: "Incoming" };
+          const workerName = bid.worker_name || `Worker ${bid.worker_chat_id}`;
+          const bidAmount = bid.bid_amount || bid.amount || 0;
+          const newState = {
+            biddingsStream: [...state.biddingsStream, newBid]
+          };
+          return newState;
+        });
+        get().appendMessage(
+          "system",
+          `${bid.worker_name || "Worker"} bids Rs ${bid.bid_amount || bid.amount || 0}`,
+          "BID SYSTEM"
+        );
       }
     };
 
     set({ customerSocket: socket });
   },
+
+  appendMessage: (sender, text, senderName = "You") =>
+    set((state) => ({
+      chatMessages: [
+        ...state.chatMessages,
+        { id: crypto.randomUUID(), sender, senderName, text }
+      ]
+    })),
+
+  connectCustomerChat: async (bookingChatId) => {
+    get().disconnectCustomerChat();
+    const token = localStorage.getItem("handy_man_access_token");
+    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
+    const socket = new WebSocket(
+      `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`
+    );
+
+    socket.onopen = () => {
+      set({ isChatConnected: true, chatBookingChatId: bookingChatId });
+    };
+
+    socket.onerror = (err) =>
+      console.error("❌ Customer chat WebSocket error:", err);
+
+    socket.onclose = () =>
+      set({ isChatConnected: false, chatBookingChatId: null });
+
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === "HUMAN_MESSAGE") {
+        const { sender, sender_name, message: msgContent } = message.data;
+        set((state) => ({
+          chatMessages: [
+            ...state.chatMessages,
+            { id: crypto.randomUUID(), sender, senderName: sender_name, text: msgContent }
+          ]
+        }));
+      }
+
+      if (message.type === "SYSTEM_BID") {
+        const { bid_amount, worker_chat_id, worker_name } = message.data;
+        const bidAmount = bid_amount || 0;
+        const workerName = worker_name || `Worker ${worker_chat_id}`;
+        
+        set((state) => ({
+          chatMessages: [
+            ...state.chatMessages,
+            {
+              id: crypto.randomUUID(),
+              sender: "system",
+              senderName: "BID SYSTEM",
+              text: `${workerName} placed a bid: Rs ${bidAmount}`
+            }
+          ]
+        }));
+
+        set((state) => ({
+          biddingsStream: [
+            ...state.biddingsStream,
+            {
+              id: crypto.randomUUID(),
+              worker_chat_id,
+              worker_name: workerName,
+              provider: workerName,
+              bid_amount: bidAmount,
+              amount: bidAmount,
+              offer: bidAmount,
+              message: message.data.bid_message || "",
+              status: "Incoming"
+            }
+          ]
+        }));
+      }
+    };
+
+    set({ chatSocket: socket });
+  },
+
+  disconnectCustomerChat: () => {
+    const { chatSocket } = get();
+    if (chatSocket) {
+      chatSocket.close();
+      set({ chatSocket: null, isChatConnected: false, chatBookingChatId: null, chatMessages: [] });
+    }
+  },
+
+  sendHumanMessage: async (bookingChatId, sender, text) => {
+    try {
+      const data = await apiClient.post(
+        `/dispatch/chat/${bookingChatId}/message`,
+        { sender, message: text }
+      );
+      return data;
+    } catch (error) {
+      console.error("❌ Failed to send human message:", error);
+      throw error;
+    }
+  },
+
+  fetchChatHistory: async (bookingChatId) => {
+      try {
+        const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
+        const history = data.history || [];
+        const sanitizedHistory = history.filter((msg) => {
+          if (msg.role !== "system") return true;
+          if (msg.role === "system" && msg.content && msg.content.length < 200) return true;
+          return false;
+        });
+        const messages = sanitizedHistory
+          .map((msg) => ({
+            id: crypto.randomUUID(),
+            sender: msg.role,
+            senderName: msg.sender_name || (msg.role === "customer" ? "Customer" : msg.role === "worker" ? "Worker" : "BID SYSTEM"),
+            text: msg.content,
+          }));
+        set({ chatMessages: messages });
+      } catch (error) {
+        if (error.status === 500) {
+          console.error("❌ Chat history fetch failed (server error), skipping retry:", error.message);
+        } else {
+          console.error("❌ Failed to fetch chat history:", error);
+        }
+      }
+    },
 });

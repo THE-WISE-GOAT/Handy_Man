@@ -27,9 +27,6 @@
   min-width: 0;
 }
 
-/* These two previously faked a split with `margin-right: 50%` / `margin-left: 50%`,
-   which ignores the grid gap and overlaps at narrow widths. Using real columns
-   in the same grid row keeps the identical visual result. */
 .grid-bottom-left {
   grid-column: 1;
   grid-row: 2;
@@ -82,7 +79,7 @@
   font-weight: 500;
   color: var(--fixfast-ink-3, #9A9A9A);
   margin-bottom: 12px;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
@@ -155,7 +152,6 @@
   margin: 8px 0 0;
 }
 
-/* Also consumed by dash3board.jsx, which has no calendar styles of its own. */
 .calendar-box {
   margin-top: 16px;
   padding: 20px;
@@ -167,4 +163,42 @@
 .light .calendar-box {
   border-color: rgba(13, 13, 13, 0.2);
   background: #F4F5F7;
+}
+
+.chat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  padding-bottom: 10px;
+  border-radius: 8px;
+  background: var(--k-raise);
+  max-height: 400px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.chat-msg {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  max-width: 80%;
+  word-break: break-word;
+}
+
+.chat-msg--customer {
+  align-self: flex-end;
+  background: var(--k-orange-ink);
+  color: #0D0D0D;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-msg--worker {
+  align-self: flex-start;
+  background: var(--k-wash);
+  color: var(--k-ink);
+  border-bottom-left-radius: 2px;
 }
