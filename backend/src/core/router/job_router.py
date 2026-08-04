@@ -384,3 +384,107 @@ async def place_bid_on_job(
         "bid_message": match.bid_message,
         "booking_chat_id": job.booking_chat_id if job else None,
     }
+
+
+@router.post("/{job_id}/book", summary="Accept selected bid(s) and assign worker to job")
+async def book_job(
+    job_id: int,
+    payload: dict,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    selected_bid_ids = payload.get("selected_bid_ids", [])
+    if not selected_bid_ids:
+        raise HTTPException(status_code=400, detail="No workers selected for booking.")
+
+    job = db.execute(
+        select(model.Job).where(model.Job.id == job_id)
+    ).scalar_one_or_none()
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    if job.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the customer who created the job can book a worker.")
+
+    selected_matches = db.execute(
+        select(model.JobWorkerMatch).where(
+            model.JobWorkerMatch.id.in_(selected_bid_ids),
+            model.JobWorkerMatch.job_id == job_id,
+        )
+    ).scalars().all()
+
+    if not selected_matches:
+        raise HTTPException(status_code=404, detail="No valid bids found for the selected IDs.")
+
+    primary_match = selected_matches[0]
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(model.WorkerProfile.id == primary_match.worker_id)
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        raise HTTPException(status_code=404, detail="Worker profile not found for the selected bid.")
+
+    job.worker_id = worker_profile.user_id
+    job.status = "assigned"
+
+    for match in selected_matches:
+        match.is_selected = True
+        match.is_active = True
+
+    other_matches = db.execute(
+        select(model.JobWorkerMatch).where(
+            model.JobWorkerMatch.job_id == job_id,
+            model.JobWorkerMatch.id.notin_(selected_bid_ids),
+        )
+    ).scalars().all()
+
+    for match in other_matches:
+        match.is_rejected = True
+        match.is_active = False
+
+    db.commit()
+    db.refresh(job)
+
+    if job.booking_chat_id:
+        worker_name = f"{getattr(current_user, 'firstName', None) or ''} {getattr(current_user, 'lastName', None) or ''}".strip() or current_user.username
+        booking_chat = db.execute(
+            select(model.BookingChat).where(model.BookingChat.id == job.booking_chat_id)
+        ).scalar_one_or_none()
+
+        if booking_chat:
+            history = list(booking_chat.history)
+            history.append({
+                "role": "system",
+                "content": f"Worker assigned: {worker_profile.user_id} selected for Rs {primary_match.bid_amount or 0}",
+                "sender_name": "BID SYSTEM",
+            })
+            booking_chat.history = history
+            db.commit()
+            db.refresh(booking_chat)
+
+        bid_payload = {
+            "type": "SYSTEM_BID",
+            "data": {
+                "job_id": job_id,
+                "bid_amount": float(primary_match.bid_amount) if primary_match.bid_amount else 0,
+                "worker_chat_id": worker_profile.worker_chat_id,
+                "worker_name": worker_name,
+                "bid_message": primary_match.bid_message or "",
+                "booking_chat_id": job.booking_chat_id,
+            },
+        }
+        background_tasks.add_task(
+            _broadcast_customer_bid,
+            job.booking_chat_id,
+            bid_payload,
+        )
+
+    return {
+        "status": "success",
+        "message": "Worker assigned to job successfully.",
+        "job_id": job_id,
+        "worker_id": job.worker_id,
+        "job_status": job.status,
+    }

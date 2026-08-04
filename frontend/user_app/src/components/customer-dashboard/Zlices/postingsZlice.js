@@ -50,7 +50,6 @@ export const createPostingsZlice = (set, get) => ({
           const lng = job.longitude ?? job.location?.longitude;
           return {
             ...job,
-            id: job.booking_chat_id,
             latitude: lat,
             longitude: lng,
             matchedCount: job.matched_count || 0,
