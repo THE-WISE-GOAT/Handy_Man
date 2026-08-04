@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerDashboardData } from './useCustomerDashboardData';
+import { apiClient } from '@shared/api/client';
 import './dash2board.css';
 
 // 1. IMPORT LEAFLET
@@ -1065,15 +1066,17 @@ export default function Dash2Board({ viewSlug }) {
   const handleProceedToPayment = async () => {
     setShowBookingModal(false);
     try {
-      const token = localStorage.getItem("handy_man_access_token");
-      await fetch(`http://127.0.0.1:8000/jobs/${selectedJob.id}/book`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ selected_bid_ids: selectedBidIds }),
+      const data = await apiClient.post(`/jobs/${selectedJob.id}/book`, {
+        selected_bid_ids: selectedBidIds,
       });
+
+      if (data.status === "success") {
+        useCustomerDashboardData.getState().updateJobMetrics(selectedJob.id, {
+          worker_id: data.worker_id,
+          status: data.job_status || "assigned",
+        });
+        useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
+      }
     } catch (error) {
       console.error("Failed to book worker(s):", error);
     }
