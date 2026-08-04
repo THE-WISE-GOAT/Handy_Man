@@ -8,6 +8,24 @@ export default function Dash1Worker({ viewSlug }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const getCurrentUserId = () => {
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      if (!token) return null;
+      const base64Payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64Payload)
+          .split("")
+          .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+          .join("")
+      );
+      return JSON.parse(jsonPayload).user_id;
+    } catch {
+      return null;
+    }
+  };
+  const currentUserId = getCurrentUserId();
+
   const {
     workspaceSlots,
     swapWorkspaceSlots,
@@ -322,21 +340,22 @@ export default function Dash1Worker({ viewSlug }) {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (job.status === 'assigned' || job.worker_id === currentUserId) return;
                         expressInterest(job.job_id, workerChatId);
                       }}
                       style={{
                         padding: '6px 14px',
-                        backgroundColor: job.is_interested ? '#FF6B1A' : 'transparent',
-                        color: job.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)',
-                        border: job.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)',
+                        backgroundColor: (job.status === 'assigned' || job.worker_id === currentUserId) ? '#22c55e' : (job.is_interested ? '#FF6B1A' : 'transparent'),
+                        color: (job.status === 'assigned' || job.worker_id === currentUserId) ? '#0D0D0D' : (job.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)'),
+                        border: (job.status === 'assigned' || job.worker_id === currentUserId) ? '1px solid #22c55e' : (job.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)'),
                         borderRadius: '6px',
-                        cursor: job.is_interested ? 'default' : 'pointer',
+                        cursor: (job.status === 'assigned' || job.worker_id === currentUserId) ? 'default' : (job.is_interested ? 'default' : 'pointer'),
                         fontWeight: 600,
                         fontSize: '13px'
                       }}
-                      disabled={job.is_interested}
+                      disabled={job.status === 'assigned' || job.worker_id === currentUserId || job.is_interested}
                     >
-                      {job.is_interested ? 'Interested ✓' : "I'm Interested"}
+                      {(job.status === 'assigned' || job.worker_id === currentUserId) ? 'Assigned ✓' : (job.is_interested ? 'Interested ✓' : "I'm Interested")}
                     </button>
                   </div>
                 ))}
