@@ -297,6 +297,16 @@ class WorkerSkill(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
     )
 
+
+    certificate: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    license: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    misc: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+
+    is_license: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_certificate: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_training: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
     worker: Mapped["WorkerProfile"] = relationship(
         "WorkerProfile",
         back_populates="skills",
