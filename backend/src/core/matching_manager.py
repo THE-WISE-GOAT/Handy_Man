@@ -1,8 +1,9 @@
 import os
+import re
 import json
 import math
 import logging
-from typing import Any
+from typing import Any, Optional
 from openai import OpenAI
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -16,15 +17,17 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-SCORE_THRESHOLD = 70
-
-# --- LLM reranker config ---
-_nvidia_client = OpenAI(
-    base_url="https://integrate.api.nvidia.com/v1",
-    api_key=os.environ.get("NVIDIA_API_KEY"),
-)
+SCORE_THRESHOLD = 70.0
 RERANK_MODEL = "meta/llama-3.1-8b-instruct"
 MAX_CANDIDATES_FOR_RERANK = 25
+
+
+def _get_nvidia_client() -> OpenAI:
+    """Lazy initializer for OpenAI client using Nvidia endpoint."""
+    return OpenAI(
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=os.environ.get("NVIDIA_API_KEY"),
+    )
 
 
 def _ensure_geography(location: Any):
@@ -32,10 +35,7 @@ def _ensure_geography(location: Any):
     Safely normalizes dictionaries, Pydantic objects, or GeoAlchemy elements 
     into a valid PostGIS Geography Point with guaranteed (Longitude, Latitude) order.
     """
-    if location is None:
-        return None
-
-    if isinstance(location, WKBElement):
+    if location is None or isinstance(location, WKBElement):
         return location
 
     lat, lon = None, None
@@ -47,10 +47,15 @@ def _ensure_geography(location: Any):
         lon = location.get("longitude") or location.get("lng") or location.get("lon")
 
     if lat is not None and lon is not None:
-        return func.ST_SetSRID(
-            func.ST_MakePoint(float(lon), float(lat)), 
-            4326
-        ).cast(Geography)
+        try:
+            # PostGIS ST_MakePoint explicitly requires (Longitude, Latitude) -> (X, Y)
+            return func.ST_SetSRID(
+                func.ST_MakePoint(float(lon), float(lat)), 
+                4326
+            ).cast(Geography)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to cast location coordinates (lat={lat}, lon={lon}): {e}")
+            return None
 
     return location
 
@@ -58,9 +63,36 @@ def _ensure_geography(location: Any):
 def calculate_match_score(distance: float) -> float:
     """The system's single source of truth scoring mechanism (Sigmoid)."""
     try:
-        return max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2)))
+        return max(0.0, min(100.0, round((1.0 / (1.0 + math.exp(15.0 * (distance - 0.87)))) * 100.0, 2)))
     except Exception:
         return 0.0
+
+
+def _extract_json_array(raw_text: str) -> list[Any]:
+    """Robustly extracts a JSON array from LLM responses using standard parsing and regex fallback."""
+    cleaned_text = raw_text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+
+    # Attempt 1: Standard JSON parse
+    try:
+        data = json.loads(cleaned_text)
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return next((v for v in data.values() if isinstance(v, list)), [])
+    except json.JSONDecodeError:
+        pass
+
+    # Attempt 2: Regex search for embedded JSON array
+    match = re.search(r"\[\s*.*?\s*\]", raw_text, re.DOTALL)
+    if match:
+        try:
+            data = json.loads(match.group(0))
+            if isinstance(data, list):
+                return data
+        except json.JSONDecodeError:
+            pass
+
+    return []
 
 
 def _search_workers(
@@ -68,6 +100,7 @@ def _search_workers(
     query_vector: list[float],
     customer_location: Any,
     radius_meters: int,
+    job_category: Optional[str] = None,
 ) -> list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]:
     distance_expr = model.WorkerSkill.embedding.cosine_distance(query_vector)
     spatial_point = _ensure_geography(customer_location)
@@ -89,6 +122,14 @@ def _search_workers(
             model.WorkerProfile.is_rejected.is_(False),
         )
     )
+
+    # Dynamic category pre-filtering with escaped ILIKE wildcards
+    if job_category:
+        safe_category = job_category.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(
+            (model.WorkerProfile.category_tag.ilike(f"%{safe_category}%")) |
+            (model.WorkerProfile.job_category.ilike(f"%{safe_category}%"))
+        )
 
     if spatial_point is not None:
         stmt = stmt.where(func.ST_DWithin(model.WorkerProfile.location, spatial_point, radius_meters))
@@ -131,14 +172,13 @@ def _build_candidate_summary(match: MatchDetail) -> dict:
 
 def _llm_rerank_matches(
     job_description: str,
-    job_category: str | None,
+    job_category: Optional[str],
     rich_matches: list[MatchDetail],
 ) -> list[MatchDetail]:
     if not rich_matches:
         return rich_matches
 
     candidates = rich_matches[:MAX_CANDIDATES_FOR_RERANK]
-    leftover = rich_matches[MAX_CANDIDATES_FOR_RERANK:]
     candidate_payload = [_build_candidate_summary(m) for m in candidates]
 
     prompt = (
@@ -152,23 +192,20 @@ def _llm_rerank_matches(
     )
 
     try:
-        response = _nvidia_client.chat.completions.create(
+        client = _get_nvidia_client()
+        response = client.chat.completions.create(
             model=RERANK_MODEL,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
-        raw_text = (response.choices[0].message.content or "").strip()
-        raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        raw_text = response.choices[0].message.content or ""
+        parsed_ids = _extract_json_array(raw_text)
 
-        parsed_ids = json.loads(raw_text)
-        if isinstance(parsed_ids, dict):
-            parsed_ids = next((v for v in parsed_ids.values() if isinstance(v, list)), [])
-
-        ordered_ids = [int(x) for x in parsed_ids if isinstance(x, (int, str)) and str(x).isdigit()] if isinstance(parsed_ids, list) else []
+        ordered_ids = [int(x) for x in parsed_ids if isinstance(x, (int, str)) and str(x).isdigit()]
 
     except Exception as e:
         logger.error(f"LLM reranker exception, using vector fallback: {e}")
-        return rich_matches
+        return candidates
 
     by_worker_id = {int(m["worker_profile"].id): m for m in candidates}
     reranked: list[MatchDetail] = []
@@ -182,10 +219,7 @@ def _llm_rerank_matches(
         reranked.append(match)
         seen_ids.add(worker_id)
 
-    for i, match in enumerate(leftover, start=len(reranked) + 1):
-        match["rank"] = i
-
-    return reranked + leftover
+    return reranked
 
 
 def _build_job_candidate_summary(job: model.Job, skill: model.WorkerSkill, score: float, rank: int) -> dict:
@@ -202,7 +236,7 @@ def _build_job_candidate_summary(job: model.Job, skill: model.WorkerSkill, score
 
 
 def _llm_rerank_jobs_for_worker(
-    worker_profile: model.WorkerProfile | None,
+    worker_profile: Optional[model.WorkerProfile],
     worker_skills: list[model.WorkerSkill],
     candidate_jobs: list[dict],
 ) -> list[dict]:
@@ -210,7 +244,6 @@ def _llm_rerank_jobs_for_worker(
         return candidate_jobs
 
     candidates = candidate_jobs[:MAX_CANDIDATES_FOR_RERANK]
-    leftover = candidate_jobs[MAX_CANDIDATES_FOR_RERANK:]
 
     worker_summary = {
         "job_category": getattr(worker_profile, "job_category", "Unknown"),
@@ -235,23 +268,20 @@ def _llm_rerank_jobs_for_worker(
     )
 
     try:
-        response = _nvidia_client.chat.completions.create(
+        client = _get_nvidia_client()
+        response = client.chat.completions.create(
             model=RERANK_MODEL,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
-        raw_text = (response.choices[0].message.content or "").strip()
-        raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        raw_text = response.choices[0].message.content or ""
+        parsed_ids = _extract_json_array(raw_text)
 
-        parsed_ids = json.loads(raw_text)
-        if isinstance(parsed_ids, dict):
-            parsed_ids = next((v for v in parsed_ids.values() if isinstance(v, list)), [])
-
-        ordered_ids = [int(x) for x in parsed_ids if isinstance(x, (int, str)) and str(x).isdigit()] if isinstance(parsed_ids, list) else []
+        ordered_ids = [int(x) for x in parsed_ids if isinstance(x, (int, str)) and str(x).isdigit()]
 
     except Exception as e:
         logger.error(f"LLM worker reranker exception, using vector fallback: {e}")
-        return candidate_jobs
+        return candidates
 
     by_job_id = {int(m["job"].id): m for m in candidates}
     reranked: list[dict] = []
@@ -265,10 +295,7 @@ def _llm_rerank_jobs_for_worker(
         reranked.append(match)
         seen_ids.add(job_id)
 
-    for i, match in enumerate(leftover, start=len(reranked) + 1):
-        match["rank"] = i
-
-    return reranked + leftover
+    return reranked
 
 
 def create_matches_for_job(
@@ -278,32 +305,30 @@ def create_matches_for_job(
     customer_location: Any,
     radius_meters: int,
     job_description: str,
-    job_category: str | None = None,
+    job_category: Optional[str] = None,
 ) -> MatchingResult:
-    """
-    Creates/Updates matches for a customer job without destroying user interaction state.
-    """
-    search_results = _search_workers(db, query_vector, customer_location, radius_meters)
+    """Creates/Updates matches for a customer job without destroying user interaction state."""
+    search_results = _search_workers(db, query_vector, customer_location, radius_meters, job_category)
     search_results = _deduplicate_by_user(search_results)
 
     rich_matches: list[MatchDetail] = []
-    distance_by_worker_id: dict[int, float] = {}
     vector_rank = 1
 
     for worker, user, skill, distance in search_results:
-        score = calculate_match_score(float(distance))
+        dist_val = float(distance)
+        score = calculate_match_score(dist_val)
         if score > SCORE_THRESHOLD:
             rich_matches.append({
                 "worker_profile": worker,
                 "user": user,
                 "score": score,
                 "rank": vector_rank,
+                "distance": dist_val,
                 "worker_chat_id": getattr(worker, "worker_chat_id", None),
                 "matched_skill_id": skill.id,
                 "matched_skill_title": skill.title,
                 "matched_skill_description": skill.description,
             })
-            distance_by_worker_id[worker.id] = float(distance)
             vector_rank += 1
 
     rich_matches = _llm_rerank_matches(job_description, job_category, rich_matches)
@@ -326,7 +351,7 @@ def create_matches_for_job(
             match_row.matched_skill_id = match.get("matched_skill_id")
             match_row.match_score = match["score"]
             match_row.match_rank = match["rank"]
-            match_row.semantic_distance = distance_by_worker_id[worker.id]
+            match_row.semantic_distance = match["distance"]
             match_row.is_active = True
         else:
             # Create new record
@@ -336,7 +361,7 @@ def create_matches_for_job(
                 matched_skill_id=match.get("matched_skill_id"),
                 match_score=match["score"],
                 match_rank=match["rank"],
-                semantic_distance=distance_by_worker_id[worker.id],
+                semantic_distance=match["distance"],
                 is_active=True,
                 is_interested=False,
                 is_selected=False,
@@ -347,7 +372,7 @@ def create_matches_for_job(
         if match.get("worker_chat_id"):
             notifiable_worker_chat_ids.append(match["worker_chat_id"])
 
-    # Deactivate matches that are no longer valid, but keep record for historical integrity
+    # Deactivate matches that are no longer valid, keeping records for historical integrity
     for w_id, old_match in existing_matches.items():
         if w_id not in matched_worker_ids:
             old_match.is_active = False
@@ -367,7 +392,6 @@ def create_matches_for_worker(
     worker_location: Any,
     radius_meters: int = 60_000,
 ) -> WorkerMatchingResult:
-    
     worker_profile = db.query(model.WorkerProfile).filter(model.WorkerProfile.id == worker_id).first()
     worker_skills = db.query(model.WorkerSkill).filter(
         model.WorkerSkill.worker_id == worker_id,
@@ -380,7 +404,6 @@ def create_matches_for_worker(
     distance_expr = model.Job.description_vector.cosine_distance(model.WorkerSkill.embedding)
     spatial_point = _ensure_geography(worker_location or getattr(worker_profile, "location", None))
 
-    # ✅ FIXED SQL QUERY: Explicit cross-select between Job and WorkerSkill
     stmt = (
         select(
             model.Job,
@@ -414,12 +437,13 @@ def create_matches_for_worker(
             continue
         seen_job_ids.add(job.id)
 
-        score = calculate_match_score(float(distance))
+        dist_val = float(distance)
+        score = calculate_match_score(dist_val)
         if score > SCORE_THRESHOLD:
             candidate_jobs.append({
                 "job": job,
                 "skill": skill,
-                "distance": float(distance),
+                "distance": dist_val,
                 "score": score,
                 "rank": vector_rank,
             })
