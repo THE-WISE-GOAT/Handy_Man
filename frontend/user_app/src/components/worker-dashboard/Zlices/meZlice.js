@@ -38,6 +38,11 @@ export const createMeZlice = (set, get) => ({
   latitude: null,
   longitude: null,
 
+  // ATTACHMENT STATES
+  certificateAttachments: [],
+  licenseAttachments: [],
+  miscAttachments: [],
+
   extractedProfile: null,
   isSubmittingApplication: false,
   applicationSubmitted: false,
@@ -127,6 +132,10 @@ export const createMeZlice = (set, get) => ({
   setLatitude: (val) => set({ latitude: val }),
   setLongitude: (val) => set({ longitude: val }),
 
+  setCertificateAttachments: (val) => set({ certificateAttachments: val }),
+  setLicenseAttachments: (val) => set({ licenseAttachments: val }),
+  setMiscAttachments: (val) => set({ miscAttachments: val }),
+
   setAiResponse: (val) => set({ aiResponse: val }),
   setIsAiGenerating: (val) => set({ isAiGenerating: val }),
   setIsChatComplete: (val) => set({ isChatComplete: val }),
@@ -163,7 +172,6 @@ export const createMeZlice = (set, get) => ({
   // SKILLS & CATEGORY ENDPOINTS
   // ====================================================
 
-  // GET /{worker_chat_id}/skills
   fetchWorkerSkills: async () => {
     const { workerChatId } = get();
     if (!workerChatId) return;
@@ -184,14 +192,12 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // POST /{worker_chat_id}/add-skill
   startAddSkill: async () => {
     const { workerChatId, meSlots } = get();
     if (!workerChatId) return;
     try {
       set({ isAiGenerating: true, isAddingSkill: true });
 
-      // Bring interview panel to main slot if not already
       if (meSlots.main !== "MeInterview") {
         const slots = { ...meSlots };
         const slotKeyWithInterview = Object.keys(slots).find(
@@ -235,13 +241,10 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // PLACEHOLDER: Add New Category Button (Backend not implemented yet)
   startAddCategory: () => {
     console.log("Add new category clicked: Placeholder action.");
-    // Unmanaged in backend currently, left intentionally empty.
   },
 
-  // CANCEL SESSION: Exits specialty interview chat and restores main UI view
   cancelAddSession: () => {
     set({
       isAddingSkill: false,
@@ -309,7 +312,6 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  // ROUTER: Checks isAddingSkill to choose appropriate chat endpoint
   sendWorkerMessage: async (userMessage) => {
     const { workerChatId, addChatMessage, isAddingSkill } = get();
 
@@ -325,7 +327,6 @@ export const createMeZlice = (set, get) => ({
       const token = localStorage.getItem("handy_man_access_token");
 
       if (isAddingSkill) {
-        // ENDPOINT: POST /{worker_chat_id}/add-skill/chat
         const response = await fetch(
           `http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill/chat`,
           {
@@ -368,7 +369,6 @@ export const createMeZlice = (set, get) => ({
           set({ isAddingSkill: false });
         }
       } else {
-        // ENDPOINT: POST /worker-interview/chat (Initial category interview)
         const response = await fetch(
           "http://127.0.0.1:8000/worker-interview/chat",
           {
@@ -469,8 +469,15 @@ export const createMeZlice = (set, get) => ({
   },
 
   submitApplication: async () => {
-    const { workerChatId, phoneNumber, addressText, latitude, longitude } =
-      get();
+    const {
+      workerChatId,
+      phoneNumber,
+      latitude,
+      longitude,
+      certificateAttachments,
+      licenseAttachments,
+      miscAttachments,
+    } = get();
 
     if (!workerChatId) {
       console.error("No worker_chat_id found.");
@@ -495,6 +502,9 @@ export const createMeZlice = (set, get) => ({
               longitude: parseFloat(longitude) || 0.0,
               latitude: parseFloat(latitude) || 0.0,
             },
+            certificate_attachments: certificateAttachments,
+            license_attachments: licenseAttachments,
+            misc_attachments: miscAttachments,
           }),
         },
       );
@@ -669,6 +679,8 @@ export const createMeZlice = (set, get) => ({
               has_verified_specialty: data.has_verified_specialty || false,
               scenario_passed: data.scenario_passed || false,
               scenario_score: data.scenario_score || 0,
+              is_license: data.is_license || false,
+              is_certificate: data.is_certificate || false,
             },
             editableProfile: {
               job_category: data.job_category || "",
