@@ -24,6 +24,14 @@ export default function Dash3Worker({ viewSlug }) {
     isSubmittingApplication,
     applicationSubmitted,
 
+    // Attachment state
+    certificateAttachments,
+    licenseAttachments,
+    miscAttachments,
+    setCertificateAttachments,
+    setLicenseAttachments,
+    setMiscAttachments,
+
     // Chat state
     chatMessages,
     aiResponse,
@@ -356,6 +364,26 @@ export default function Dash3Worker({ viewSlug }) {
   };
 
   // ====================================================
+  // ATTACHMENT UPLOAD HANDLER
+  // ====================================================
+  const handleFileUpload = (e, attachmentSetter, currentAttachments) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    const newFiles = files.map((file) => ({
+      name: file.name,
+      url: URL.createObjectURL(file),
+    }));
+
+    attachmentSetter([...currentAttachments, ...newFiles]);
+  };
+
+  const removeAttachment = (index, attachmentSetter, currentAttachments) => {
+    const updated = currentAttachments.filter((_, i) => i !== index);
+    attachmentSetter(updated);
+  };
+
+  // ====================================================
   // RENDER: AI Chat Terminal / Post-Application Sketch UI
   // ====================================================
   const renderChatTerminal = ({ isActive }) => {
@@ -382,7 +410,6 @@ export default function Dash3Worker({ viewSlug }) {
       );
     }
 
-    // STATE 1: ACTIVE SPECIALTY / ADD-SKILL CHAT SESSION
     if (isAddingSkill) {
       return (
         <div className="dashboard-card slot-main">
@@ -463,7 +490,6 @@ export default function Dash3Worker({ viewSlug }) {
       );
     }
 
-    // STATE 2: POST-APPLICATION SUBMITTED VIEW (THE SKETCH DESIGN)
     if (
       applicationSubmitted ||
       applicantStage === "pending_admin_review" ||
@@ -500,7 +526,6 @@ export default function Dash3Worker({ viewSlug }) {
               padding: "16px",
             }}
           >
-            {/* INNER CONTAINER (MATCHING SKETCH) */}
             <div
               style={{
                 border: "1px solid var(--ind-border, rgba(255,255,255,0.15))",
@@ -582,7 +607,6 @@ export default function Dash3Worker({ viewSlug }) {
               </div>
             </div>
 
-            {/* LOWER BUTTON (MATCHING SKETCH) */}
             <div>
               <button
                 type="button"
@@ -611,7 +635,6 @@ export default function Dash3Worker({ viewSlug }) {
       );
     }
 
-    // STATE 3: INITIAL ONBOARDING INTERVIEW (Before initial application is submitted)
     const hasActiveChat =
       chatMessages.length > 1 || isChatComplete || isAiGenerating;
 
@@ -711,6 +734,19 @@ export default function Dash3Worker({ viewSlug }) {
       );
     }
 
+    const isLicenseRequired = Boolean(extractedProfile?.is_license);
+    const isCertificateRequired = Boolean(extractedProfile?.is_certificate);
+
+    const isLicenseValid = !isLicenseRequired || licenseAttachments.length > 0;
+    const isCertificateValid =
+      !isCertificateRequired || certificateAttachments.length > 0;
+
+    const canSubmit =
+      isChatComplete !== false &&
+      isLicenseValid &&
+      isCertificateValid &&
+      !isSubmittingApplication;
+
     return (
       <div className="dashboard-card slot-main">
         <div className="card-header">••• EXTRACTION & SUBMISSION</div>
@@ -756,9 +792,17 @@ export default function Dash3Worker({ viewSlug }) {
                   </span>
                 </div>
                 <div className="extracted-row">
-                  <span className="extracted-label">License:</span>
+                  <span className="extracted-label">License Flag:</span>
                   <span className="extracted-value">
-                    {extractedProfile.license_or_certification || "—"}
+                    {isLicenseRequired ? "Yes (Required)" : "No (Optional)"}
+                  </span>
+                </div>
+                <div className="extracted-row">
+                  <span className="extracted-label">Certificate Flag:</span>
+                  <span className="extracted-value">
+                    {isCertificateRequired
+                      ? "Yes (Required)"
+                      : "No (Optional)"}
                   </span>
                 </div>
               </div>
@@ -769,6 +813,134 @@ export default function Dash3Worker({ viewSlug }) {
                   : "Profile data will appear here as the AI interview progresses."}
               </p>
             )}
+          </div>
+
+          <div className="location-panel">
+            <h3>Document Attachments</h3>
+            <div className="attachment-group">
+              {/* LICENSE UPLOAD FIELD */}
+              <div className="attachment-field">
+                <label className="attachment-label">
+                  License Pictures
+                  {isLicenseRequired ? (
+                    <span className="required-asterisk"> *Required</span>
+                  ) : (
+                    <span className="optional-tag"> (Optional)</span>
+                  )}
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  multiple
+                  onChange={(e) =>
+                    handleFileUpload(e, setLicenseAttachments, licenseAttachments)
+                  }
+                  className="file-input"
+                />
+                <div className="file-list">
+                  {licenseAttachments.map((file, i) => (
+                    <div key={i} className="file-chip">
+                      <span>📄 {file.name}</span>
+                      <button
+                        type="button"
+                        className="file-remove-btn"
+                        onClick={() =>
+                          removeAttachment(
+                            i,
+                            setLicenseAttachments,
+                            licenseAttachments,
+                          )
+                        }
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* CERTIFICATE UPLOAD FIELD */}
+              <div className="attachment-field">
+                <label className="attachment-label">
+                  Certificate Pictures
+                  {isCertificateRequired ? (
+                    <span className="required-asterisk"> *Required</span>
+                  ) : (
+                    <span className="optional-tag"> (Optional)</span>
+                  )}
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  multiple
+                  onChange={(e) =>
+                    handleFileUpload(
+                      e,
+                      setCertificateAttachments,
+                      certificateAttachments,
+                    )
+                  }
+                  className="file-input"
+                />
+                <div className="file-list">
+                  {certificateAttachments.map((file, i) => (
+                    <div key={i} className="file-chip">
+                      <span>📄 {file.name}</span>
+                      <button
+                        type="button"
+                        className="file-remove-btn"
+                        onClick={() =>
+                          removeAttachment(
+                            i,
+                            setCertificateAttachments,
+                            certificateAttachments,
+                          )
+                        }
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* MISC ATTACHMENTS FIELD */}
+              <div className="attachment-field">
+                <label className="attachment-label">
+                  Any Other Relevant Attachments
+                  <span className="optional-tag"> (Optional)</span>
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  multiple
+                  onChange={(e) =>
+                    handleFileUpload(e, setMiscAttachments, miscAttachments)
+                  }
+                  className="file-input"
+                />
+                <div className="file-list">
+                  {miscAttachments.map((file, i) => (
+                    <div key={i} className="file-chip">
+                      <span>📄 {file.name}</span>
+                      <button
+                        type="button"
+                        className="file-remove-btn"
+                        onClick={() =>
+                          removeAttachment(
+                            i,
+                            setMiscAttachments,
+                            miscAttachments,
+                          )
+                        }
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="location-panel">
@@ -808,7 +980,7 @@ export default function Dash3Worker({ viewSlug }) {
               type="button"
               className="submit-app-btn"
               onClick={handleSubmitApplication}
-              disabled={isSubmittingApplication || isChatComplete === false}
+              disabled={!canSubmit}
             >
               {isSubmittingApplication ? "Submitting..." : "Send Application"}
             </button>
@@ -865,7 +1037,6 @@ export default function Dash3Worker({ viewSlug }) {
       <div className="dashboard-card slot-main">
         <div className="card-header">••• WORKER PROFILE</div>
         <div className="main-panel profile-editor">
-          {/* ========== BASE USER INFO (EDITABLE) ========== */}
           <div className="profile-section">
             <div className="profile-section-header">
               <h3>Personal Information</h3>
@@ -990,7 +1161,11 @@ export default function Dash3Worker({ viewSlug }) {
                   </button>
                   {userInfoSaveMessage && (
                     <span
-                      className={`profile-save-message ${userInfoSaveMessage.includes("Failed") ? "profile-save-message--error" : "profile-save-message--success"}`}
+                      className={`profile-save-message ${
+                        userInfoSaveMessage.includes("Failed")
+                          ? "profile-save-message--error"
+                          : "profile-save-message--success"
+                      }`}
                     >
                       {userInfoSaveMessage}
                     </span>
@@ -1000,7 +1175,6 @@ export default function Dash3Worker({ viewSlug }) {
             )}
           </div>
 
-          {/* ========== SKILLS & SPECIALITIES SECTION ========== */}
           <div className="profile-section profile-section--worker">
             <div className="profile-section-header">
               <h3>Verified Skills & Specialties</h3>
@@ -1068,7 +1242,6 @@ export default function Dash3Worker({ viewSlug }) {
             </div>
           </div>
 
-          {/* ========== WORKER SPECIFIC DETAILS (READ-ONLY) ========== */}
           <div className="profile-section profile-section--worker">
             <div className="profile-section-header">
               <h3>Worker Details</h3>
