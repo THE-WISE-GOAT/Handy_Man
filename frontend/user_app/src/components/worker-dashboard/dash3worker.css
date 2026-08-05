@@ -1013,3 +1013,97 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   10. ATTACHMENT UPLOAD STYLES
+   ========================================================================== */
+.attachment-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.4rem;
+}
+
+.attachment-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.attachment-label {
+  font-family: var(--fixfast-mono, ui-monospace, monospace);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fixfast-ink-3, #9A9A9A);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.required-asterisk {
+  color: #FF4D4D;
+  font-weight: 700;
+}
+
+.optional-tag {
+  color: var(--fixfast-ink-3, #9A9A9A);
+  font-size: 0.6rem;
+  text-transform: none;
+}
+
+.file-input {
+  border: var(--fixfast-border-strong, 1px solid rgba(245, 245, 247, 0.42));
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.78rem;
+  background: rgba(13, 13, 13, 0.4);
+  color: #FFFFFF;
+  cursor: pointer;
+}
+
+.file-input::file-selector-button {
+  background: #FF6B1A;
+  color: #0D0D0D;
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  font-weight: 700;
+  font-size: 0.72rem;
+  cursor: pointer;
+  margin-right: 0.5rem;
+}
+
+.file-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 107, 26, 0.12);
+  border: 1px solid rgba(255, 107, 26, 0.3);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  color: #F5F5F7;
+}
+
+.file-remove-btn {
+  background: transparent;
+  border: none;
+  color: #FF8A8E;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0;
+  line-height: 1;
+}
+
+.file-remove-btn:hover {
+  color: #FF4D4D;
+}
