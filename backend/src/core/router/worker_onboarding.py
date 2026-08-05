@@ -161,7 +161,6 @@ async def submit_worker_application(
         profile.longitude = payload.longitude
         profile.location = f"POINT({payload.longitude} {payload.latitude})"
 
-    # Fetch latest valid profile session directly utilizing sorting
     stmt = (
         select(model.WorkerInterviewSession)
         .where(
@@ -173,8 +172,47 @@ async def submit_worker_application(
 
     session = db.execute(stmt).scalars().first()
 
+    profile_data = session.profile if (session and session.profile) else {}
     if session and session.profile:
         sync_profile_extracted_fields(profile, session.profile)
+
+    # Determine attachment requirement flags
+    is_cert = bool(profile_data.get("is_certificate"))
+    is_lic = bool(profile_data.get("is_license"))
+    is_train = bool(profile_data.get("is_training"))
+
+    loc_str = str(profile_data.get("license_or_certification") or "").lower()
+    if not is_cert and "certif" in loc_str:
+        is_cert = True
+    if not is_lic and ("licens" in loc_str or "licenc" in loc_str):
+        is_lic = True
+
+    existing_baseline = db.execute(
+        select(model.WorkerSkill).where(
+            model.WorkerSkill.worker_id == profile.id,
+            model.WorkerSkill.skill_type == model.SkillType.BASELINE,
+        )
+    ).scalar_one_or_none()
+
+    if existing_baseline:
+        if existing_baseline.is_certificate:
+            is_cert = True
+        if existing_baseline.is_license:
+            is_lic = True
+        if existing_baseline.is_training:
+            is_train = True
+
+    # Validate mandatory attachments against requirement flags
+    if is_cert and not payload.certificate:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one certificate attachment is required.",
+        )
+    if is_lic and not payload.license:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one license attachment is required.",
+        )
 
     if profile.job_description:
         try:
@@ -186,12 +224,18 @@ async def submit_worker_application(
             embedding_vec = None
 
         primary_title = profile.job_category or "General Skill"
-        # This path has only the composed job_description to work with (it never
-        # ran the two-layer split), so it becomes the baseline. upsert_baseline_skill
-        # updates in place, so re-submitting cannot create a second baseline, and a
-        # failed embedding leaves any existing good vector alone.
         upsert_baseline_skill(
-            db, profile.id, primary_title, profile.job_description, embedding_vec
+            db,
+            profile.id,
+            primary_title,
+            profile.job_description,
+            embedding_vec,
+            certificate=payload.certificate,
+            license=payload.license,
+            misc=payload.misc,
+            is_certificate=is_cert,
+            is_license=is_lic,
+            is_training=is_train,
         )
 
     try:
@@ -358,9 +402,11 @@ def reject_worker_application(
         select(model.WorkerProfile).where(model.WorkerProfile.id == skill.worker_id)
     )
     if profile:
-        profile.stage = "rejected"
-        profile.is_rejected = True
-        profile.rejection_reason = payload.reason
+        # Only mark overall profile as rejected if rejecting the baseline skill
+        if skill.skill_type == model.SkillType.BASELINE:
+            profile.stage = "rejected"
+            profile.is_rejected = True
+            profile.rejection_reason = payload.reason
 
     db.commit()
     if profile:
