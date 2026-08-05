@@ -61,6 +61,9 @@ class SubmitWorkerAppIn(BaseModel):
     address_text: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+    certificate: List[Dict[str, Any]] = Field(default_factory=list)
+    license: List[Dict[str, Any]] = Field(default_factory=list)
+    misc: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class SubmitWorkerAppOut(BaseModel):
@@ -434,21 +437,29 @@ class FindHelpOut(BaseModel):
 class WorkerCompleteChatIn(BaseModel):
     location: LocationCoordinates
     phone_number: Optional[str] = None
+    certificate: List[Dict[str, Any]] = Field(default_factory=list)
+    license: List[Dict[str, Any]] = Field(default_factory=list)
+    misc: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 # ── Add-skill flow (already-verified worker adds another speciality) ──────────
 
 
 class WorkerSkillOut(BaseModel):
-    """One independently matchable capability of a worker."""
-
     id: int
-    skill_type: str  # "baseline" | "speciality"
+    skill_type: str
     title: str
     description: str
     scenario_score: Optional[int] = None
     is_active: bool
-    has_vector: bool  # False means it is stored but not yet matchable
+    has_vector: bool
+    stage: str
+    certificate: List[Dict[str, Any]] = Field(default_factory=list)
+    license: List[Dict[str, Any]] = Field(default_factory=list)
+    misc: List[Dict[str, Any]] = Field(default_factory=list)
+    is_license: bool = False
+    is_certificate: bool = False
+    is_training: bool = False
 
     class Config:
         from_attributes = True
