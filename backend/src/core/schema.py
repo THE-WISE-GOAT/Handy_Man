@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, TypedDict
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -23,6 +23,7 @@ class CompleteChatIn(BaseModel):
     mode: str = "regular"
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
     phone_number: Optional[str] = None
+    scheduled_date: Optional[date] = None
 
 
 class CreateJobIn(BaseModel):
@@ -37,6 +38,7 @@ class CreateJobIn(BaseModel):
     mode: str = "regular"
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
     phone_number: Optional[str] = None
+    scheduled_date: Optional[date] = None
 
 
 class InitializeWorkerAppIn(BaseModel):

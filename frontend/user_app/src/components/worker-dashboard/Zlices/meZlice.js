@@ -470,7 +470,7 @@ export const createMeZlice = (set, get) => ({
         applicationSubmitted: true,
       });
 
-      await get().loadApplicantStatus(true);
+      await get().loadApplicantStatus();
     } catch (error) {
       console.error("Failed to complete application process:", error);
     } finally {
@@ -578,11 +578,7 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  _statusCheckInProgress: false,
-  _statusChecked: false,
-  loadApplicantStatus: async (force = false) => {
-    if (!force && (get()._statusCheckInProgress || get()._statusChecked)) return;
-    set({ _statusCheckInProgress: true });
+  loadApplicantStatus: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
@@ -608,7 +604,8 @@ export const createMeZlice = (set, get) => ({
         });
 
         if (data.worker_chat_id) {
-          get().fetchWorkerInterviewHistory(data.worker_chat_id);
+          get().fetchChatHistory(data.worker_chat_id);
+          get().fetchWorkerSkills();
         }
 
         if (
@@ -649,12 +646,10 @@ export const createMeZlice = (set, get) => ({
       }
     } catch (error) {
       console.error("Failed to load applicant status:", error);
-    } finally {
-      set({ _statusCheckInProgress: false, _statusChecked: true });
     }
   },
 
-  fetchWorkerInterviewHistory: async (workerChatId) => {
+  fetchChatHistory: async (workerChatId) => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(

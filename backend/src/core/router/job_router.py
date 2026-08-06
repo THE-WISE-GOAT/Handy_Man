@@ -92,6 +92,7 @@ async def create_job_direct_endpoint(
         "contact_name": payload.contact_name,
         "contact_phone": payload.contact_phone,
         "mode": payload.mode,
+        "scheduled_date": payload.scheduled_date,
         "attachments": payload.attachments,
         "latitude": lat,
         "longitude": lng,
