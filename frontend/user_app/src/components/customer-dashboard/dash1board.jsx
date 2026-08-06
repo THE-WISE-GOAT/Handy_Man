@@ -6,6 +6,7 @@ import "./dash1board.css";
 export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
   const fileInputRef = useRef(null);
 
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -323,7 +324,7 @@ export default function Dash1Board({ viewSlug }) {
   };
 
   const handleCreateJobFinalize = async () => {
-    await createJob();
+    await createJob({ scheduled_date: scheduledDate || null });
     fetchBookingsPendingJobs();
   };
 
@@ -867,51 +868,112 @@ export default function Dash1Board({ viewSlug }) {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => console.log("🚨 Emergency toggle triggered")}
-              className="title"
-              dir="rtl"
-              name="emergency"
-            >
-              EmERGENcY ToGGLE
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCreateJobFinalize}
-              disabled={isSubmitting}
-              className="title"
-              dir="rtl"
-              name="post"
+            <div
               style={{
-                background: "#FF6B1A",
-                color: "#0D0D0D",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 18px",
-                fontWeight: "bold",
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-                fontSize: "13px",
-                transition: "transform 120ms ease, opacity 120ms ease",
-                opacity: isSubmitting ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) => {
-                if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = 1;
-              }}
-              onMouseDown={(e) => {
-                if (!isSubmitting)
-                  e.currentTarget.style.transform = "scale(0.95)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: "12px",
               }}
             >
-              {isSubmitting ? "Posting..." : "<- Post Job"}
-            </button>
+              <button
+                type="button"
+                onClick={() => console.log("🚨 Emergency toggle triggered")}
+                className="title"
+                dir="rtl"
+                name="emergency"
+              >
+                EmERGENcY ToGGLE
+              </button>
+
+              <div
+                style={{
+                  position: "relative",
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                <button
+                  type="button"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 14px",
+                    background: "var(--k-raise, #1a1a1a)",
+                    color: "#ffffff",
+                    border: "1px solid var(--k-line, #333)",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    transition: "opacity 120ms ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = 0.85;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = 1;
+                  }}
+                >
+                  📅 {scheduledDate ? scheduledDate : "Select Date"}
+                </button>
+                <input
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    padding: 0,
+                    margin: 0,
+                    opacity: 0,
+                    cursor: "pointer",
+                    border: "none",
+                    background: "transparent",
+                  }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCreateJobFinalize}
+                disabled={isSubmitting}
+                className="title"
+                dir="rtl"
+                name="post"
+                style={{
+                  background: "#FF6B1A",
+                  color: "#0D0D0D",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "10px 18px",
+                  fontWeight: "bold",
+                  cursor: isSubmitting ? "not-allowed" : "pointer",
+                  fontSize: "13px",
+                  transition: "transform 120ms ease, opacity 120ms ease",
+                  opacity: isSubmitting ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = 1;
+                }}
+                onMouseDown={(e) => {
+                  if (!isSubmitting)
+                    e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                {isSubmitting ? "Posting..." : "<- Post Job"}
+              </button>
+            </div>
           </div>
         </div>
       );

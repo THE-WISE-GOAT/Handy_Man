@@ -145,7 +145,7 @@ export const createBookingsZlice = (set, get) => ({
     }
   },
 
-  createJob: async () => {
+  createJob: async (overrides = {}) => {
     const {
       booking_chat_id,
       jobTitleDraft,
@@ -177,7 +177,8 @@ export const createBookingsZlice = (set, get) => ({
         contact_phone: userCont || "",
         status: "pending",
         mode: "regular",
-        attachments: attachments || []
+        attachments: attachments || [],
+        scheduled_date: overrides.scheduled_date || null,
       });
 
       if (data.status === "success") {

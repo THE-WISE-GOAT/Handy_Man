@@ -32,7 +32,6 @@ export const createPostingsZlice = (set, get) => ({
   feedbackRating: "Verified Feedback - 5.0 Star Average",
   pipelineStatus: "Post Network Pipeline Monitor Active",
 
-  customerSocket: null,
   chatSocket: null,
   chatMessages: [],
   chatBookingChatId: null,
@@ -165,7 +164,9 @@ export const createPostingsZlice = (set, get) => ({
     if (!jobId) return;
 
     try {
-      const data = await apiClient.get(`/dispatch/match/${jobId}/find-help`);
+      const job = get().pendingJobs.find((j) => j.id === jobId);
+      const bookingChatId = job?.booking_chat_id || jobId;
+      const data = await apiClient.get(`/dispatch/match/${bookingChatId}/find-help`);
       const workers = data.workers || [];
 
       get().updateJobMetrics(jobId, {
@@ -200,80 +201,8 @@ export const createPostingsZlice = (set, get) => ({
     set({ selectedJob: job, selectedWorkerId: null });
     if (job && job.id) {
       get().fetchJobBids(job.id);
-      if (job.booking_chat_id) {
-        const token = localStorage.getItem("handy_man_access_token");
-        get().connectCustomerDispatch(job.booking_chat_id, token);
-      }
+      get().fetchMatchedWorkersForJob(job.id);
     }
-  },
-
-  disconnectCustomerDispatch: () => {
-    const { customerSocket } = get();
-    if (customerSocket) {
-      customerSocket.close();
-      set({ customerSocket: null });
-    }
-  },
-
-  connectCustomerDispatch: (bookingChatId, token) => {
-    get().disconnectCustomerDispatch();
-
-    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
-    const socket = new WebSocket(
-      `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`,
-    );
-
-    socket.onopen = () => console.log("🟢 Live Dispatch WebSocket Connected");
-    socket.onerror = (err) =>
-      console.error("❌ Live Dispatch WebSocket Error:", err);
-    socket.onclose = () =>
-      console.log("🔴 Live Dispatch WebSocket Disconnected");
-
-    socket.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-
-      if (message.type === "WORKER_INTEREST_UPDATE") {
-        const { job_id, worker_chat_id, interested } = message.data;
-        set((state) => ({
-          pendingJobs: state.pendingJobs.map((job) =>
-            job.id === job_id
-              ? {
-                  ...job,
-                  interestedCount:
-                    (job.interestedCount || 0) + (interested ? 1 : -1),
-                }
-              : job,
-          ),
-          workerLocations: {
-            ...state.workerLocations,
-            [worker_chat_id]: {
-              ...state.workerLocations[worker_chat_id],
-              is_interested: interested,
-            },
-          },
-        }));
-      }
-
-      if (message.type === "NEW_BID") {
-        const { job_id, bid } = message.data;
-        set((state) => {
-          const newBid = { ...bid, id: crypto.randomUUID(), status: "Incoming" };
-          const workerName = bid.worker_name || `Worker ${bid.worker_chat_id}`;
-          const bidAmount = bid.bid_amount || bid.amount || 0;
-          const newState = {
-            biddingsStream: [...state.biddingsStream, newBid]
-          };
-          return newState;
-        });
-        get().appendMessage(
-          "system",
-          `${bid.worker_name || "Worker"} bids Rs ${bid.bid_amount || bid.amount || 0}`,
-          "BID SYSTEM"
-        );
-      }
-    };
-
-    set({ customerSocket: socket });
   },
 
   appendMessage: (sender, text, senderName = "You") =>
