@@ -101,20 +101,20 @@ export default function Dash2Board({ viewSlug }) {
   const [showRatingsModal, setShowRatingsModal] = useState(false);
   const [selectedWorkersForReview, setSelectedWorkersForReview] = useState([]);
 
-   const {
-     postingsSlots,
-     swapPostingsSlots,
-     biddingsStream,
-     pendingJobs,
-     selectedJob,
-     setSelectedJob,
-     fetchPendingJobs,
-     chatMessages,
-     connectCustomerChat,
-     sendHumanMessage,
-     appendMessage,
-     disconnectCustomerChat,
-     matchedWorkersMap,
+  const {
+    postingsSlots,
+    swapPostingsSlots,
+    biddingsStream,
+    pendingJobs,
+    selectedJob,
+    setSelectedJob,
+    fetchPendingJobs,
+    chatMessages,
+    connectCustomerChat,
+    sendHumanMessage,
+    appendMessage,
+    disconnectCustomerChat,
+    matchedWorkersMap,
     workerLocations,          
     toggleWorkerInterest,     
     selectedWorkerId,
@@ -141,40 +141,40 @@ export default function Dash2Board({ viewSlug }) {
     }
   }, [selectedWorkerId]);
 
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-      return () => clearTimeout(timer);
-    }, [chatMessages, viewAllBids]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [chatMessages, viewAllBids]);
 
-    useEffect(() => {
-      if (selectedJob && selectedJob.booking_chat_id) {
-        useCustomerDashboardData.getState().connectCustomerChat(selectedJob.booking_chat_id);
-        useCustomerDashboardData.getState().fetchChatHistory(selectedJob.booking_chat_id);
-      }
-    }, [selectedJob]);
+  useEffect(() => {
+    if (selectedJob && selectedJob.booking_chat_id) {
+      useCustomerDashboardData.getState().connectCustomerChat(selectedJob.booking_chat_id);
+      useCustomerDashboardData.getState().fetchChatHistory(selectedJob.booking_chat_id);
+    }
+  }, [selectedJob]);
 
-    // ── Fetch historical bids for the selected job on mount and when selectedJob changes ──
-    useEffect(() => {
-      if (selectedJob && selectedJob.id) {
-        useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
-      } else {
-        useCustomerDashboardData.getState().fetchPendingJobs();
-      }
-    }, [selectedJob]);
+  // ── Fetch historical bids for the selected job on mount and when selectedJob changes ──
+  useEffect(() => {
+    if (selectedJob && selectedJob.id) {
+      useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
+    } else {
+      useCustomerDashboardData.getState().fetchPendingJobs();
+    }
+  }, [selectedJob]);
 
-    useEffect(() => {
-      if (!viewSlug) return;
-      if (postingsSlots.main !== viewSlug) {
-        const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
-        if (targetSlot) swapPostingsSlots(targetSlot);
-      }
-    }, [viewSlug, postingsSlots, swapPostingsSlots]);
+  useEffect(() => {
+    if (!viewSlug) return;
+    if (postingsSlots.main !== viewSlug) {
+      const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
+      if (targetSlot) swapPostingsSlots(targetSlot);
+    }
+  }, [viewSlug, postingsSlots, swapPostingsSlots]);
 
-    useEffect(() => {
-      return () => useCustomerDashboardData.getState().disconnectCustomerChat();
-    }, []);
+  useEffect(() => {
+    return () => useCustomerDashboardData.getState().disconnectCustomerChat();
+  }, []);
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/customer/postings/${targetSlug}`);
@@ -357,7 +357,7 @@ export default function Dash2Board({ viewSlug }) {
                       </span>
                     </div>
 
-                    {/* Middle links - static text, no handlers for now */}
+                    {/* Middle links */}
                     <div style={{ display: "flex", gap: "16px", fontSize: "12px" }}>
                       <span style={{ color: "#FF6B1A", textDecoration: "underline", cursor: "not-allowed" }}>
                         Ratings &amp; Reviews
@@ -439,21 +439,16 @@ export default function Dash2Board({ viewSlug }) {
 
     return (
       <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position} onSelect={handleModuleSelect}>
-        {position === "sidebar" ? (
-          <>
-            <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
-            <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
-            <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
-          </>
-        ) : (
-          <span className="badge">Footer Slot: Bids for {selectedJob?.title || "N/A"}</span>
-        )}
+        <div className="preview-panel">
+          <span className="badge badge-highlight">Slot: Bids Incoming Feed</span>
+          <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
+          <p className="card-summary">Offers: {biddingsStream.length}</p>
+        </div>
       </Card>
     );
   };
 
   const renderLiveMap = (position) => {
-    // 🛠️ ARCHITECTURAL FIX: Consumes seamlessly flattened store coordinates safely
     const centerPoint =
       selectedJob && selectedJob.latitude && selectedJob.longitude
         ? [parseFloat(selectedJob.latitude), parseFloat(selectedJob.longitude)]
@@ -533,16 +528,16 @@ export default function Dash2Board({ viewSlug }) {
                   </Marker>
                 )}
 
-                {/* 2. Worker Location Markers */}
-                 {currentWorkers.map((worker, index) => {
-                   const locInfo = workerLocations[worker.worker_chat_id];
-                   if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
-                   
-                   const workerPos = [locInfo.latitude, locInfo.longitude];
-                   const rank = index + 1;
-                   const isTopThree = rank <= 3;
-                   const isInterested = worker.is_interested || locInfo.is_interested;
-                   const iconToUse = isTopThree ? goldenWorkerIcon : (isInterested ? blinkingWorkerIcon : staticWorkerIcon);
+                {/* Worker Location Markers */}
+                {currentWorkers.map((worker, index) => {
+                  const locInfo = workerLocations[worker.worker_chat_id];
+                  if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
+                  
+                  const workerPos = [locInfo.latitude, locInfo.longitude];
+                  const rank = index + 1;
+                  const isTopThree = rank <= 3;
+                  const isInterested = worker.is_interested || locInfo.is_interested;
+                  const iconToUse = isTopThree ? goldenWorkerIcon : (isInterested ? blinkingWorkerIcon : staticWorkerIcon);
 
                   return (
                     <Marker
@@ -588,22 +583,13 @@ export default function Dash2Board({ viewSlug }) {
           </div>
         ) : (
           <div className="preview-panel">
-            {position === "sidebar" ? (
-              <>
-                <span className="badge badge-highlight">
-                  Sidebar: GPS Map Node Tracker
-                </span>
-                <p className="card-summary">
-                  Lat: {selectedJob?.latitude || "N/A"} | Lng:{" "}
-                  {selectedJob?.longitude || "N/A"}
-                </p>
-                <p className="card-summary">
-                  Workers Rendered: {currentWorkers.length}
-                </p>
-              </>
-            ) : (
-              <span className="badge">Footer Slot: Map Tracking Active</span>
-            )}
+            <span className="badge badge-highlight">Slot: GPS Map Node Tracker</span>
+            <p className="card-summary">
+              Lat: {selectedJob?.latitude || "N/A"} | Lng: {selectedJob?.longitude || "N/A"}
+            </p>
+            <p className="card-summary">
+              Workers Rendered: {currentWorkers.length}
+            </p>
           </div>
         )}
       </Card>
@@ -814,23 +800,13 @@ export default function Dash2Board({ viewSlug }) {
           </div>
         ) : (
           <div className="preview-panel">
-            {position === "sidebar" ? (
-              <>
-                <span className="badge badge-highlight">
-                  Sidebar: Network Discovery
-                </span>
-                <p className="card-summary">
-                  Scanning: {selectedJob?.title || "N/A"}
-                </p>
-                <p className="card-summary">
-                  Available Matches: {currentWorkers.length}
-                </p>
-              </>
-            ) : (
-              <span className="badge">
-                Footer Slot: Matches for {selectedJob?.title || "N/A"}
-              </span>
-            )}
+            <span className="badge badge-highlight">Slot: Network Discovery</span>
+            <p className="card-summary">
+              Scanning: {selectedJob?.title || "N/A"}
+            </p>
+            <p className="card-summary">
+              Matches: {currentWorkers.length}
+            </p>
           </div>
         )}
       </Card>
@@ -960,31 +936,31 @@ export default function Dash2Board({ viewSlug }) {
                       </div>
                     </div>
 
-                      <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
-                      <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedJob(job);
-                            navigate('/customer/postings/ActiveBiddingsEngine');
-                          }}
-                          style={{
-                            padding: '8px 20px',
-                            background: '#FF6B1A',
-                            color: '#0D0D0D',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                          }}
-                        >
-                          Chat
-                        </button>
-                      </div>
+                    <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
+                    <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedJob(job);
+                          navigate('/customer/postings/ActiveBiddingsEngine');
+                        }}
+                        style={{
+                          padding: '8px 20px',
+                          background: '#FF6B1A',
+                          color: '#0D0D0D',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                        }}
+                      >
+                        Chat
+                      </button>
                     </div>
+                  </div>
                 );
               })
             )}
@@ -992,29 +968,19 @@ export default function Dash2Board({ viewSlug }) {
         </div>
       ) : (
         <div className="preview-panel">
-          {position === "sidebar" ? (
-            <>
-              <span className="badge badge-highlight">
-                Sidebar: Pipeline Stream
-              </span>
-              <p className="card-summary">
-                Selected: {selectedJob?.title || "None"}
-              </p>
-              <p className="card-summary">
-                Total Pending: {pendingJobs.length}
-              </p>
-            </>
-          ) : (
-            <span className="badge">
-              Footer Slot: Active Job ({selectedJob?.title || "None"})
-            </span>
-          )}
+          <span className="badge badge-highlight">Slot: Pipeline Stream</span>
+          <p className="card-summary">
+            Selected: {selectedJob?.title || "None"}
+          </p>
+          <p className="card-summary">
+            Total Pending: {pendingJobs.length}
+          </p>
         </div>
       )}
     </Card>
   );
 
-   const resolveModuleBySlot = (slotKey) => {
+  const resolveModuleBySlot = (slotKey) => {
     switch (postingsSlots[slotKey]) {
       case "ActiveBiddingsEngine":
         return renderBiddingsEngine(slotKey);
@@ -1080,39 +1046,6 @@ export default function Dash2Board({ viewSlug }) {
     } catch (error) {
       console.error("Failed to book worker(s):", error);
     }
-  };
-
-  const handleRatingsClick = (worker) => {
-    const allWorkers = matchedWorkersMap[selectedJob?.id] || [];
-    if (bookMultiple && selectedBidIds.length > 0) {
-      const selectedWorkers = bidsForSelectedJob
-        .filter((bid) => selectedBidIds.includes(bid.id))
-        .map((bid) => ({
-          ...allWorkers.find((w) => w.worker_chat_id === bid.worker_chat_id),
-          _highlighted: true,
-        }));
-      setSelectedWorkersForReview(selectedWorkers);
-    } else {
-      const targetWorker =
-        allWorkers.find((w) => w.worker_chat_id === worker.worker_chat_id) || worker;
-      setSelectedWorkersForReview([{ ...targetWorker, _highlighted: true }]);
-    }
-    setShowRatingsModal(true);
-  };
-
-  const handleMapsClick = (worker) => {
-    setViewAllBids(false);
-    workerCardRefs.current[worker.worker_chat_id]?.scrollIntoView({
-      behavior: "auto", block: "center"
-    });
-  };
-
-  const handleMapsClickMulti = () => {
-    setViewAllBids(false);
-    const selectedIds = bidsForSelectedJob
-      .filter((bid) => selectedBidIds.includes(bid.id))
-      .map((bid) => bid.worker_chat_id);
-    navigate('/customer/postings/RatingsReviewLogs');
   };
 
   // ── Inlined Centered Modals ──
@@ -1291,12 +1224,36 @@ export default function Dash2Board({ viewSlug }) {
     );
   };
 
+  /* 
+    LAYOUT STRUCTURE SUMMARY:
+    - `.grid-main`: Large Main Slot taking up the full left side.
+    - `.sidebar-stack`: Container on the right holding Slot 2 (`sidebar`), Slot 3 (`bottomLeft`), and Slot 4 (`bottomRight`).
+    - Clicking any right slot swaps its active component into the main slot automatically.
+  */
   return (
     <div className="dashboard-grid-4pane">
-      <div className="grid-main">{resolveModuleBySlot("main")}</div>
-      <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
-      <div className="grid-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
-      <div className="grid-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
+      {/* MAIN SLOT (LEFT LARGE AREA) */}
+      <div className="grid-main">
+        {resolveModuleBySlot("main")}
+      </div>
+
+      {/* RIGHT SIDEBAR STACK (SLOT 2, SLOT 3, SLOT 4) */}
+      <div className="sidebar-stack">
+        {/* SLOT 2 (Top Right) */}
+        <div className="grid-sidebar">
+          {resolveModuleBySlot("sidebar")}
+        </div>
+
+        {/* SLOT 3 (Middle Right) */}
+        <div className="grid-bottom-left">
+          {resolveModuleBySlot("bottomLeft")}
+        </div>
+
+        {/* SLOT 4 (Bottom Right) */}
+        <div className="grid-bottom-right">
+          {resolveModuleBySlot("bottomRight")}
+        </div>
+      </div>
 
       {/* ── Centered Modals ── */}
       {renderBookingModal()}
