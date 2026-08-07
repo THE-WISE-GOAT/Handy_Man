@@ -1,6 +1,7 @@
 // Zlices/scheduledZlice.js
+import { apiClient } from "@shared/api/client";
 
-export const createScheduledZlice = (set) => ({
+export const createScheduledZlice = (set, get) => ({
   // ==========================================
   // 1. BUSINESS CONTENT DATA PLACEHOLDERS
   // ==========================================
@@ -8,6 +9,9 @@ export const createScheduledZlice = (set) => ({
   jobsRegistryStatus: "Confirmed Client Operations Counter",
   clientQueryStatus: "Unread Dispatches Pending Response",
   routeMatrixStatus: "Geospatial Routing Parameters Validated",
+
+  assignedJobs: [],
+  activeAssignedJob: null,
 
   // ==========================================
   // 2. DYNAMIC LAYOUT POSITIONS (4-Slot Map)
@@ -37,4 +41,23 @@ export const createScheduledZlice = (set) => ({
         },
       };
     }),
+
+  setScheduledSlots: (slots) => set({ scheduledSlots: slots }),
+
+  setActiveAssignedJob: (job) => set({ activeAssignedJob: job }),
+
+  fetchAssignedJobs: async () => {
+    try {
+      const data = await apiClient.get("/jobs/assigned");
+      if (data.status === "success") {
+        const jobs = data.jobs || [];
+        set({ assignedJobs: jobs });
+        if (jobs.length > 0 && !get().activeAssignedJob) {
+          set({ activeAssignedJob: jobs[0] });
+        }
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch assigned jobs:", error);
+    }
+  },
 });
