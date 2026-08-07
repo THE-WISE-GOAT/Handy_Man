@@ -12,8 +12,8 @@ export const createBookingsZlice = (set, get) => ({
       userLat: lat,
     }),
 
-  jobDescriptionDraft: "I want to install a smart home manager like alexa....",
-  jobTitleDraft: "SMartHoME SeTUP",
+  jobDescriptionDraft: "I want to install a smart home manager like Alexa for my house. It's a medium sized house, about 2 stories high. The manager should service roughly 6 rooms with any and all modern features. ",
+  jobTitleDraft: "Smart-Home Setup",
   aiTitle: "",
   aiDescription: "",
   chatMessages: [
@@ -27,9 +27,9 @@ export const createBookingsZlice = (set, get) => ({
   isAiGenerating: false,
   fetchedJobs: [],
 
-  userName: "ANUP G",
+  userName: "Simran Singh",
   userAddr: "BHAKTAPUR",
-  userCont: "+977 9814737741",
+  userCont: "+977 9812345678",
 
   longitude: 27.671,
   latitude: 85.428,
