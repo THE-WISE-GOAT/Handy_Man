@@ -3,8 +3,10 @@
    ========================================================================== */
 .dashboard-grid {
   display: grid;
+  /* LAYOUT ADJUSTMENT: 2 columns layout matching 1st wireframe picture */
+  /* SLOT SIZING: Adjust '1fr 380px' below to change main vs sidebar width ratio */
   grid-template-columns: 1fr 380px;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr;
   gap: 16px;
   width: 100%;
   height: calc(100vh - 120px);
@@ -13,24 +15,48 @@
   background-color: var(--ind-concrete);
 }
 
+/* MAIN SLOT (Takes full left column) */
 .grid-main {
   grid-column: 1;
   grid-row: 1;
   display: flex;
   min-width: 0;
+  height: 100%;
 }
 
-.grid-bottom {
-  grid-column: 1;
-  grid-row: 2;
+/* RIGHT SIDEBAR CONTAINER (Hosts Slot-2 and Slot-3 stacked vertically) */
+.right-sidebar-container {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
   min-width: 0;
 }
 
-.grid-sidebar {
-  grid-column: 2;
-  grid-row: 1 / span 2;
+/* SLOT-2 (Top Right Slot) */
+.grid-slot-2 {
+  /* SLOT SIZING: Adjust flex ratio or fixed height (e.g., flex: 1 or height: 50%) */
+  flex: 1;
   display: flex;
+  min-height: 0;
+}
+
+/* SLOT-3 (Bottom Right Slot) */
+.grid-slot-3 {
+  /* SLOT SIZING: Adjust flex ratio or fixed height (e.g., flex: 1 or height: 50%) */
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* Legacy wrappers mapped for slot rendering compatibility */
+.grid-bottom,
+.grid-sidebar {
+  display: flex;
+  width: 100%;
+  height: 100%;
   min-width: 0;
 }
 
@@ -42,6 +68,7 @@
   border: 1px solid var(--ind-border);
   border-radius: 12px;
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   padding: 20px;
@@ -60,9 +87,6 @@
   border-color: rgba(255, 107, 26, 0.3);
 }
 
-/* Emergency keeps the single reserved red — it is the one control where a
-   distinct alarm colour is worth breaking the palette for. Sizing moved off
-   the old `height: 10%` + 29px font, which stretched with the card. */
 button[name="emergency"] {
   margin-top: auto;
   align-self: center;
@@ -96,8 +120,6 @@ button[name="emergency"]:focus-visible {
   color: #C0292E;
 }
 
-/* Post is the primary action on this card, so it takes the solid orange fill.
-   Charcoal on orange is 6.82:1; white on orange would be 2.85:1. */
 button[name="post"] {
   margin: 8px 0 0;
   align-self: center;
@@ -152,9 +174,9 @@ button[name="post"]:focus-visible {
 }
 
 .bottom-slot {
-  min-height: 100px;
+  height: 100%;
   padding: 16px 20px;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 /* ==========================================================================
@@ -256,7 +278,6 @@ button[name="post"]:focus-visible {
   padding: 16px;
   background-color: rgba(13, 13, 13, 0.4);
   margin-bottom: 14px;
-  max-height: 350px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -283,8 +304,6 @@ button[name="post"]:focus-visible {
   opacity: 0.82;
 }
 
-/* The customer speaks in brand orange; the assistant stays quiet. Previously
-   these were blue (#3b82f6), which was outside the palette. */
 .chat-msg--user {
   background: #FF6B1A;
   border-left: none;
@@ -313,7 +332,6 @@ button[name="post"]:focus-visible {
   border-radius: 3px 12px 12px 12px;
 }
 
-/* Orange on the peach wash is already near the contrast floor; no opacity to spare. */
 .chat-msg--system strong {
   opacity: 1;
 }
