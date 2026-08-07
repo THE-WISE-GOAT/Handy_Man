@@ -29,6 +29,16 @@ class User(Base):
     lastName: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default='TRUE')
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default="now()")
+
+    contact_number:  Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    contact_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # ── Map & Geolocation Parameters ─────────────────────────────────────────
+    address_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    location: Mapped[Optional[WKBElement]] = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=True)
+
       
     
     # THE RELATIONSHIP LINK FOR USER
