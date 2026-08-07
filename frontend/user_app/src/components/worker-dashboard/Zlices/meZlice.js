@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "@shared/config/api";
+
 export const createMeZlice = (set, get) => ({
   meSlots: {
     main: "MeInterview",
@@ -31,6 +33,11 @@ export const createMeZlice = (set, get) => ({
   addressText: "",
   latitude: null,
   longitude: null,
+
+  // ATTACHMENT STATES
+  certificateAttachments: [],
+  licenseAttachments: [],
+  miscAttachments: [],
 
   extractedProfile: null,
   isSubmittingApplication: false,
@@ -102,6 +109,10 @@ export const createMeZlice = (set, get) => ({
   setLatitude: (val) => set({ latitude: val }),
   setLongitude: (val) => set({ longitude: val }),
 
+  setCertificateAttachments: (val) => set({ certificateAttachments: val }),
+  setLicenseAttachments: (val) => set({ licenseAttachments: val }),
+  setMiscAttachments: (val) => set({ miscAttachments: val }),
+
   setAiResponse: (val) => set({ aiResponse: val }),
   setIsAiGenerating: (val) => set({ isAiGenerating: val }),
   setIsChatComplete: (val) => set({ isChatComplete: val }),
@@ -134,13 +145,17 @@ export const createMeZlice = (set, get) => ({
       ],
     })),
 
+  // ====================================================
+  // SKILLS & CATEGORY ENDPOINTS
+  // ====================================================
+
   fetchWorkerSkills: async () => {
     const { workerChatId } = get();
     if (!workerChatId) return;
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const res = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/skills`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/skills`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -174,7 +189,7 @@ export const createMeZlice = (set, get) => ({
 
       const token = localStorage.getItem("handy_man_access_token");
       const res = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/add-skill`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -226,7 +241,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        "http://127.0.0.1:8000/worker-interview/session",
+        `${API_BASE_URL}/worker-interview/session`,
         {
           method: "POST",
           headers: {
@@ -286,7 +301,7 @@ export const createMeZlice = (set, get) => ({
 
       if (isAddingSkill) {
         const response = await fetch(
-          `http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill/chat`,
+          `${API_BASE_URL}/worker-interview/${workerChatId}/add-skill/chat`,
           {
             method: "POST",
             headers: {
@@ -328,7 +343,7 @@ export const createMeZlice = (set, get) => ({
         }
       } else {
         const response = await fetch(
-          "http://127.0.0.1:8000/worker-interview/chat",
+          `${API_BASE_URL}/worker-interview/chat`,
           {
             method: "POST",
             headers: {
@@ -386,7 +401,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/summary`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/summary`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -427,8 +442,15 @@ export const createMeZlice = (set, get) => ({
   },
 
   submitApplication: async () => {
-    const { workerChatId, phoneNumber, addressText, latitude, longitude } =
-      get();
+    const {
+      workerChatId,
+      phoneNumber,
+      latitude,
+      longitude,
+      certificateAttachments,
+      licenseAttachments,
+      miscAttachments,
+    } = get();
 
     if (!workerChatId) {
       console.error("No worker_chat_id found.");
@@ -440,7 +462,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/complete`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/complete`,
         {
           method: "POST",
           headers: {
@@ -453,6 +475,9 @@ export const createMeZlice = (set, get) => ({
               longitude: parseFloat(longitude) || 0.0,
               latitude: parseFloat(latitude) || 0.0,
             },
+            certificate: certificateAttachments,
+            license: licenseAttachments,
+            misc: miscAttachments,
           }),
         },
       );
@@ -470,7 +495,7 @@ export const createMeZlice = (set, get) => ({
         applicationSubmitted: true,
       });
 
-      await get().loadApplicantStatus(true);
+      await get().loadApplicantStatus();
     } catch (error) {
       console.error("Failed to complete application process:", error);
     } finally {
@@ -491,7 +516,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        `http://127.0.0.1:8000/worker-onboarding/my-profile`,
+        `${API_BASE_URL}/worker-onboarding/my-profile`,
         {
           method: "PATCH",
           headers: {
@@ -521,7 +546,7 @@ export const createMeZlice = (set, get) => ({
   loadUserProfile: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/users/me", {
+      const response = await fetch(`${API_BASE_URL}/users/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -551,7 +576,7 @@ export const createMeZlice = (set, get) => ({
 
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/users/me", {
+      const response = await fetch(`${API_BASE_URL}/users/me`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -578,15 +603,11 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  _statusCheckInProgress: false,
-  _statusChecked: false,
-  loadApplicantStatus: async (force = false) => {
-    if (!force && (get()._statusCheckInProgress || get()._statusChecked)) return;
-    set({ _statusCheckInProgress: true });
+  loadApplicantStatus: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        "http://127.0.0.1:8000/worker-onboarding/my-status",
+        `${API_BASE_URL}/worker-onboarding/my-status`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -609,6 +630,7 @@ export const createMeZlice = (set, get) => ({
 
         if (data.worker_chat_id) {
           get().fetchWorkerInterviewHistory(data.worker_chat_id);
+          get().fetchWorkerSkills();
         }
 
         if (
@@ -630,6 +652,8 @@ export const createMeZlice = (set, get) => ({
               has_verified_specialty: data.has_verified_specialty || false,
               scenario_passed: data.scenario_passed || false,
               scenario_score: data.scenario_score || 0,
+              is_license: data.is_license || false,
+              is_certificate: data.is_certificate || false,
             },
             editableProfile: {
               job_category: data.job_category || "",
@@ -649,8 +673,6 @@ export const createMeZlice = (set, get) => ({
       }
     } catch (error) {
       console.error("Failed to load applicant status:", error);
-    } finally {
-      set({ _statusCheckInProgress: false, _statusChecked: true });
     }
   },
 
@@ -658,7 +680,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/history`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/history`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

@@ -92,6 +92,7 @@ async def create_job_direct_endpoint(
         "contact_name": payload.contact_name,
         "contact_phone": payload.contact_phone,
         "mode": payload.mode,
+        "scheduled_date": payload.scheduled_date,
         "attachments": payload.attachments,
         "latitude": lat,
         "longitude": lng,
@@ -235,12 +236,12 @@ def get_worker_matched_jobs(
             "booking_chat_id": job.booking_chat_id,
             "title": job.title,
             "description": job.description,
-            "budget": None,
+            "status": job.status,
+            "worker_id": job.worker_id,
             "location": job.address_text,
             "match_score": match.match_score,
             "match_rank": match.match_rank,
             "created_at": match.created_at,
-            "status": job.status,
             "is_interested": match.is_interested,
             "interested_count": int(interest_count),
         }
@@ -488,3 +489,49 @@ async def book_job(
         "worker_id": job.worker_id,
         "job_status": job.status,
     }
+
+
+@router.get("/assigned", summary="Fetch jobs assigned to the authenticated worker")
+def get_assigned_jobs_for_worker(
+    db: Session = Depends(get_db),
+    current_user: model.User = Depends(get_current_user),
+):
+    worker_profile = db.execute(
+        select(model.WorkerProfile).where(
+            model.WorkerProfile.user_id == current_user.id
+        )
+    ).scalar_one_or_none()
+
+    if not worker_profile:
+        return {"status": "success", "jobs": []}
+
+    stmt = (
+        select(model.Job)
+        .where(
+            model.Job.worker_id == current_user.id,
+            model.Job.status == "assigned",
+        )
+        .order_by(model.Job.updated_at.desc())
+    )
+
+    results = db.execute(stmt).scalars().all()
+
+    jobs = [
+        {
+            "id": row.id,
+            "booking_chat_id": row.booking_chat_id,
+            "title": row.title,
+            "description": row.description,
+            "status": row.status,
+            "address_text": row.address_text,
+            "latitude": row.latitude,
+            "longitude": row.longitude,
+            "contact_name": row.contact_name,
+            "contact_phone": row.contact_phone,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+        for row in results
+    ]
+
+    return {"status": "success", "jobs": jobs}

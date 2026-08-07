@@ -20,6 +20,7 @@ from src.core.router import (
     worker_onboarding,
     socket,
     worker_router,
+    user_router
 )
 from src.core.oauth2 import get_current_user
 
@@ -71,6 +72,7 @@ app.include_router(job_router.router)
 app.include_router(worker_onboarding.router)
 app.include_router(socket.router)
 app.include_router(worker_router.router)
+app.include_router(user_router.router)
 
 
 # 5. Worker locations stub (preserves legacy frontend contract)

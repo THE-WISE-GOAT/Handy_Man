@@ -1,4 +1,14 @@
 import { apiClient } from "@shared/api/client";
+import { API_BASE_URL } from "@shared/config/api";
+
+const normalizeMessage = (msg) => ({
+  id: msg.id || msg.message_id || `msg-${Math.random()}`,
+  sender_id: msg.sender_id ?? msg.senderId ?? msg.user_id ?? msg.author_id,
+  sender_role: String(msg.sender_role || msg.role || msg.sender_type || '').toLowerCase(),
+  sender_name: msg.sender_name || msg.username || msg.sender || 'Unknown',
+  text: msg.text || msg.message || msg.content || '',
+  timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
+});
 
 export const createWorkspaceZlice = (set, get) => ({
   mapStatus: "REALTIME DISPATCH TRACKING MATRIX ACTIVE",
@@ -46,7 +56,7 @@ export const createWorkspaceZlice = (set, get) => ({
   fetchMatchedJobs: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/jobs/for-worker", {
+      const response = await fetch(`${API_BASE_URL}/jobs/for-worker`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -68,8 +78,9 @@ export const createWorkspaceZlice = (set, get) => ({
   },
 
   connectToDispatch: (workerChatId, token) => {
+    const wsBaseUrl = (import.meta.env?.VITE_WS_URL || API_BASE_URL).replace(/^http/, "ws");
     const socket = new WebSocket(
-      `ws://127.0.0.1:8000/ws/${workerChatId}?token=${token}`
+      `${wsBaseUrl}/ws/booking/${workerChatId}?token=${token}`
     );
 
     socket.onmessage = (event) => {
@@ -108,7 +119,7 @@ export const createWorkspaceZlice = (set, get) => ({
     } else {
       try {
         const token = localStorage.getItem("handy_man_access_token");
-        const res = await fetch(`http://127.0.0.1:8000/jobs/${jobId}/interest`, {
+        const res = await fetch(`${API_BASE_URL}/jobs/${jobId}/interest`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -155,13 +166,21 @@ export const createWorkspaceZlice = (set, get) => ({
     }
   },
 
-  appendMessage: (sender, text, senderName = "You") =>
+  appendMessage: (senderOrMsg, text, senderName, senderId) => {
+    const raw = typeof senderOrMsg === "object" && senderOrMsg !== null
+      ? senderOrMsg
+      : { 
+          sender: senderOrMsg, 
+          role: senderOrMsg,
+          text, 
+          sender_name: senderName || (senderOrMsg === "worker" ? "You" : undefined), 
+          sender_id: senderId 
+        };
+    const msg = normalizeMessage(raw);
     set((state) => ({
-      chatMessages: [
-        ...state.chatMessages,
-        { id: crypto.randomUUID(), sender, senderName, text }
-      ]
-    })),
+      chatMessages: [...state.chatMessages, msg]
+    }));
+  },
 
   connectWorkerChat: async (workerChatId) => {
     get().disconnectWorkerChat();
@@ -170,9 +189,9 @@ export const createWorkspaceZlice = (set, get) => ({
       console.error("No access token found for WebSocket connection");
       return;
     }
-    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
+    const wsBaseUrl = (import.meta.env?.VITE_WS_URL || API_BASE_URL).replace(/^http/, "ws");
     const socket = new WebSocket(
-      `${wsBaseUrl}/ws/worker/${workerChatId}?token=${token}`
+      `${wsBaseUrl}/ws/booking/${workerChatId}?token=${token}`
     );
 
     socket.onopen = () => {
@@ -186,18 +205,21 @@ export const createWorkspaceZlice = (set, get) => ({
       set({ isChatConnected: false, chatWorkerChatId: null });
 
     socket.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === "HUMAN_MESSAGE") {
-        const { sender, sender_name, message: msgContent } = message.data;
-        set((state) => ({
-          chatMessages: [
-            ...state.chatMessages,
-            { id: crypto.randomUUID(), sender, senderName: sender_name, text: msgContent }
-          ]
-        }));
+      const rawData = JSON.parse(event.data);
+      if (rawData.type === "HUMAN_MESSAGE") {
+        const normalized = normalizeMessage(rawData.data);
+        set((state) => {
+          const exists = state.chatMessages.some(m => m.id === normalized.id);
+          if (exists) return state;
+
+          const filtered = state.chatMessages.filter(
+            m => !String(m.id).startsWith("temp-") || m.text !== normalized.text
+          );
+          return { chatMessages: [...filtered, normalized] };
+        });
       }
-      if (message.type === "NEW_JOB_NOTIFICATION") {
-        set({ activeJob: message.data });
+      if (rawData.type === "NEW_JOB_NOTIFICATION") {
+        set({ activeJob: rawData.data });
       }
     };
 
@@ -218,6 +240,33 @@ export const createWorkspaceZlice = (set, get) => ({
   },
 
   sendHumanMessage: async (bookingChatId, sender, text) => {
+    const token = localStorage.getItem("handy_man_access_token");
+    let currentUserId = null;
+    try {
+      if (token) {
+        const base64Payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64Payload)
+            .split("")
+            .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+            .join("")
+        );
+        currentUserId = JSON.parse(jsonPayload).user_id;
+      }
+    } catch {
+      currentUserId = null;
+    }
+
+    const optimisticMsg = normalizeMessage({
+      id: `temp-${Date.now()}`,
+      sender_id: currentUserId,
+      sender_role: sender,
+      sender_name: "You",
+      text,
+      timestamp: new Date().toISOString(),
+    });
+    get().appendMessage(optimisticMsg);
+
     try {
       const data = await apiClient.post(
         `/dispatch/chat/${bookingChatId}/message`,
@@ -239,13 +288,7 @@ export const createWorkspaceZlice = (set, get) => ({
           if (msg.role === "system" && msg.content && msg.content.length < 200) return true;
           return false;
         });
-        const messages = sanitizedHistory
-          .map((msg) => ({
-            id: crypto.randomUUID(),
-            sender: msg.role,
-            senderName: msg.sender_name || (msg.role === "customer" ? "Customer" : msg.role === "worker" ? "Worker" : "BID SYSTEM"),
-            text: msg.content,
-          }));
+        const messages = sanitizedHistory.map((msg) => normalizeMessage(msg));
         set({ chatMessages: messages });
       } catch (error) {
         if (error.status === 500) {

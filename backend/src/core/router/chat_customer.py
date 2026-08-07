@@ -145,9 +145,7 @@ def _resolve_booking_chat(
         return None
 
     is_owner = job.customer_id == current_user.id
-    is_assigned_worker = (
-        job.worker_id is not None and job.worker_id == current_user.id
-    )
+    is_assigned_worker = job.worker_id is not None and job.worker_id == current_user.id
 
     is_matched_worker = False
     if not is_assigned_worker:
@@ -428,7 +426,12 @@ async def send_human_message(
 
     updated_history = list(chat_session.history)
     updated_history.append(
-        {"role": payload.sender, "content": payload.message, "sender_name": sender_name}
+        {
+            "role": payload.sender,
+            "content": payload.message,
+            "sender_name": sender_name,
+            "sender_id": current_user.id,
+        }
     )
     chat_session.history = updated_history
 
@@ -447,8 +450,9 @@ async def send_human_message(
             "booking_chat_id": chat_session.id,
             "sender": payload.sender,
             "sender_name": sender_name,
+            "sender_id": current_user.id,
             "message": payload.message,
-        }
+        },
     }
 
     if payload.sender == "customer":
@@ -463,24 +467,32 @@ async def send_human_message(
                     )
                 ).scalar_one_or_none()
                 if worker_session:
-                    await manager.send_worker_notification(worker_session.id, message_payload)
+                    await manager.send_worker_notification(
+                        worker_session.id, message_payload
+                    )
 
-            matched_profiles = db.execute(
-                select(model.WorkerProfile).join(
-                    model.JobWorkerMatch,
-                    model.JobWorkerMatch.worker_id == model.WorkerProfile.id,
-                ).where(
-                    model.JobWorkerMatch.job_id == job.id,
-                    model.JobWorkerMatch.is_active == True,
+            matched_profiles = (
+                db.execute(
+                    select(model.WorkerProfile)
+                    .join(
+                        model.JobWorkerMatch,
+                        model.JobWorkerMatch.worker_id == model.WorkerProfile.id,
+                    )
+                    .where(
+                        model.JobWorkerMatch.job_id == job.id,
+                        model.JobWorkerMatch.is_active == True,
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for profile in matched_profiles:
                 if profile.worker_chat_id:
-                    await manager.send_worker_notification(profile.worker_chat_id, message_payload)
+                    await manager.send_worker_notification(
+                        profile.worker_chat_id, message_payload
+                    )
 
-            await manager.send_worker_notification(
-                chat_session.id, message_payload
-            )
+            await manager.send_worker_notification(chat_session.id, message_payload)
     elif payload.sender == "worker":
         await manager.send_customer_notification(chat_session.id, message_payload)
 
@@ -522,6 +534,7 @@ def get_history(
                 else msg["content"]
             ),
             "sender_name": msg.get("sender_name"),
+            "sender_id": msg.get("sender_id"),
         }
         for msg in chat_session.history
         if msg["role"] not in ("user", "assistant")
@@ -588,9 +601,7 @@ async def _refine_job_description_with_ai(raw_description: str) -> Dict[str, Any
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
                 max_tokens=300,
-                response_format={
-                    "type": "json_object"
-                },
+                response_format={"type": "json_object"},
             )
         )
 
@@ -620,10 +631,13 @@ async def _refine_job_description_with_ai(raw_description: str) -> Dict[str, Any
 async def _broadcast_customer_bid(booking_chat_id: int, bid_payload: dict):
     """Send a SYSTEM_BID notification to the customer's WebSocket connection."""
     from src.core.manager import manager
+
     try:
         await manager.send_customer_notification(booking_chat_id, bid_payload)
     except Exception as ws_err:
-        logger.warning(f"Failed SYSTEM_BID broadcast to booking {booking_chat_id}: {ws_err}")
+        logger.warning(
+            f"Failed SYSTEM_BID broadcast to booking {booking_chat_id}: {ws_err}"
+        )
 
 
 @router.post(
@@ -700,6 +714,7 @@ async def complete_customer_chat(
         "contact_name": payload.contact_name,
         "contact_phone": payload.contact_phone,
         "mode": payload.mode,
+        "scheduled_date": payload.scheduled_date,
         "attachments": payload.attachments,
         "latitude": lat,
         "longitude": lng,
@@ -746,7 +761,7 @@ async def complete_customer_chat(
             "booking_chat_id": booking_chat_id,
             "title": payload.title,
             "description": final_job_desc,
-        }
+        },
     }
 
     if worker_chat_ids := matching_result.get("worker_chat_ids", []):

@@ -8,6 +8,45 @@ export default function Dash1Worker({ viewSlug }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const getCurrentUserId = () => {
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      if (!token) return null;
+      const base64Payload = token
+        .split(".")[1]
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64Payload)
+          .split("")
+          .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+          .join(""),
+      );
+      return JSON.parse(jsonPayload).user_id;
+    } catch {
+      return null;
+    }
+  };
+  const currentUserId = getCurrentUserId();
+
+  const getOtherWorkerColor = (identifier) => {
+    const lightColors = [
+      { background: "#BFDBFE", color: "#1E3A8A" },
+      { background: "#BBF7D0", color: "#14532D" },
+      { background: "#E9D5FF", color: "#581C87" },
+      { background: "#FBCFE8", color: "#831843" },
+      { background: "#99F6E4", color: "#134E4A" },
+      { background: "#FEF08A", color: "#713F12" },
+    ];
+
+    let hash = 0;
+    for (let i = 0; i < identifier.length; i++) {
+      hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % lightColors.length;
+    return lightColors[index];
+  };
+
   const {
     workspaceSlots,
     swapWorkspaceSlots,
@@ -53,15 +92,20 @@ export default function Dash1Worker({ viewSlug }) {
             bid_amount: parseFloat(bidAmount),
             bid_message: "",
           }),
-        }
+        },
       );
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const workerName = userProfile?.username || userProfile?.firstName || "Worker";
-      appendMessage("system", `${workerName} placed a bid: Rs ${bidAmount}`, "BID SYSTEM");
+      const workerName =
+        userProfile?.username || userProfile?.firstName || "Worker";
+      appendMessage(
+        "system",
+        `${workerName} placed a bid: Rs ${bidAmount}`,
+        "BID SYSTEM",
+      );
     } catch (error) {
       console.error("Failed to place bid:", error);
     }
@@ -88,15 +132,20 @@ export default function Dash1Worker({ viewSlug }) {
           bid_amount: parseFloat(amount),
           bid_message: "",
         }),
-      }
+      },
     );
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    const workerName = userProfile?.firstName || userProfile?.lastName
-      ? `${userProfile?.firstName || ""} ${userProfile?.lastName || ""}`.trim()
-      : userProfile?.username || "Worker";
-    appendMessage("system", `${workerName} placed a bid: Rs ${amount}`, "BID SYSTEM");
+    const workerName =
+      userProfile?.firstName || userProfile?.lastName
+        ? `${userProfile?.firstName || ""} ${userProfile?.lastName || ""}`.trim()
+        : userProfile?.username || "Worker";
+    appendMessage(
+      "system",
+      `${workerName} placed a bid: Rs ${amount}`,
+      "BID SYSTEM",
+    );
   };
 
   useEffect(() => {
@@ -107,7 +156,9 @@ export default function Dash1Worker({ viewSlug }) {
   useEffect(() => {
     const jobIdParam = searchParams.get("jobId");
     if (!activeJob && jobIdParam) {
-      const found = matchedJobs.find((j) => String(j.job_id) === String(jobIdParam));
+      const found = matchedJobs.find(
+        (j) => String(j.job_id) === String(jobIdParam),
+      );
       if (found) {
         setActiveJob(found);
       }
@@ -120,8 +171,12 @@ export default function Dash1Worker({ viewSlug }) {
 
   useEffect(() => {
     if (activeJob && activeJob.booking_chat_id) {
-      useWorkerDashboardData.getState().connectWorkerChat(activeJob.booking_chat_id);
-      useWorkerDashboardData.getState().fetchChatHistory(activeJob.booking_chat_id);
+      useWorkerDashboardData
+        .getState()
+        .connectWorkerChat(activeJob.booking_chat_id);
+      useWorkerDashboardData
+        .getState()
+        .fetchChatHistory(activeJob.booking_chat_id);
     }
   }, [activeJob]);
 
@@ -146,8 +201,12 @@ export default function Dash1Worker({ viewSlug }) {
 
   useEffect(() => {
     if (activeJob && activeJob.booking_chat_id) {
-      useWorkerDashboardData.getState().connectWorkerChat(activeJob.booking_chat_id);
-      useWorkerDashboardData.getState().fetchChatHistory(activeJob.booking_chat_id);
+      useWorkerDashboardData
+        .getState()
+        .connectWorkerChat(activeJob.booking_chat_id);
+      useWorkerDashboardData
+        .getState()
+        .fetchChatHistory(activeJob.booking_chat_id);
     }
   }, [activeJob]);
 
@@ -322,21 +381,59 @@ export default function Dash1Worker({ viewSlug }) {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (
+                          job.status === "assigned" ||
+                          job.worker_id === currentUserId
+                        )
+                          return;
                         expressInterest(job.job_id, workerChatId);
                       }}
                       style={{
-                        padding: '6px 14px',
-                        backgroundColor: job.is_interested ? '#FF6B1A' : 'transparent',
-                        color: job.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)',
-                        border: job.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)',
-                        borderRadius: '6px',
-                        cursor: job.is_interested ? 'default' : 'pointer',
+                        padding: "6px 14px",
+                        backgroundColor:
+                          job.status === "assigned" ||
+                          job.worker_id === currentUserId
+                            ? "#22c55e"
+                            : job.is_interested
+                              ? "#FF6B1A"
+                              : "transparent",
+                        color:
+                          job.status === "assigned" ||
+                          job.worker_id === currentUserId
+                            ? "#0D0D0D"
+                            : job.is_interested
+                              ? "#0D0D0D"
+                              : "var(--k-orange-ink)",
+                        border:
+                          job.status === "assigned" ||
+                          job.worker_id === currentUserId
+                            ? "1px solid #22c55e"
+                            : job.is_interested
+                              ? "1px solid #FF6B1A"
+                              : "1px solid rgba(255, 107, 26, 0.5)",
+                        borderRadius: "6px",
+                        cursor:
+                          job.status === "assigned" ||
+                          job.worker_id === currentUserId
+                            ? "default"
+                            : job.is_interested
+                              ? "default"
+                              : "pointer",
                         fontWeight: 600,
-                        fontSize: '13px'
+                        fontSize: "13px",
                       }}
-                      disabled={job.is_interested}
+                      disabled={
+                        job.status === "assigned" ||
+                        job.worker_id === currentUserId ||
+                        job.is_interested
+                      }
                     >
-                      {job.is_interested ? 'Interested ✓' : "I'm Interested"}
+                      {job.status === "assigned" ||
+                      job.worker_id === currentUserId
+                        ? "Assigned ✓"
+                        : job.is_interested
+                          ? "Interested ✓"
+                          : "I'm Interested"}
                     </button>
                   </div>
                 ))}
@@ -405,7 +502,6 @@ export default function Dash1Worker({ viewSlug }) {
         if (!bookingChatId) return;
         try {
           await sendHumanMessage(bookingChatId, "worker", chatInput.trim());
-          appendMessage("worker", chatInput.trim());
           setChatInput("");
         } catch (err) {
           console.error("Failed to send message:", err);
@@ -413,14 +509,35 @@ export default function Dash1Worker({ viewSlug }) {
       };
 
       const renderChatView = () => (
-        <div style={{ width: "100%", height: "100%", display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", flexShrink: 0, marginBottom: "8px" }}>
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-start",
+              flexShrink: 0,
+              marginBottom: "8px",
+            }}
+          >
             <button
               onClick={() => setShowBidForm(true)}
               style={{
-                padding: "4px 14px", background: "#FF6B1A", color: "#0D0D0D",
-                border: "none", borderRadius: "20px", fontWeight: 600,
-                fontSize: "13px", cursor: "pointer"
+                padding: "4px 14px",
+                background: "#FF6B1A",
+                color: "#0D0D0D",
+                border: "none",
+                borderRadius: "20px",
+                fontWeight: 600,
+                fontSize: "13px",
+                cursor: "pointer",
               }}
             >
               Bid
@@ -430,48 +547,155 @@ export default function Dash1Worker({ viewSlug }) {
           <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
             {chatMessages
               .filter(
-                (msg) => msg.sender === "customer" || msg.sender === "worker" || msg.sender === "system"
+                (msg) =>
+                  msg.sender_role === "customer" ||
+                  msg.sender_role === "worker" ||
+                  msg.sender_role === "system",
               )
-              .map((msg) => (
-                <div key={msg.id}>
-                  {msg.sender === "system" ? (
-                    <div style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
-                      <div style={{
-                        maxWidth: "80%", padding: "4px 16px", fontSize: "0.85rem",
-                        fontWeight: 600, color: "#FF6B1A", background: "rgba(255,107,26,0.1)",
-                        borderRadius: "9999px", textAlign: "center"
-                      }}>
+              .map((msg) => {
+                const isSelf = Boolean(
+                  currentUserId &&
+                  msg.sender_id != null &&
+                  String(msg.sender_id).trim() === String(currentUserId).trim(),
+                );
+                const isClient =
+                  msg.sender_role === "customer" ||
+                  msg.sender_role === "client";
+
+                if (msg.sender_role === "system") {
+                  return (
+                    <div
+                      key={msg.id}
+                      style={{
+                        display: "flex",
+                        width: "100%",
+                        justifyContent: "center",
+                        marginBottom: "16px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          maxWidth: "80%",
+                          padding: "4px 16px",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                          color: "#FF6B1A",
+                          background: "rgba(255,107,26,0.1)",
+                          borderRadius: "9999px",
+                          textAlign: "center",
+                        }}
+                      >
                         {msg.text}
                       </div>
                     </div>
-                  ) : msg.sender === "worker" ? (
-                    <div style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
-                      <div style={{
-                        maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
-                        background: "#FF6B1A", borderRadius: "28px 4px 28px 28px"
-                      }}>
-                        <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                  );
+                }
+
+                if (isSelf) {
+                  return (
+                    <div
+                      key={msg.id}
+                      style={{
+                        display: "flex",
+                        width: "100%",
+                        justifyContent: "flex-end",
+                        marginBottom: "16px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          maxWidth: "70%",
+                          padding: "8px 16px",
+                          color: "var(--k-ink)",
+                          background: "#FF6B1A",
+                          borderRadius: "28px 4px 28px 28px",
+                          fontWeight: "normal",
+                          fontStyle: "normal",
+                        }}
+                      >
+                        <strong>
+                          {msg.sender_name === "You"
+                            ? "You:"
+                            : `${msg.sender_name}:`}
+                        </strong>{" "}
+                        {msg.text}
                       </div>
                     </div>
-                  ) : (
-                    <div style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
-                      <div style={{
-                        maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
-                        background: "var(--k-raise)", borderRadius: "4px 28px 28px 28px",
-                        border: "1px solid var(--k-line)"
-                      }}>
-                        <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                  );
+                }
+
+                if (isClient) {
+                  return (
+                    <div
+                      key={msg.id}
+                      style={{
+                        display: "flex",
+                        width: "100%",
+                        justifyContent: "flex-start",
+                        marginBottom: "16px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          maxWidth: "70%",
+                          padding: "8px 16px",
+                          color: "var(--k-ink)",
+                          background: "var(--k-raise)",
+                          borderRadius: "4px 28px 28px 28px",
+                          border: "1px solid var(--k-line)",
+                          // dont change that font, or bold/italic format
+                          fontWeight: "bold",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        <strong>{msg.sender_name}:</strong> {msg.text}
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                }
+
+                const workerColor = getOtherWorkerColor(
+                  msg.sender_name || msg.sender_role,
+                );
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: "flex",
+                      width: "100%",
+                      justifyContent: "flex-start",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: "70%",
+                        padding: "8px 16px",
+                        background: workerColor.background,
+                        color: workerColor.color,
+                        borderRadius: "4px 28px 28px 28px",
+                        border: "1px solid var(--k-line)",
+                        fontWeight: "normal",
+                        fontStyle: "normal",
+                      }}
+                    >
+                      <strong>{msg.sender_name}:</strong> {msg.text}
+                    </div>
+                  </div>
+                );
+              })}
             <div ref={messagesEndRef} />
           </div>
 
           <form
             onSubmit={handleSendChat}
-            style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--k-line)', flexShrink: 0 }}
+            style={{
+              display: "flex",
+              gap: "6px",
+              paddingTop: "8px",
+              borderTop: "1px solid var(--k-line)",
+              flexShrink: 0,
+            }}
           >
             <input
               type={isBidMode ? "number" : "text"}
@@ -483,39 +707,50 @@ export default function Dash1Worker({ viewSlug }) {
                 }
                 setChatInput(val);
               }}
-              placeholder={isBidMode ? "Enter bid amount..." : "Type a message..."}
+              placeholder={
+                isBidMode ? "Enter bid amount..." : "Type a message..."
+              }
               disabled={!activeJob}
               style={{
                 flex: 1,
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '1px solid var(--k-border-strong)',
-                background: 'var(--k-field)',
-                color: 'var(--k-ink)',
-                font: 'inherit',
-                outline: 'none',
-                fontSize: '13px'
+                padding: "6px 10px",
+                borderRadius: "6px",
+                border: "1px solid var(--k-border-strong)",
+                background: "var(--k-field)",
+                color: "var(--k-ink)",
+                font: "inherit",
+                outline: "none",
+                fontSize: "13px",
               }}
             />
             <button
               type="submit"
               disabled={!chatInput.trim() || !activeJob}
               style={{
-                padding: '6px 14px',
-                background: '#FF6B1A',
-                color: '#0D0D0D',
-                border: 'none',
-                borderRadius: '6px',
+                padding: "6px 14px",
+                background: "#FF6B1A",
+                color: "#0D0D0D",
+                border: "none",
+                borderRadius: "6px",
                 fontWeight: 700,
-                cursor: 'pointer',
-                fontSize: '13px'
+                cursor: "pointer",
+                fontSize: "13px",
               }}
             >
               Send
             </button>
           </form>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '12px', color: 'var(--k-ink-3)' }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              marginTop: "4px",
+              fontSize: "12px",
+              color: "var(--k-ink-3)",
+            }}
+          >
             <input
               type="checkbox"
               id="bidModeToggle"
@@ -524,9 +759,9 @@ export default function Dash1Worker({ viewSlug }) {
                 setIsBidMode(e.target.checked);
                 if (e.target.checked) setChatInput("");
               }}
-              style={{ cursor: 'pointer', accentColor: '#FF6B1A' }}
+              style={{ cursor: "pointer", accentColor: "#FF6B1A" }}
             />
-            <label htmlFor="bidModeToggle" style={{ cursor: 'pointer' }}>
+            <label htmlFor="bidModeToggle" style={{ cursor: "pointer" }}>
               type $$$amount to set bid.
             </label>
           </div>
@@ -534,26 +769,60 @@ export default function Dash1Worker({ viewSlug }) {
       );
 
       const renderBidView = () => (
-        <div style={{ width: "100%", height: "100%", display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
           <div style={{ flexShrink: 0, marginBottom: "16px" }}>
             <button
               onClick={() => setShowBidForm(false)}
               style={{
-                padding: "4px 14px", background: "transparent", color: "var(--k-ink-3)",
-                border: "1px solid var(--k-line)", borderRadius: "20px", fontWeight: 600,
-                fontSize: "13px", cursor: "pointer"
+                padding: "4px 14px",
+                background: "transparent",
+                color: "var(--k-ink-3)",
+                border: "1px solid var(--k-line)",
+                borderRadius: "20px",
+                fontWeight: 600,
+                fontSize: "13px",
+                cursor: "pointer",
               }}
             >
               Back to Chat
             </button>
           </div>
 
-          <h2 style={{ flexShrink: 0, margin: "0 0 8px" }}>{activeJob?.title || "Untitled Job"}</h2>
-          <p style={{ flexShrink: 0, margin: "0 0 20px", fontSize: "13px", color: "var(--k-ink-3)", lineHeight: "1.5" }}>
-            {activeJob?.description || activeJob?.job_description || "No description available."}
+          <h2 style={{ flexShrink: 0, margin: "0 0 8px" }}>
+            {activeJob?.title || "Untitled Job"}
+          </h2>
+          <p
+            style={{
+              flexShrink: 0,
+              margin: "0 0 20px",
+              fontSize: "13px",
+              color: "var(--k-ink-3)",
+              lineHeight: "1.5",
+            }}
+          >
+            {activeJob?.description ||
+              activeJob?.job_description ||
+              "No description available."}
           </p>
 
-          <label style={{ display: "block", fontSize: "13px", fontWeight: 500, color: "var(--k-ink-3)", marginBottom: "8px", flexShrink: 0 }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: "13px",
+              fontWeight: 500,
+              color: "var(--k-ink-3)",
+              marginBottom: "8px",
+              flexShrink: 0,
+            }}
+          >
             Enter your bid amount
           </label>
           <input
@@ -564,10 +833,17 @@ export default function Dash1Worker({ viewSlug }) {
             min="0"
             step="1"
             style={{
-              width: "100%", padding: "12px 16px", fontSize: "18px", fontWeight: 700,
-              color: "var(--k-ink)", background: "var(--k-raise)",
-              border: "2px solid #FF6B1A", borderRadius: "12px", outline: "none",
-              marginBottom: "20px", flexShrink: 0
+              width: "100%",
+              padding: "12px 16px",
+              fontSize: "18px",
+              fontWeight: 700,
+              color: "var(--k-ink)",
+              background: "var(--k-raise)",
+              border: "2px solid #FF6B1A",
+              borderRadius: "12px",
+              outline: "none",
+              marginBottom: "20px",
+              flexShrink: 0,
             }}
           />
 
@@ -577,9 +853,16 @@ export default function Dash1Worker({ viewSlug }) {
             onClick={handleBidPlaced}
             disabled={!bidAmount}
             style={{
-              width: "100%", padding: "12px", background: "#FF6B1A", color: "#0D0D0D",
-              border: "none", borderRadius: "12px", fontWeight: 700, fontSize: "16px", cursor: "pointer",
-              flexShrink: 0
+              width: "100%",
+              padding: "12px",
+              background: "#FF6B1A",
+              color: "#0D0D0D",
+              border: "none",
+              borderRadius: "12px",
+              fontWeight: 700,
+              fontSize: "16px",
+              cursor: "pointer",
+              flexShrink: 0,
             }}
           >
             Submit Bid
@@ -593,7 +876,15 @@ export default function Dash1Worker({ viewSlug }) {
             ••• DEPLOYED ASSIGNMENT SPECIFICATIONS
           </div>
 
-          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div
+            className="main-panel"
+            style={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+            }}
+          >
             {showBidForm ? renderBidView() : renderChatView()}
           </div>
         </div>
@@ -640,7 +931,14 @@ export default function Dash1Worker({ viewSlug }) {
         return renderJobDetails(slotKey);
 
       default:
-        return <div className="dashboard-card slot-{slotKey}"><div className="card-header">••• MODULE PLACEHOLDER</div><div className="preview-panel"><span className="badge">No module loaded for {slotKey} slot</span></div></div>;
+        return (
+          <div className="dashboard-card slot-{slotKey}">
+            <div className="card-header">••• MODULE PLACEHOLDER</div>
+            <div className="preview-panel">
+              <span className="badge">No module loaded for {slotKey} slot</span>
+            </div>
+          </div>
+        );
     }
   };
 
@@ -650,9 +948,7 @@ export default function Dash1Worker({ viewSlug }) {
 
       <div className="grid-bottom">{resolveModuleBySlot("bottom")}</div>
 
-      <div className="grid-sidebar">
-        {resolveModuleBySlot("sidebar")}
-      </div>
+      <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
 
       {jobDetailModal && (
         <div
@@ -728,7 +1024,8 @@ export default function Dash1Worker({ viewSlug }) {
               {jobDetailModal.title || "Untitled Job"}
             </h2>
             <p style={{ margin: 0, fontSize: "13px", color: "var(--k-ink-3)" }}>
-              Job ID: {jobDetailModal.booking_chat_id || jobDetailModal.job_id || "N/A"}
+              Job ID:{" "}
+              {jobDetailModal.booking_chat_id || jobDetailModal.job_id || "N/A"}
             </p>
             <p
               style={{
@@ -755,9 +1052,7 @@ export default function Dash1Worker({ viewSlug }) {
               </span>
               <span>Rank: #{jobDetailModal.match_rank || "-"}</span>
               <span>Status: {jobDetailModal.status || "N/A"}</span>
-              <span>
-                Interested: {jobDetailModal.interested_count || 0}
-              </span>
+              <span>Interested: {jobDetailModal.interested_count || 0}</span>
             </div>
 
             <button
@@ -765,8 +1060,8 @@ export default function Dash1Worker({ viewSlug }) {
               onClick={() => {
                 closeJobDetailModal();
                 navigate(
-              `/worker/workspace/WorkspaceJobDetails?jobId=${jobDetailModal.job_id}`
-            );
+                  `/worker/workspace/WorkspaceJobDetails?jobId=${jobDetailModal.job_id}`,
+                );
               }}
               style={{
                 marginTop: "8px",
@@ -785,7 +1080,7 @@ export default function Dash1Worker({ viewSlug }) {
             </button>
           </div>
         </div>
-       )}
+      )}
     </div>
   );
 }

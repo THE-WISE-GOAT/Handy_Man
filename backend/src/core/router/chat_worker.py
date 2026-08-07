@@ -779,7 +779,6 @@ async def complete_worker_chat(
             detail="Job description is missing from the extracted profile.",
         )
 
-    # Older profiles lack a separate baseline_description; fall back gracefully.
     baseline_desc = (profile_data.get("baseline_description") or "").strip() or job_desc
     speciality_title = (profile_data.get("speciality_title") or "").strip()
     speciality_desc = (profile_data.get("speciality_description") or "").strip()
@@ -788,7 +787,6 @@ async def complete_worker_chat(
     lng = payload.location.longitude
     wkt_point = f"POINT({lng} {lat})"
 
-    # Baseline embedding is mandatory — a failure here blocks registration.
     try:
         baseline_vector = await get_worker_description_embedding(baseline_desc)
     except Exception as exc:
@@ -797,15 +795,13 @@ async def complete_worker_chat(
             detail=f"Nvidia embedding API error: {exc}",
         )
 
-    # Speciality embedding is best-effort; row is stored unvectorised on failure.
     speciality_vector = None
     if speciality_desc:
         try:
             speciality_vector = await get_worker_description_embedding(speciality_desc)
         except Exception as exc:
             logger.error(
-                "Speciality embedding failed for worker_chat_id=%s (%s); "
-                "storing row unvectorised.",
+                "Speciality embedding failed for worker_chat_id=%s (%s); storing row unvectorised.",
                 worker_chat_id,
                 exc,
             )
@@ -846,10 +842,46 @@ async def complete_worker_chat(
         sync_profile_extracted_fields(db_profile, profile_data)
         db.add(db_profile)
 
-    # Legacy field kept populated so older diagnostics/readers keep working.
     db_profile.description_vector = baseline_vector
+    db.flush()
 
-    db.flush()  # obtain db_profile.id before writing skill FKs
+    # Determine attachment requirement flags from extracted profile or existing baseline
+    is_cert = bool(profile_data.get("is_certificate"))
+    is_lic = bool(profile_data.get("is_license"))
+    is_train = bool(profile_data.get("is_training"))
+
+    loc_str = str(profile_data.get("license_or_certification") or "").lower()
+    if not is_cert and "certif" in loc_str:
+        is_cert = True
+    if not is_lic and ("licens" in loc_str or "licenc" in loc_str):
+        is_lic = True
+
+    existing_baseline = db.execute(
+        select(model.WorkerSkill).where(
+            model.WorkerSkill.worker_id == db_profile.id,
+            model.WorkerSkill.skill_type == model.SkillType.BASELINE,
+        )
+    ).scalar_one_or_none()
+
+    if existing_baseline:
+        if existing_baseline.is_certificate:
+            is_cert = True
+        if existing_baseline.is_license:
+            is_lic = True
+        if existing_baseline.is_training:
+            is_train = True
+
+    # Validate mandatory attachments
+    if is_cert and not payload.certificate:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one certificate attachment is required.",
+        )
+    if is_lic and not payload.license:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one license attachment is required.",
+        )
 
     upsert_baseline_skill(
         db=db,
@@ -857,6 +889,12 @@ async def complete_worker_chat(
         title=db_profile.job_category or "general work",
         description=baseline_desc,
         embedding=baseline_vector,
+        certificate=payload.certificate,
+        license=payload.license,
+        misc=payload.misc,
+        is_certificate=is_cert,
+        is_license=is_lic,
+        is_training=is_train,
     )
 
     if speciality_desc:
@@ -1013,6 +1051,12 @@ def list_worker_skills(
                 "is_active": s.is_active,
                 "has_vector": s.embedding is not None,
                 "stage": s.stage,
+                "certificate": s.certificate or [],
+                "license": s.license or [],
+                "misc": s.misc or [],
+                "is_license": s.is_license,
+                "is_certificate": s.is_certificate,
+                "is_training": s.is_training,
             }
             for s in skills
         ],

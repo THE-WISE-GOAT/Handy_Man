@@ -1,4 +1,16 @@
 import { apiClient } from "@shared/api/client";
+import { API_BASE_URL } from "@shared/config/api";
+
+const normalizeMessage = (msg) => ({
+  id: msg.id || msg.message_id || `msg-${Math.random()}`,
+  sender_id: msg.sender_id ?? msg.senderId ?? msg.user_id ?? msg.author_id,
+  sender_role: String(
+    msg.sender_role || msg.role || msg.sender_type || "",
+  ).toLowerCase(),
+  sender_name: msg.sender_name || msg.username || msg.sender || "Unknown",
+  text: msg.text || msg.message || msg.content || "",
+  timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
+});
 
 export const createPostingsZlice = (set, get) => ({
   postingsSlots: {
@@ -32,7 +44,6 @@ export const createPostingsZlice = (set, get) => ({
   feedbackRating: "Verified Feedback - 5.0 Star Average",
   pipelineStatus: "Post Network Pipeline Monitor Active",
 
-  customerSocket: null,
   chatSocket: null,
   chatMessages: [],
   chatBookingChatId: null,
@@ -44,8 +55,8 @@ export const createPostingsZlice = (set, get) => ({
 
       if (data.status === "success") {
         const jobs = data.tasks || [];
-        
-        const mappedJobs = jobs.map(job => {
+
+        const mappedJobs = jobs.map((job) => {
           const lat = job.latitude ?? job.location?.latitude;
           const lng = job.longitude ?? job.location?.longitude;
           return {
@@ -53,12 +64,12 @@ export const createPostingsZlice = (set, get) => ({
             latitude: lat,
             longitude: lng,
             matchedCount: job.matched_count || 0,
-            interestedCount: job.interested_count || 0
+            interestedCount: job.interested_count || 0,
           };
         });
 
         set({ pendingJobs: mappedJobs });
-        
+
         const currentSelected = get().selectedJob;
         if (mappedJobs.length > 0) {
           const matchingActiveJob = currentSelected
@@ -89,7 +100,8 @@ export const createPostingsZlice = (set, get) => ({
           return {
             id: bid.id || crypto.randomUUID(),
             worker_chat_id: workerId,
-            worker_name: bid.worker_name || bid.provider || `Worker ${workerId}`,
+            worker_name:
+              bid.worker_name || bid.provider || `Worker ${workerId}`,
             provider: bid.worker_name || bid.provider || `Worker ${workerId}`,
             bid_amount: bidAmount,
             amount: bidAmount,
@@ -128,8 +140,10 @@ export const createPostingsZlice = (set, get) => ({
     if (!workerChatIds || workerChatIds.length === 0) return;
 
     try {
-      const data = await apiClient.post("/workers/locations", { worker_chat_ids: workerChatIds });
-      
+      const data = await apiClient.post("/workers/locations", {
+        worker_chat_ids: workerChatIds,
+      });
+
       if (data.status === "success") {
         const locationsMap = { ...get().workerLocations };
         data.locations.forEach((loc) => {
@@ -165,7 +179,11 @@ export const createPostingsZlice = (set, get) => ({
     if (!jobId) return;
 
     try {
-      const data = await apiClient.get(`/dispatch/match/${jobId}/find-help`);
+      const job = get().pendingJobs.find((j) => j.id === jobId);
+      const bookingChatId = job?.booking_chat_id || jobId;
+      const data = await apiClient.get(
+        `/dispatch/match/${bookingChatId}/find-help`,
+      );
       const workers = data.workers || [];
 
       get().updateJobMetrics(jobId, {
@@ -186,10 +204,13 @@ export const createPostingsZlice = (set, get) => ({
         get().fetchWorkerLocations(workerIds);
       }
     } catch (error) {
-      console.error(`❌ Failed to fetch matched workers for Job ${jobId}:`, error);
+      console.error(
+        `❌ Failed to fetch matched workers for Job ${jobId}:`,
+        error,
+      );
       get().updateJobMetrics(jobId, { matchedCount: 0 });
       set((state) => ({
-        matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] }
+        matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] },
       }));
     }
   },
@@ -200,96 +221,37 @@ export const createPostingsZlice = (set, get) => ({
     set({ selectedJob: job, selectedWorkerId: null });
     if (job && job.id) {
       get().fetchJobBids(job.id);
-      if (job.booking_chat_id) {
-        const token = localStorage.getItem("handy_man_access_token");
-        get().connectCustomerDispatch(job.booking_chat_id, token);
-      }
+      get().fetchMatchedWorkersForJob(job.id);
     }
   },
 
-  disconnectCustomerDispatch: () => {
-    const { customerSocket } = get();
-    if (customerSocket) {
-      customerSocket.close();
-      set({ customerSocket: null });
-    }
-  },
-
-  connectCustomerDispatch: (bookingChatId, token) => {
-    get().disconnectCustomerDispatch();
-
-    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
-    const socket = new WebSocket(
-      `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`,
-    );
-
-    socket.onopen = () => console.log("🟢 Live Dispatch WebSocket Connected");
-    socket.onerror = (err) =>
-      console.error("❌ Live Dispatch WebSocket Error:", err);
-    socket.onclose = () =>
-      console.log("🔴 Live Dispatch WebSocket Disconnected");
-
-    socket.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-
-      if (message.type === "WORKER_INTEREST_UPDATE") {
-        const { job_id, worker_chat_id, interested } = message.data;
-        set((state) => ({
-          pendingJobs: state.pendingJobs.map((job) =>
-            job.id === job_id
-              ? {
-                  ...job,
-                  interestedCount:
-                    (job.interestedCount || 0) + (interested ? 1 : -1),
-                }
-              : job,
-          ),
-          workerLocations: {
-            ...state.workerLocations,
-            [worker_chat_id]: {
-              ...state.workerLocations[worker_chat_id],
-              is_interested: interested,
-            },
-          },
-        }));
-      }
-
-      if (message.type === "NEW_BID") {
-        const { job_id, bid } = message.data;
-        set((state) => {
-          const newBid = { ...bid, id: crypto.randomUUID(), status: "Incoming" };
-          const workerName = bid.worker_name || `Worker ${bid.worker_chat_id}`;
-          const bidAmount = bid.bid_amount || bid.amount || 0;
-          const newState = {
-            biddingsStream: [...state.biddingsStream, newBid]
+  appendMessage: (senderOrMsg, text, senderName, senderId) => {
+    const raw =
+      typeof senderOrMsg === "object" && senderOrMsg !== null
+        ? senderOrMsg
+        : {
+            sender: senderOrMsg,
+            role: senderOrMsg,
+            text,
+            sender_name:
+              senderName || (senderOrMsg === "customer" ? "You" : undefined),
+            sender_id: senderId,
           };
-          return newState;
-        });
-        get().appendMessage(
-          "system",
-          `${bid.worker_name || "Worker"} bids Rs ${bid.bid_amount || bid.amount || 0}`,
-          "BID SYSTEM"
-        );
-      }
-    };
-
-    set({ customerSocket: socket });
-  },
-
-  appendMessage: (sender, text, senderName = "You") =>
+    const msg = normalizeMessage(raw);
     set((state) => ({
-      chatMessages: [
-        ...state.chatMessages,
-        { id: crypto.randomUUID(), sender, senderName, text }
-      ]
-    })),
+      chatMessages: [...state.chatMessages, msg],
+    }));
+  },
 
   connectCustomerChat: async (bookingChatId) => {
     get().disconnectCustomerChat();
     const token = localStorage.getItem("handy_man_access_token");
-    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
+    const wsBaseUrl = (import.meta.env?.VITE_WS_URL || API_BASE_URL).replace(
+      /^http/,
+      "ws",
+    );
     const socket = new WebSocket(
-      `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`
+      `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`,
     );
 
     socket.onopen = () => {
@@ -303,32 +265,37 @@ export const createPostingsZlice = (set, get) => ({
       set({ isChatConnected: false, chatBookingChatId: null });
 
     socket.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === "HUMAN_MESSAGE") {
-        const { sender, sender_name, message: msgContent } = message.data;
-        set((state) => ({
-          chatMessages: [
-            ...state.chatMessages,
-            { id: crypto.randomUUID(), sender, senderName: sender_name, text: msgContent }
-          ]
-        }));
+      const rawData = JSON.parse(event.data);
+      if (rawData.type === "HUMAN_MESSAGE") {
+        const normalized = normalizeMessage(rawData.data);
+        set((state) => {
+          const exists = state.chatMessages.some((m) => m.id === normalized.id);
+          if (exists) return state;
+
+          const filtered = state.chatMessages.filter(
+            (m) =>
+              !String(m.id).startsWith("temp-") || m.text !== normalized.text,
+          );
+          return { chatMessages: [...filtered, normalized] };
+        });
       }
 
-      if (message.type === "SYSTEM_BID") {
-        const { bid_amount, worker_chat_id, worker_name } = message.data;
+      if (rawData.type === "SYSTEM_BID") {
+        const { bid_amount, worker_chat_id, worker_name } = rawData.data;
         const bidAmount = bid_amount || 0;
         const workerName = worker_name || `Worker ${worker_chat_id}`;
-        
+
+        const bidMessage = {
+          id: crypto.randomUUID(),
+          sender_id: null,
+          sender_role: "system",
+          sender_name: "BID SYSTEM",
+          text: `${workerName} placed a bid: Rs ${bidAmount}`,
+          timestamp: new Date().toISOString(),
+        };
+
         set((state) => ({
-          chatMessages: [
-            ...state.chatMessages,
-            {
-              id: crypto.randomUUID(),
-              sender: "system",
-              senderName: "BID SYSTEM",
-              text: `${workerName} placed a bid: Rs ${bidAmount}`
-            }
-          ]
+          chatMessages: [...state.chatMessages, bidMessage],
         }));
 
         set((state) => ({
@@ -342,10 +309,10 @@ export const createPostingsZlice = (set, get) => ({
               bid_amount: bidAmount,
               amount: bidAmount,
               offer: bidAmount,
-              message: message.data.bid_message || "",
-              status: "Incoming"
-            }
-          ]
+              message: rawData.data.bid_message || "",
+              status: "Incoming",
+            },
+          ],
         }));
       }
     };
@@ -357,15 +324,50 @@ export const createPostingsZlice = (set, get) => ({
     const { chatSocket } = get();
     if (chatSocket) {
       chatSocket.close();
-      set({ chatSocket: null, isChatConnected: false, chatBookingChatId: null, chatMessages: [] });
+      set({
+        chatSocket: null,
+        isChatConnected: false,
+        chatBookingChatId: null,
+        chatMessages: [],
+      });
     }
   },
 
   sendHumanMessage: async (bookingChatId, sender, text) => {
+    const token = localStorage.getItem("handy_man_access_token");
+    let currentUserId = null;
+    try {
+      if (token) {
+        const base64Payload = token
+          .split(".")[1]
+          .replace(/-/g, "+")
+          .replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64Payload)
+            .split("")
+            .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+            .join(""),
+        );
+        currentUserId = JSON.parse(jsonPayload).user_id;
+      }
+    } catch {
+      currentUserId = null;
+    }
+
+    const optimisticMsg = normalizeMessage({
+      id: `temp-${Date.now()}`,
+      sender_id: currentUserId,
+      sender_role: sender,
+      sender_name: "You",
+      text,
+      timestamp: new Date().toISOString(),
+    });
+    get().appendMessage(optimisticMsg);
+
     try {
       const data = await apiClient.post(
         `/dispatch/chat/${bookingChatId}/message`,
-        { sender, message: text }
+        { sender, message: text },
       );
       return data;
     } catch (error) {
@@ -375,28 +377,26 @@ export const createPostingsZlice = (set, get) => ({
   },
 
   fetchChatHistory: async (bookingChatId) => {
-      try {
-        const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
-        const history = data.history || [];
-        const sanitizedHistory = history.filter((msg) => {
-          if (msg.role !== "system") return true;
-          if (msg.role === "system" && msg.content && msg.content.length < 200) return true;
-          return false;
-        });
-        const messages = sanitizedHistory
-          .map((msg) => ({
-            id: crypto.randomUUID(),
-            sender: msg.role,
-            senderName: msg.sender_name || (msg.role === "customer" ? "Customer" : msg.role === "worker" ? "Worker" : "BID SYSTEM"),
-            text: msg.content,
-          }));
-        set({ chatMessages: messages });
-      } catch (error) {
-        if (error.status === 500) {
-          console.error("❌ Chat history fetch failed (server error), skipping retry:", error.message);
-        } else {
-          console.error("❌ Failed to fetch chat history:", error);
-        }
+    try {
+      const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
+      const history = data.history || [];
+      const sanitizedHistory = history.filter((msg) => {
+        if (msg.role !== "system") return true;
+        if (msg.role === "system" && msg.content && msg.content.length < 200)
+          return true;
+        return false;
+      });
+      const messages = sanitizedHistory.map((msg) => normalizeMessage(msg));
+      set({ chatMessages: messages });
+    } catch (error) {
+      if (error.status === 500) {
+        console.error(
+          "❌ Chat history fetch failed (server error), skipping retry:",
+          error.message,
+        );
+      } else {
+        console.error("❌ Failed to fetch chat history:", error);
       }
-    },
+    }
+  },
 });

@@ -2,6 +2,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWorkerDashboardData } from "./useWorkerDashboardData";
+import { apiClient } from "@shared/api/client";
 import "./dash2worker.css";
 
 export default function Dash2Worker({ viewSlug }) {
@@ -14,9 +15,16 @@ export default function Dash2Worker({ viewSlug }) {
     jobsRegistryStatus,
     clientQueryStatus,
     routeMatrixStatus,
+    assignedJobs,
+    activeAssignedJob,
+    setActiveAssignedJob,
+    fetchAssignedJobs,
   } = useWorkerDashboardData();
 
-  // Route state synchronization layer
+  useEffect(() => {
+    fetchAssignedJobs();
+  }, [fetchAssignedJobs]);
+
   useEffect(() => {
     if (!viewSlug) return;
 
@@ -31,23 +39,47 @@ export default function Dash2Worker({ viewSlug }) {
     }
   }, [viewSlug, scheduledSlots, swapScheduledSlots]);
 
+  useEffect(() => {
+    if (assignedJobs.length > 0 && !activeAssignedJob) {
+      setActiveAssignedJob(assignedJobs[0]);
+    }
+  }, [assignedJobs, activeAssignedJob, setActiveAssignedJob]);
+
   const handleModuleSelect = (targetSlug) => {
     navigate(`/worker/scheduled/${targetSlug}`);
+  };
+
+  const handleJobSelect = (job) => {
+    setActiveAssignedJob(job);
   };
 
   // ====================================================
   // SUB-MODULE RENDERS
   // ====================================================
 
+  const job = activeAssignedJob || assignedJobs[0];
+
   const renderCalendar = (slotKey) => {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">••• SCHEDULE PLATFORM PLANNERS</div>
+          <div className="card-header">••• ASSIGNED JOB SCHEDULE</div>
 
           <div className="main-panel">
-            <h2>System Planner Calendar</h2>
-            <p className="panel-desc">{calendarDescText}</p>
+            {job ? (
+              <>
+                <h2>{job.title} — Timeline</h2>
+                <p><strong>Status:</strong> {job.status}</p>
+                <p><strong>Created:</strong> {new Date(job.created_at).toLocaleString()}</p>
+                <p><strong>Updated:</strong> {new Date(job.updated_at).toLocaleString()}</p>
+                <p><strong>Address:</strong> {job.address_text}</p>
+              </>
+            ) : (
+              <>
+                <h2>System Planner Calendar</h2>
+                <p className="panel-desc">{calendarDescText}</p>
+              </>
+            )}
           </div>
         </div>
       );
@@ -58,20 +90,22 @@ export default function Dash2Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("ScheduledCalendar")}
       >
-        <div className="card-header">••• SCHEDULE PLATFORM PLANNERS</div>
+        <div className="card-header">••• ASSIGNED JOB SCHEDULE</div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
             <>
               <span className="badge badge-highlight">
-                Sidebar: Planner Context
+                Sidebar: Job Timeline
               </span>
 
-              <p className="card-summary">{calendarDescText}</p>
+              <p className="card-summary">
+                {job ? `${job.title} — ${job.status}` : calendarDescText}
+              </p>
             </>
           ) : (
             <span className="badge">
-              Footer ({slotKey}): Calendar Monitor Live
+              Footer ({slotKey}): {job ? job.status : "Calendar Monitor Live"}
             </span>
           )}
         </div>
@@ -83,10 +117,26 @@ export default function Dash2Worker({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">••• UPCOMING DEPLOYMENT NODES</div>
+          <div className="card-header">••• ASSIGNED JOB DETAILS</div>
 
           <div className="main-panel">
-            <h2>Scheduled Jobs Registry</h2>
+            {job ? (
+              <>
+                <h2>{job.title}</h2>
+                <p><strong>Status:</strong> {job.status}</p>
+                <p><strong>Description:</strong> {job.description}</p>
+                <p><strong>Contact:</strong> {job.contact_name || "N/A"}</p>
+                <p><strong>Phone:</strong> {job.contact_phone || "N/A"}</p>
+                <p><strong>Address:</strong> {job.address_text || "N/A"}</p>
+                {job.booking_chat_id && (
+                  <p><strong>Booking Chat:</strong> {job.booking_chat_id}</p>
+                )}
+              </>
+            ) : (
+              <>
+                <h2>Scheduled Jobs Registry</h2>
+              </>
+            )}
           </div>
         </div>
       );
@@ -97,18 +147,20 @@ export default function Dash2Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("ScheduledJobCard")}
       >
-        <div className="card-header">••• UPCOMING DEPLOYMENT NODES</div>
+        <div className="card-header">••• ASSIGNED JOB DETAILS</div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
             <>
               <span className="badge badge-highlight">Sidebar: Job Matrix</span>
 
-              <p className="card-summary">Status: {jobsRegistryStatus}</p>
+              <p className="card-summary">
+                {job ? `${job.title} — ${job.status}` : jobsRegistryStatus}
+              </p>
             </>
           ) : (
             <span className="badge">
-              Footer ({slotKey}): Registry — {jobsRegistryStatus}
+              Footer ({slotKey}): {job ? job.status : `Registry — ${jobsRegistryStatus}`}
             </span>
           )}
         </div>
@@ -120,10 +172,21 @@ export default function Dash2Worker({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">••• ACTIVE MESSAGING CORRIDOR</div>
+          <div className="card-header">••• ACTIVE BOOKING CHAT</div>
 
           <div className="main-panel">
-            <h2>Client Communications Terminal</h2>
+            {job?.booking_chat_id ? (
+              <>
+                <h2>Booking Chat: {job.booking_chat_id}</h2>
+                <p>Real-time communication with customer for assigned job <strong>{job.title}</strong>.</p>
+                <p><strong>Customer:</strong> {job.contact_name || "N/A"}</p>
+              </>
+            ) : (
+              <>
+                <h2>Client Communications Terminal</h2>
+                <p>No active booking chat for this job.</p>
+              </>
+            )}
           </div>
         </div>
       );
@@ -134,7 +197,7 @@ export default function Dash2Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("ClientQueries")}
       >
-        <div className="card-header">••• ACTIVE MESSAGING CORRIDOR</div>
+        <div className="card-header">••• ACTIVE BOOKING CHAT</div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
@@ -143,11 +206,15 @@ export default function Dash2Worker({ viewSlug }) {
                 Sidebar: Inbox Comms
               </span>
 
-              <p className="card-summary">Queue: {clientQueryStatus}</p>
+              <p className="card-summary">
+                {job?.booking_chat_id
+                  ? `Chat ${job.booking_chat_id} — ${job.title}`
+                  : `Queue: ${clientQueryStatus}`}
+              </p>
             </>
           ) : (
             <span className="badge">
-              Footer ({slotKey}): Comms Feed ({clientQueryStatus})
+              Footer ({slotKey}): {job?.booking_chat_id ? "Comms Active" : `Comms Feed (${clientQueryStatus})`}
             </span>
           )}
         </div>
@@ -162,7 +229,23 @@ export default function Dash2Worker({ viewSlug }) {
           <div className="card-header">••• APPOINTMENT LOCATION INDEX</div>
 
           <div className="main-panel">
-            <h2>Route Matrix Overview</h2>
+            {job ? (
+              <>
+                <h2>Job Location — {job.title}</h2>
+                {job.latitude && job.longitude ? (
+                  <p>
+                    <strong>Coordinates:</strong> {Number(job.latitude).toFixed(6)}, {Number(job.longitude).toFixed(6)}
+                  </p>
+                ) : (
+                  <p>No geospatial data available for this job.</p>
+                )}
+                <p><strong>Address:</strong> {job.address_text}</p>
+              </>
+            ) : (
+              <>
+                <h2>Route Matrix Overview</h2>
+              </>
+            )}
           </div>
         </div>
       );
@@ -182,11 +265,15 @@ export default function Dash2Worker({ viewSlug }) {
                 Sidebar: Matrix Node
               </span>
 
-              <p className="card-summary">Routing: {routeMatrixStatus}</p>
+              <p className="card-summary">
+                {job && job.latitude && job.longitude
+                  ? `${Number(job.latitude).toFixed(4)}, ${Number(job.longitude).toFixed(4)}`
+                  : `Routing: ${routeMatrixStatus}`}
+              </p>
             </>
           ) : (
             <span className="badge">
-              Footer ({slotKey}): Routing Stream [{routeMatrixStatus}]
+              Footer ({slotKey}): {job ? "Dispatch Active" : `Routing Stream [${routeMatrixStatus}]`}
             </span>
           )}
         </div>

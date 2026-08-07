@@ -6,6 +6,8 @@ import "./dash1board.css";
 export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const dateInputRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -62,6 +64,11 @@ export default function Dash1Board({ viewSlug }) {
     isEditMode,
     editingJobId,
     exitEditMode,
+
+    saveDraftProfile,
+    setSaveDraftProfile,
+    saveUserProfileDraft,
+    fetchUserProfile,
   } = useCustomerDashboardData();
 
   const scrollRef = useRef(null);
@@ -83,8 +90,9 @@ export default function Dash1Board({ viewSlug }) {
   };
 
   useEffect(() => {
+    fetchUserProfile();
     useCustomerDashboardData.getState().startNewSession();
-  }, []);
+  }, [fetchUserProfile]);
 
   useEffect(() => {
     if (!viewSlug) return;
@@ -322,9 +330,27 @@ export default function Dash1Board({ viewSlug }) {
     navigate(`/customer/bookings/${targetSlug}`);
   };
 
+  const handleSaveDraftToggle = async (e) => {
+    const checked = e.target.checked;
+    setSaveDraftProfile(checked);
+    if (checked) {
+      await saveUserProfileDraft();
+    }
+  };
+
   const handleCreateJobFinalize = async () => {
-    await createJob();
+    await createJob({ scheduled_date: scheduledDate || null });
     fetchBookingsPendingJobs();
+  };
+
+  const handleOpenDatePicker = () => {
+    if (dateInputRef.current) {
+      if (typeof dateInputRef.current.showPicker === "function") {
+        dateInputRef.current.showPicker();
+      } else {
+        dateInputRef.current.focus();
+      }
+    }
   };
 
   const renderAiChat = (slotKey) => {
@@ -337,7 +363,10 @@ export default function Dash1Board({ viewSlug }) {
       };
 
       return (
-        <div className="dashboard-card main-view">
+        <div
+          className="dashboard-card main-view"
+          style={{ overflow: "scroll", maxHeight: "85vh" }}
+        >
           <span className="card-flag">
             INTERACTIVE DISPATCH MANAGER
             {turns_remaining !== undefined &&
@@ -384,7 +413,7 @@ export default function Dash1Board({ viewSlug }) {
               + Create Job Manually
             </button>
           </div>
-          <div className="chat-box">
+          <div className="chat-box" style={{ maxHeight: "none" }}>
             {chatMessages.map((m) => (
               <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
                 <strong>{m.sender.toUpperCase()}:</strong> {m.text}
@@ -448,16 +477,11 @@ export default function Dash1Board({ viewSlug }) {
         onClick={() => handleModuleSelect("AiChatTerminal")}
       >
         <div className="card-header">••• AI CHAT TERMINAL</div>
-        {slotKey === "sidebar" ? (
-          <>
-            <span className="badge badge-highlight">
-              Live Dispatch — Active Session
-            </span>
-            <p className="card-summary">Logs Captured: {chatMessages.length}</p>
-          </>
-        ) : (
-          <span className="badge">AI Dispatch running asleep below...</span>
-        )}
+        <span className="badge badge-highlight">Post Job through AI chat</span>
+        <p className="card-summary">Logs Captured: {chatMessages.length}</p>
+        <div className="card-summary" style={{ color: "brown" }}>
+          <p>Post your job by talking to our AI assistant.</p>
+        </div>
       </div>
     );
   };
@@ -500,9 +524,10 @@ export default function Dash1Board({ viewSlug }) {
               className="title"
               style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}
             >
-              <span>·•TITLE:</span>
+              <span>·•Title:&nbsp;</span>
               <input
                 type="text"
+                placeholder="Set Title"
                 value={jobTitleDraft}
                 onChange={(e) => setJobTitle(e.target.value)}
                 spellCheck={false}
@@ -520,10 +545,11 @@ export default function Dash1Board({ viewSlug }) {
               <span style={{ whiteSpace: "nowrap", flexShrink: 0 }}>•·</span>
             </h3>
 
-            <h3 className="title">DEsCRIPTION:</h3>
+            <h3 className="title">Description:</h3>
             <textarea
               className="workspace-textarea"
               value={jobDescriptionDraft}
+              placeholder="ENTER JOB DESCRIPTION..."
               onChange={(e) => setJobDescription(e.target.value)}
               style={{
                 border: "2px dashed var(--ind-border-strong)",
@@ -548,7 +574,7 @@ export default function Dash1Board({ viewSlug }) {
             }}
           >
             <h3 className="title" dir="rtl" style={{ marginBottom: "4px" }}>
-              AttACHMENTs
+              Attachments
             </h3>
 
             <div
@@ -788,15 +814,19 @@ export default function Dash1Board({ viewSlug }) {
 
             <h3 className="title" dir="rtl" style={{ marginTop: "10px" }}>
               {" "}
-              UsER INFo{" "}
+              User Info{" "}
             </h3>
             <div className="user-info" style={{ lineHeight: "35px" }}>
               <span style={{ display: "inline-flex", alignItems: "baseline" }}>
-                <span>NAME:</span>
+                <span>NAME:&nbsp;</span>
                 <input
                   type="text"
                   value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="ENTER YOU NAME"
+                  onChange={(e) => {
+                    setUserName(e.target.value);
+                    if (saveDraftProfile) saveUserProfileDraft();
+                  }}
                   spellCheck={false}
                   style={{
                     outline: "none",
@@ -814,12 +844,16 @@ export default function Dash1Board({ viewSlug }) {
               </span>
 
               <span style={{ display: "inline-flex", alignItems: "baseline" }}>
-                <span>CONTACT:</span>
+                <span>CONTACT:&nbsp;</span>
                 <input
                   type="text"
                   value={userCont}
-                  onChange={(e) => setUserCont(e.target.value)}
+                  onChange={(e) => {
+                    setUserCont(e.target.value);
+                    if (saveDraftProfile) saveUserProfileDraft();
+                  }}
                   spellCheck={false}
+                  placeholder="ENTER CONTACT (+977 ...)"
                   style={{
                     outline: "none",
                     border: "none",
@@ -848,7 +882,7 @@ export default function Dash1Board({ viewSlug }) {
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.75)}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}
               >
-                <span style={{ flexShrink: 0 }}>ADDRESS:</span>
+                <span style={{ flexShrink: 0 }}>ADDRESS:&nbsp;</span>
                 <span
                   style={{
                     paddingLeft: "4px",
@@ -865,53 +899,159 @@ export default function Dash1Board({ viewSlug }) {
                   {userAddrText || "SET LOCATION 🗺️"}
                 </span>
               </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginTop: "6px",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  id="saveDraftCheckbox"
+                  checked={saveDraftProfile}
+                  onChange={handleSaveDraftToggle}
+                  style={{
+                    cursor: "pointer",
+                    accentColor: "#FF6B1A",
+                    width: "16px",
+                    height: "16px",
+                  }}
+                />
+                <label
+                  htmlFor="saveDraftCheckbox"
+                  style={{
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    color: "var(--k-ink-2, #ccc)",
+                    userSelect: "none",
+                    fontWeight: 600,
+                  }}
+                >
+                  Save Draft for future reference
+                </label>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => console.log("🚨 Emergency toggle triggered")}
-              className="title"
-              dir="rtl"
-              name="emergency"
-            >
-              EmERGENcY ToGGLE
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCreateJobFinalize}
-              disabled={isSubmitting}
-              className="title"
-              dir="rtl"
-              name="post"
+            <div
               style={{
-                background: "#FF6B1A",
-                color: "#0D0D0D",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 18px",
-                fontWeight: "bold",
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-                fontSize: "13px",
-                transition: "transform 120ms ease, opacity 120ms ease",
-                opacity: isSubmitting ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) => {
-                if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = 1;
-              }}
-              onMouseDown={(e) => {
-                if (!isSubmitting)
-                  e.currentTarget.style.transform = "scale(0.95)";
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+                marginTop: "24px",
+                width: "100%",
               }}
             >
-              {isSubmitting ? "Posting..." : "<- Post Job"}
-            </button>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                  gap: "16px",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <button
+                    type="button"
+                    onClick={() => console.log("🚨 Emergency toggle triggered")}
+                    className="title"
+                    dir="rtl"
+                    name="emergency"
+                  >
+                    Emergency Toggle
+                  </button>
+                </div>
+
+                <div style={{ flex: 1, position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={handleOpenDatePicker}
+                    style={{
+                      width: "100%",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      padding: "12px 20px",
+                      background: "#1e293b",
+                      color: "#ffffff",
+                      borderRadius: "8px",
+                      border: "1px solid #475569",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      lineHeight: "1.2",
+                      textAlign: "center",
+                      transition: "opacity 120ms ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = 0.85;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = 1;
+                    }}
+                  >
+                    📅 {scheduledDate ? scheduledDate : "Select Date"}
+                  </button>
+                  <input
+                    type="date"
+                    ref={dateInputRef}
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                    style={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      width: "1px",
+                      height: "1px",
+                      opacity: 0,
+                      pointerEvents: "none",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCreateJobFinalize}
+                disabled={isSubmitting}
+                className="title"
+                dir="rtl"
+                name="post"
+                style={{
+                  width: "100%",
+                  padding: "16px",
+                  background: "#FF6B1A",
+                  color: "#0D0D0D",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontWeight: "bold",
+                  cursor: isSubmitting ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                  transition: "transform 120ms ease, opacity 120ms ease",
+                  opacity: isSubmitting ? 0.6 : 1,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = 1;
+                }}
+                onMouseDown={(e) => {
+                  if (!isSubmitting)
+                    e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                {isSubmitting ? "Posting..." : "<- Post Job"}
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -922,19 +1062,19 @@ export default function Dash1Board({ viewSlug }) {
         className={`dashboard-card asleep-view ${slotKey}-slot clickable`}
         onClick={() => handleModuleSelect("JobDescriptionWorkspace")}
       >
-        <div className="card-header">••• JOB DESCRIPTION WORKSPACE</div>
-        {slotKey === "sidebar" ? (
-          <>
-            <span className="badge">
-              Sidebar: Description Live Glance — Draft Mode
-            </span>
-          </>
-        ) : (
-          <span className="badge">
-            Footer: Draft character footprint: {jobDescriptionDraft.length}{" "}
-            chars
-          </span>
-        )}
+        <div className="card-header">••• JOB WORKSPACE</div>
+        <div>
+          <span className="badge badge-highlight">Extracted Job Detail</span>
+          <span className="badge badge-highlight">Manual Job Posting</span>
+        </div>
+        <p className="card-summary">
+          Description Draft: {jobDescriptionDraft.length} chars
+        </p>
+        <div className="card-summary" style={{ color: "brown" }}>
+          <p>Extracted Job Credentials through AI appears here.</p>
+          <span>Edit and Post a job after chat finalized.</span>
+          <p>Manually Fill Job Credentials without talking to AI.</p>
+        </div>
       </div>
     );
   };
@@ -944,9 +1084,10 @@ export default function Dash1Board({ viewSlug }) {
       return (
         <div
           className="dashboard-card main-view"
-          style={{ overflow: "scroll", maxHeight: "33vw" }}
+          style={{ overflow: "scroll", maxHeight: "80vh" }}
         >
           <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
+
           <h2>ACTIVE PENDING POSTS</h2>
           <button
             onClick={fetchBookingsPendingJobs}
@@ -1098,20 +1239,16 @@ export default function Dash1Board({ viewSlug }) {
         onClick={() => handleModuleSelect("YourActivePosts")}
       >
         <div className="card-header">••• YOUR ACTIVE POSTS</div>
-        {slotKey === "sidebar" ? (
-          <>
-            <span className="badge badge-highlight">
-              Network Pipeline Active
-            </span>
-            <p className="card-summary">
-              Live Trackable: {activePostsCount} Positions
-            </p>
-          </>
-        ) : (
-          <span className="badge">
-            Posts Monitor sleeping below — {activePostsCount} items queued
-          </span>
-        )}
+        <div>
+          <span className="badge badge-highlight">Active Posts</span>
+          <span className="badge badge-highlight">Edit Posted Jobs</span>
+        </div>
+        <div className="card-summary">
+          <span>You have {activePostsCount} active posts.</span>
+        </div>
+        <div className="card-summary" style={{ color: "brown" }}>
+          <p>View and Edit posted jobs.</p>
+        </div>
       </div>
     );
   };
@@ -1133,8 +1270,12 @@ export default function Dash1Board({ viewSlug }) {
   return (
     <div className="dashboard-grid">
       <div className="grid-main">{resolveAndRenderModule("main")}</div>
-      <div className="grid-bottom">{resolveAndRenderModule("bottom")}</div>
-      <div className="grid-sidebar">{resolveAndRenderModule("sidebar")}</div>
+
+      <div className="right-sidebar-container">
+        <div className="grid-slot-2">{resolveAndRenderModule("sidebar")}</div>
+
+        <div className="grid-slot-3">{resolveAndRenderModule("bottom")}</div>
+      </div>
 
       {isMapOpen && (
         <div
@@ -1306,13 +1447,16 @@ export default function Dash1Board({ viewSlug }) {
 
               <button
                 type="button"
-                onClick={() => {
-                  setUserAddrText(
+                onClick={async () => {
+                  const finalAddr =
                     modalAddrText ||
-                      `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`,
-                  );
+                    `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`;
+                  setUserAddrText(finalAddr);
                   setUserCoordinates(modalLng, modalLat);
                   setIsMapOpen(false);
+                  if (saveDraftProfile) {
+                    await saveUserProfileDraft();
+                  }
                 }}
                 style={{
                   flex: 1,
