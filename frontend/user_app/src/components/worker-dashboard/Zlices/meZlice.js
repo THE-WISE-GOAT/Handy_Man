@@ -629,7 +629,7 @@ export const createMeZlice = (set, get) => ({
         });
 
         if (data.worker_chat_id) {
-          get().fetchChatHistory(data.worker_chat_id);
+          get().fetchWorkerInterviewHistory(data.worker_chat_id);
           get().fetchWorkerSkills();
         }
 
@@ -676,7 +676,7 @@ export const createMeZlice = (set, get) => ({
     }
   },
 
-  fetchChatHistory: async (workerChatId) => {
+  fetchWorkerInterviewHistory: async (workerChatId) => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(

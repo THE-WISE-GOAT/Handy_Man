@@ -26,6 +26,24 @@ export default function Dash1Worker({ viewSlug }) {
   };
   const currentUserId = getCurrentUserId();
 
+  const getOtherWorkerColor = (identifier) => {
+    const lightColors = [
+      { background: "#BFDBFE", color: "#1E3A8A" },
+      { background: "#BBF7D0", color: "#14532D" },
+      { background: "#E9D5FF", color: "#581C87" },
+      { background: "#FBCFE8", color: "#831843" },
+      { background: "#99F6E4", color: "#134E4A" },
+      { background: "#FEF08A", color: "#713F12" },
+    ];
+
+    let hash = 0;
+    for (let i = 0; i < identifier.length; i++) {
+      hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % lightColors.length;
+    return lightColors[index];
+  };
+
   const {
     workspaceSlots,
     swapWorkspaceSlots,
@@ -424,7 +442,6 @@ export default function Dash1Worker({ viewSlug }) {
         if (!bookingChatId) return;
         try {
           await sendHumanMessage(bookingChatId, "worker", chatInput.trim());
-          appendMessage("worker", chatInput.trim());
           setChatInput("");
         } catch (err) {
           console.error("Failed to send message:", err);
@@ -446,47 +463,84 @@ export default function Dash1Worker({ viewSlug }) {
             </button>
           </div>
 
-          <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
-            {chatMessages
-              .filter(
-                (msg) => msg.sender === "customer" || msg.sender === "worker" || msg.sender === "system"
-              )
-              .map((msg) => (
-                <div key={msg.id}>
-                  {msg.sender === "system" ? (
-                    <div style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
+           <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
+              {chatMessages
+                .filter(
+                  (msg) => msg.sender_role === "customer" || msg.sender_role === "worker" || msg.sender_role === "system"
+                )
+                .map((msg) => {
+                  const isSelf = Boolean(
+                    currentUserId &&
+                    msg.sender_id != null &&
+                    String(msg.sender_id).trim() === String(currentUserId).trim()
+                  );
+                  const isClient = msg.sender_role === "customer" || msg.sender_role === "client";
+                  
+                  if (msg.sender_role === "system") {
+                    return (
+                      <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
+                        <div style={{
+                          maxWidth: "80%", padding: "4px 16px", fontSize: "0.85rem",
+                          fontWeight: 600, color: "#FF6B1A", background: "rgba(255,107,26,0.1)",
+                          borderRadius: "9999px", textAlign: "center"
+                        }}>
+                          {msg.text}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  if (isSelf) {
+                    return (
+                      <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
+                        <div style={{
+                          maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
+                          background: "#FF6B1A", borderRadius: "28px 4px 28px 28px",
+                          fontWeight: "normal",
+                          fontStyle: "normal"
+                        }}>
+                          <strong>{msg.sender_name === "You" ? "You:" : `${msg.sender_name}:`}</strong> {msg.text}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  if (isClient) {
+                    return (
+                      <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
+                        <div style={{
+                          maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
+                          background: "var(--k-raise)", borderRadius: "4px 28px 28px 28px",
+                          border: "1px solid var(--k-line)",
+                          // dont change that font, or bold/italic format
+                          fontWeight: "bold",
+                          fontStyle: "italic"
+                        }}>
+                          <strong>{msg.sender_name}:</strong> {msg.text}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  const workerColor = getOtherWorkerColor(msg.sender_name || msg.sender_role);
+                  return (
+                    <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
                       <div style={{
-                        maxWidth: "80%", padding: "4px 16px", fontSize: "0.85rem",
-                        fontWeight: 600, color: "#FF6B1A", background: "rgba(255,107,26,0.1)",
-                        borderRadius: "9999px", textAlign: "center"
+                        maxWidth: "70%", padding: "8px 16px",
+                        background: workerColor.background,
+                        color: workerColor.color,
+                        borderRadius: "4px 28px 28px 28px",
+                        border: "1px solid var(--k-line)",
+                        fontWeight: "normal",
+                        fontStyle: "normal"
                       }}>
-                        {msg.text}
+                        <strong>{msg.sender_name}:</strong> {msg.text}
                       </div>
                     </div>
-                  ) : msg.sender === "worker" ? (
-                    <div style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
-                      <div style={{
-                        maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
-                        background: "#FF6B1A", borderRadius: "28px 4px 28px 28px"
-                      }}>
-                        <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
-                      <div style={{
-                        maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
-                        background: "var(--k-raise)", borderRadius: "4px 28px 28px 28px",
-                        border: "1px solid var(--k-line)"
-                      }}>
-                        <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            <div ref={messagesEndRef} />
-          </div>
+                  );
+                })}
+              <div ref={messagesEndRef} />
+            </div>
 
           <form
             onSubmit={handleSendChat}

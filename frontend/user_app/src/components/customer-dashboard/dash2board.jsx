@@ -91,6 +91,42 @@ export default function Dash2Board({ viewSlug }) {
   const messagesEndRef = React.useRef(null);
   const [chatInput, setChatInput] = React.useState("");
 
+  const getCurrentUserId = () => {
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      if (!token) return null;
+      const base64Payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64Payload)
+          .split("")
+          .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+          .join("")
+      );
+      return JSON.parse(jsonPayload).user_id;
+    } catch {
+      return null;
+    }
+  };
+  const currentUserId = getCurrentUserId();
+
+  const getOtherWorkerColor = (identifier) => {
+    const lightColors = [
+      { background: "#BFDBFE", color: "#1E3A8A" },
+      { background: "#BBF7D0", color: "#14532D" },
+      { background: "#E9D5FF", color: "#581C87" },
+      { background: "#FBCFE8", color: "#831843" },
+      { background: "#99F6E4", color: "#134E4A" },
+      { background: "#FEF08A", color: "#713F12" },
+    ];
+
+    let hash = 0;
+    for (let i = 0; i < identifier.length; i++) {
+      hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % lightColors.length;
+    return lightColors[index];
+  };
+
   // ── Full-width view toggle for ActiveBiddingsEngine ──
   const [viewAllBids, setViewAllBids] = useState(false);
   const [bookMultiple, setBookMultiple] = useState(false);
@@ -188,7 +224,6 @@ export default function Dash2Board({ viewSlug }) {
       if (!bookingChatId) return;
       try {
         await sendHumanMessage(bookingChatId, "customer", chatInput.trim());
-        appendMessage("customer", chatInput.trim());
         setChatInput("");
       } catch (err) {
         console.error("Failed to send message:", err);
@@ -213,11 +248,19 @@ export default function Dash2Board({ viewSlug }) {
 
         <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
           {chatMessages
-            .filter((msg) => msg.sender === "customer" || msg.sender === "worker" || msg.sender === "system")
-            .map((msg) => (
-              <div key={msg.id}>
-                {msg.sender === "system" ? (
-                  <div style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
+            .filter((msg) => msg.sender_role === "customer" || msg.sender_role === "worker" || msg.sender_role === "system")
+            .map((msg) => {
+              const isSelf = Boolean(
+                currentUserId &&
+                msg.sender_id != null &&
+                String(msg.sender_id).trim() === String(currentUserId).trim()
+              );
+              const isClient = msg.sender_role === "customer" || msg.sender_role === "client";
+              const isOtherWorker = msg.sender_role === "worker" && !isSelf;
+
+              if (msg.sender_role === "system") {
+                return (
+                  <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
                     <div style={{
                       maxWidth: "80%", padding: "4px 16px", fontSize: "0.85rem",
                       fontWeight: 600, color: "#FF6B1A", background: "rgba(255,107,26,0.1)",
@@ -226,28 +269,58 @@ export default function Dash2Board({ viewSlug }) {
                       {msg.text}
                     </div>
                   </div>
-                ) : msg.sender === "customer" ? (
-                  <div style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
+                );
+              }
+
+              if (isSelf) {
+                return (
+                  <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
                     <div style={{
                       maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
-                      background: "#FF6B1A", borderRadius: "28px 4px 28px 28px"
+                      background: "#FF6B1A", borderRadius: "28px 4px 28px 28px",
+                      fontWeight: "normal",
+                      fontStyle: "normal"
                     }}>
-                      <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                      <strong>{msg.sender_name === "You" ? "You:" : `${msg.sender_name}:`}</strong> {msg.text}
                     </div>
                   </div>
-                ) : (
-                  <div style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
+                );
+              }
+
+              if (isClient) {
+                return (
+                  <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
                     <div style={{
                       maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
                       background: "var(--k-raise)", borderRadius: "4px 28px 28px 28px",
-                      border: "1px solid var(--k-line)"
+                      border: "1px solid var(--k-line)",
+                      // dont change that font, or bold/italic format
+                      fontWeight: "bold",
+                      fontStyle: "italic"
                     }}>
-                      <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                      <strong>{msg.sender_name}:</strong> {msg.text}
                     </div>
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              }
+
+              const workerColor = getOtherWorkerColor(msg.sender_name || msg.sender_role);
+              return (
+                <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
+                  <div style={{
+                    maxWidth: "70%", padding: "8px 16px",
+                    background: workerColor.background,
+                    color: workerColor.color,
+                    borderRadius: "4px 28px 28px 28px",
+                    border: "1px solid var(--k-line)",
+                    fontWeight: "normal",
+                    fontStyle: "normal"
+                  }}>
+                    <strong>{msg.sender_name}:</strong> {msg.text}
+                  </div>
+                </div>
+              );
+            })}
           <div ref={messagesEndRef} />
         </div>
 
