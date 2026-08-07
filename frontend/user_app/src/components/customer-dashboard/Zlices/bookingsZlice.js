@@ -5,6 +5,47 @@ export const createBookingsZlice = (set, get) => ({
   userLng: 85.428,
   userLat: 27.671,
 
+  saveDraftProfile: false,
+  setSaveDraftProfile: (val) => set({ saveDraftProfile: val }),
+
+  fetchUserProfile: async () => {
+    try {
+      const data = await apiClient.get("/userDetails/profile");
+      if (data) {
+        if (data.contact_name) set({ userName: data.contact_name });
+        if (data.contact_number) set({ userCont: data.contact_number });
+        if (data.address_text) set({ userAddrText: data.address_text });
+        if (data.latitude !== null && data.latitude !== undefined) {
+          set({ userLat: data.latitude, latitude: data.latitude });
+        }
+        if (data.longitude !== null && data.longitude !== undefined) {
+          set({ userLng: data.longitude, longitude: data.longitude });
+        }
+        if (data.contact_name || data.contact_number || data.address_text) {
+          set({ saveDraftProfile: true });
+        }
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch user profile:", error);
+    }
+  },
+
+  saveUserProfileDraft: async () => {
+    const { userName, userCont, userAddrText, userLat, userLng } = get();
+    try {
+      await apiClient.put("/userDetails/profile", {
+        contact_name: userName || "",
+        contact_number: userCont || "",
+        address_text: userAddrText || "",
+        latitude: parseFloat(userLat) || 0.0,
+        longitude: parseFloat(userLng) || 0.0,
+      });
+      console.log("✅ User profile draft saved successfully.");
+    } catch (error) {
+      console.error("❌ Failed to save user profile draft:", error);
+    }
+  },
+
   setUserAddrText: (text) => set({ userAddrText: text }),
   setUserCoordinates: (lng, lat) => set({ userLng: lng, userLat: lat }),
   setUserLocation: (address, lng, lat) =>
@@ -14,8 +55,8 @@ export const createBookingsZlice = (set, get) => ({
       userLat: lat,
     }),
 
-  jobDescriptionDraft: "I want to install a smart home manager like Alexa for my house. It's a medium sized house, about 2 stories high. The manager should service roughly 6 rooms with any and all modern features. ",
-  jobTitleDraft: "Smart-Home Setup",
+  jobDescriptionDraft: "",
+  jobTitleDraft: "",
   aiTitle: "",
   aiDescription: "",
   chatMessages: [
@@ -29,9 +70,9 @@ export const createBookingsZlice = (set, get) => ({
   isAiGenerating: false,
   fetchedJobs: [],
 
-  userName: "Simran Singh",
+  userName: "",
   userAddr: "BHAKTAPUR",
-  userCont: "+977 9812345678",
+  userCont: "",
 
   longitude: 27.671,
   latitude: 85.428,
@@ -156,11 +197,17 @@ export const createBookingsZlice = (set, get) => ({
       userCont,
       attachments,
       fetchBookingsPendingJobs,
+      saveDraftProfile,
+      saveUserProfileDraft,
     } = get();
 
     if (!booking_chat_id) {
       console.error("❌ Cannot post job. No active booking_chat_id found.");
       return;
+    }
+
+    if (saveDraftProfile) {
+      await saveUserProfileDraft();
     }
 
     set({ isSubmitting: true });
@@ -265,6 +312,7 @@ export const createBookingsZlice = (set, get) => ({
       editingJobId: null,
     });
     try {
+      await get().fetchUserProfile();
       const data = await apiClient.post("/dispatch/session", {});
 
       set({
