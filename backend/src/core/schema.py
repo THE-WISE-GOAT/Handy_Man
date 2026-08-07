@@ -48,7 +48,7 @@ class InitializeWorkerAppIn(BaseModel):
 class InitializeWorkerAppOut(BaseModel):
     worker_id: int
     user_id: int
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     is_rejected: bool
     worker_chat_id: int | None = None
@@ -70,13 +70,13 @@ class SubmitWorkerAppIn(BaseModel):
 
 class SubmitWorkerAppOut(BaseModel):
     worker_id: int
-    stage: str
+    stage: Optional[str] = None
     message: str
 
 
 class WorkerAppStatusOut(BaseModel):
     worker_id: int
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     is_rejected: bool
     rejection_reason: str | None = None
@@ -96,7 +96,7 @@ class AdminPendingAppOut(BaseModel):
     skill_id: int
     skill_title: str
     skill_type: str
-    stage: str
+    stage: Optional[str] = None
 
     id: int
     user_id: int
@@ -382,7 +382,7 @@ class WorkerProfileSchema(BaseModel):
 class WorkerSessionStartOut(BaseModel):
     worker_chat_id: int
     ai_response: str
-    stage: str
+    stage: Optional[str] = None
 
 
 class WorkerChatMessageIn(BaseModel):
@@ -393,7 +393,7 @@ class WorkerChatMessageIn(BaseModel):
 class WorkerChatMessageOut(BaseModel):
     worker_chat_id: int
     ai_response: str
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     is_rejected: bool
     scenario_question: Optional[str] = None
@@ -404,14 +404,14 @@ class WorkerChatMessageOut(BaseModel):
 class WorkerChatHistoryOut(BaseModel):
     worker_chat_id: int
     history: List[dict]
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     turns_used: int
     turns_remaining: int
 
 
 class WorkerSummaryOut(BaseModel):
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     is_rejected: bool
     rejection_reason: Optional[str] = None
@@ -452,7 +452,7 @@ class WorkerSkillOut(BaseModel):
     scenario_score: Optional[int] = None
     is_active: bool
     has_vector: bool
-    stage: str
+    stage: Optional[str] = None
     certificate: List[Dict[str, Any]] = Field(default_factory=list)
     license: List[Dict[str, Any]] = Field(default_factory=list)
     misc: List[Dict[str, Any]] = Field(default_factory=list)
@@ -475,7 +475,7 @@ class AddSkillStartOut(BaseModel):
     worker_chat_id: int
     ai_response: str
     existing_skills: List[str]
-    stage: str
+    stage: Optional[str] = None
 
 
 class AddSkillMessageIn(BaseModel):
@@ -493,7 +493,7 @@ class AddSkillMessageIn(BaseModel):
 class AddSkillMessageOut(BaseModel):
     worker_chat_id: int
     ai_response: str
-    stage: str
+    stage: Optional[str] = None
     scenario_question: Optional[str] = None
     skill_added: bool = False
     skill_title: Optional[str] = None

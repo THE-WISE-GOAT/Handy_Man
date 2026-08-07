@@ -7,6 +7,7 @@ export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
+  const dateInputRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -326,6 +327,16 @@ export default function Dash1Board({ viewSlug }) {
   const handleCreateJobFinalize = async () => {
     await createJob({ scheduled_date: scheduledDate || null });
     fetchBookingsPendingJobs();
+  };
+
+  const handleOpenDatePicker = () => {
+    if (dateInputRef.current) {
+      if (typeof dateInputRef.current.showPicker === "function") {
+        dateInputRef.current.showPicker();
+      } else {
+        dateInputRef.current.focus();
+      }
+    }
   };
 
   const renderAiChat = (slotKey) => {
@@ -871,71 +882,89 @@ export default function Dash1Board({ viewSlug }) {
             <div
               style={{
                 display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-                gap: "12px",
+                flexDirection: "column",
+                gap: "16px",
+                marginTop: "24px",
+                width: "100%",
               }}
             >
-              <button
-                type="button"
-                onClick={() => console.log("🚨 Emergency toggle triggered")}
-                className="title"
-                dir="rtl"
-                name="emergency"
-              >
-                EmERGENcY ToGGLE
-              </button>
-
               <div
                 style={{
-                  position: "relative",
-                  display: "inline-flex",
+                  display: "flex",
+                  flexDirection: "row",
                   alignItems: "center",
+                  gap: "16px",
                 }}
               >
-                <button
-                  type="button"
+                <div
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "8px 14px",
-                    background: "var(--k-raise, #1a1a1a)",
-                    color: "#ffffff",
-                    border: "1px solid var(--k-line, #333)",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    fontSize: "13px",
-                    transition: "opacity 120ms ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = 0.85;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = 1;
+                    flex: 1,
                   }}
                 >
-                  📅 {scheduledDate ? scheduledDate : "Select Date"}
-                </button>
-                <input
-                  type="date"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  min={new Date().toISOString().split("T")[0]}
+                  <button
+                    type="button"
+                    onClick={() => console.log("🚨 Emergency toggle triggered")}
+                    className="title"
+                    dir="rtl"
+                    name="emergency"
+                  >
+                    EmERGENcY ToGGLE
+                  </button>
+                </div>
+
+                <div
                   style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "100%",
-                    padding: 0,
-                    margin: 0,
-                    opacity: 0,
-                    cursor: "pointer",
-                    border: "none",
-                    background: "transparent",
+                    flex: 1,
+                    position: "relative",
                   }}
-                />
+                >
+                  <button
+                    type="button"
+                    onClick={handleOpenDatePicker}
+                    style={{
+                      width: "100%",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      padding: "12px 20px",
+                      background: "#1e293b",
+                      color: "#ffffff",
+                      borderRadius: "8px",
+                      border: "1px solid #475569",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      lineHeight: "1.2",
+                      textAlign: "center",
+                      transition: "opacity 120ms ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = 0.85;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = 1;
+                    }}
+                  >
+                    📅 {scheduledDate ? scheduledDate : "Select Date"}
+                  </button>
+                  <input
+                    type="date"
+                    ref={dateInputRef}
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                    style={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      width: "1px",
+                      height: "1px",
+                      opacity: 0,
+                      pointerEvents: "none",
+                    }}
+                  />
+                </div>
               </div>
 
               <button
@@ -946,16 +975,18 @@ export default function Dash1Board({ viewSlug }) {
                 dir="rtl"
                 name="post"
                 style={{
+                  width: "100%",
+                  padding: "16px",
                   background: "#FF6B1A",
                   color: "#0D0D0D",
                   border: "none",
                   borderRadius: "8px",
-                  padding: "10px 18px",
                   fontWeight: "bold",
                   cursor: isSubmitting ? "not-allowed" : "pointer",
-                  fontSize: "13px",
+                  fontSize: "14px",
                   transition: "transform 120ms ease, opacity 120ms ease",
                   opacity: isSubmitting ? 0.6 : 1,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
