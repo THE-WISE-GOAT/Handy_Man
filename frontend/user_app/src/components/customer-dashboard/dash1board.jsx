@@ -363,7 +363,10 @@ export default function Dash1Board({ viewSlug }) {
       };
 
       return (
-        <div className="dashboard-card main-view">
+        <div
+          className="dashboard-card main-view"
+          style={{ overflow: "scroll", maxHeight: '85vh' }}
+        >
           <span className="card-flag">
             INTERACTIVE DISPATCH MANAGER
             {turns_remaining !== undefined &&
@@ -1081,7 +1084,7 @@ export default function Dash1Board({ viewSlug }) {
       return (
         <div
           className="dashboard-card main-view"
-          style={{ overflow: "scroll", maxHeight: "90vh" }}
+          style={{ overflow: "scroll", maxHeight: '80vh' }}
         >
           <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
 
