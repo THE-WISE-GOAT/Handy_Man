@@ -58,7 +58,6 @@ def _ensure_geography(location: Any):
 
     return location
 
-
 def calculate_match_score(distance: float) -> float:
     """The system's single source of truth scoring mechanism (Sigmoid)."""
     try:
@@ -66,7 +65,8 @@ def calculate_match_score(distance: float) -> float:
             0.0,
             min(
                 100.0,
-                round((1.0 / (1.0 + math.exp(25.0 * (distance - 0.90)))) * 100.0, 2),
+                # ONLY CHANGES: Changed steepness to 11.0 and midpoint to 0.68
+                round((1.0 / (1.0 + math.exp(11.0 * (distance - 0.68)))) * 100.0, 2),
             ),
         )
     except Exception:
