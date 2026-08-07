@@ -428,7 +428,7 @@ async def send_human_message(
 
     updated_history = list(chat_session.history)
     updated_history.append(
-        {"role": payload.sender, "content": payload.message, "sender_name": sender_name}
+        {"role": payload.sender, "content": payload.message, "sender_name": sender_name, "sender_id": current_user.id}
     )
     chat_session.history = updated_history
 
@@ -447,6 +447,7 @@ async def send_human_message(
             "booking_chat_id": chat_session.id,
             "sender": payload.sender,
             "sender_name": sender_name,
+            "sender_id": current_user.id,
             "message": payload.message,
         }
     }
@@ -522,6 +523,7 @@ def get_history(
                 else msg["content"]
             ),
             "sender_name": msg.get("sender_name"),
+            "sender_id": msg.get("sender_id"),
         }
         for msg in chat_session.history
         if msg["role"] not in ("user", "assistant")

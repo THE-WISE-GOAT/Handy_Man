@@ -1,4 +1,14 @@
 import { apiClient } from "@shared/api/client";
+import { API_BASE_URL } from "@shared/config/api";
+
+const normalizeMessage = (msg) => ({
+  id: msg.id || msg.message_id || `msg-${Math.random()}`,
+  sender_id: msg.sender_id ?? msg.senderId ?? msg.user_id ?? msg.author_id,
+  sender_role: String(msg.sender_role || msg.role || msg.sender_type || '').toLowerCase(),
+  sender_name: msg.sender_name || msg.username || msg.sender || 'Unknown',
+  text: msg.text || msg.message || msg.content || '',
+  timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
+});
 
 export const createPostingsZlice = (set, get) => ({
   postingsSlots: {
@@ -205,18 +215,26 @@ export const createPostingsZlice = (set, get) => ({
     }
   },
 
-  appendMessage: (sender, text, senderName = "You") =>
+  appendMessage: (senderOrMsg, text, senderName, senderId) => {
+    const raw = typeof senderOrMsg === "object" && senderOrMsg !== null
+      ? senderOrMsg
+      : { 
+          sender: senderOrMsg, 
+          role: senderOrMsg,
+          text, 
+          sender_name: senderName || (senderOrMsg === "customer" ? "You" : undefined), 
+          sender_id: senderId 
+        };
+    const msg = normalizeMessage(raw);
     set((state) => ({
-      chatMessages: [
-        ...state.chatMessages,
-        { id: crypto.randomUUID(), sender, senderName, text }
-      ]
-    })),
+      chatMessages: [...state.chatMessages, msg]
+    }));
+  },
 
   connectCustomerChat: async (bookingChatId) => {
     get().disconnectCustomerChat();
     const token = localStorage.getItem("handy_man_access_token");
-    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
+    const wsBaseUrl = (import.meta.env?.VITE_WS_URL || API_BASE_URL).replace(/^http/, "ws");
     const socket = new WebSocket(
       `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`
     );
@@ -232,32 +250,36 @@ export const createPostingsZlice = (set, get) => ({
       set({ isChatConnected: false, chatBookingChatId: null });
 
     socket.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === "HUMAN_MESSAGE") {
-        const { sender, sender_name, message: msgContent } = message.data;
-        set((state) => ({
-          chatMessages: [
-            ...state.chatMessages,
-            { id: crypto.randomUUID(), sender, senderName: sender_name, text: msgContent }
-          ]
-        }));
+      const rawData = JSON.parse(event.data);
+      if (rawData.type === "HUMAN_MESSAGE") {
+        const normalized = normalizeMessage(rawData.data);
+        set((state) => {
+          const exists = state.chatMessages.some(m => m.id === normalized.id);
+          if (exists) return state;
+
+          const filtered = state.chatMessages.filter(
+            m => !String(m.id).startsWith("temp-") || m.text !== normalized.text
+          );
+          return { chatMessages: [...filtered, normalized] };
+        });
       }
 
-      if (message.type === "SYSTEM_BID") {
-        const { bid_amount, worker_chat_id, worker_name } = message.data;
+      if (rawData.type === "SYSTEM_BID") {
+        const { bid_amount, worker_chat_id, worker_name } = rawData.data;
         const bidAmount = bid_amount || 0;
         const workerName = worker_name || `Worker ${worker_chat_id}`;
         
+        const bidMessage = {
+          id: crypto.randomUUID(),
+          sender_id: null,
+          sender_role: "system",
+          sender_name: "BID SYSTEM",
+          text: `${workerName} placed a bid: Rs ${bidAmount}`,
+          timestamp: new Date().toISOString(),
+        };
+        
         set((state) => ({
-          chatMessages: [
-            ...state.chatMessages,
-            {
-              id: crypto.randomUUID(),
-              sender: "system",
-              senderName: "BID SYSTEM",
-              text: `${workerName} placed a bid: Rs ${bidAmount}`
-            }
-          ]
+          chatMessages: [...state.chatMessages, bidMessage]
         }));
 
         set((state) => ({
@@ -271,7 +293,7 @@ export const createPostingsZlice = (set, get) => ({
               bid_amount: bidAmount,
               amount: bidAmount,
               offer: bidAmount,
-              message: message.data.bid_message || "",
+              message: rawData.data.bid_message || "",
               status: "Incoming"
             }
           ]
@@ -291,6 +313,33 @@ export const createPostingsZlice = (set, get) => ({
   },
 
   sendHumanMessage: async (bookingChatId, sender, text) => {
+    const token = localStorage.getItem("handy_man_access_token");
+    let currentUserId = null;
+    try {
+      if (token) {
+        const base64Payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64Payload)
+            .split("")
+            .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+            .join("")
+        );
+        currentUserId = JSON.parse(jsonPayload).user_id;
+      }
+    } catch {
+      currentUserId = null;
+    }
+
+    const optimisticMsg = normalizeMessage({
+      id: `temp-${Date.now()}`,
+      sender_id: currentUserId,
+      sender_role: sender,
+      sender_name: "You",
+      text,
+      timestamp: new Date().toISOString(),
+    });
+    get().appendMessage(optimisticMsg);
+
     try {
       const data = await apiClient.post(
         `/dispatch/chat/${bookingChatId}/message`,
@@ -312,13 +361,7 @@ export const createPostingsZlice = (set, get) => ({
           if (msg.role === "system" && msg.content && msg.content.length < 200) return true;
           return false;
         });
-        const messages = sanitizedHistory
-          .map((msg) => ({
-            id: crypto.randomUUID(),
-            sender: msg.role,
-            senderName: msg.sender_name || (msg.role === "customer" ? "Customer" : msg.role === "worker" ? "Worker" : "BID SYSTEM"),
-            text: msg.content,
-          }));
+        const messages = sanitizedHistory.map((msg) => normalizeMessage(msg));
         set({ chatMessages: messages });
       } catch (error) {
         if (error.status === 500) {
