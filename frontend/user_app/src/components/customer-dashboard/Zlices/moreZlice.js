@@ -1,4 +1,5 @@
 // Zlices/moreZlice.js
+import { apiClient } from "@shared/api/client";
 
 export const createMoreZlice = (set, get) => ({
   // ==========================================
@@ -9,10 +10,12 @@ export const createMoreZlice = (set, get) => ({
   archivePipelineStatus: "Archived Deployments Index Stream",
   systemPortalStatus: "System Parameters Modification Portal",
 
+  assignedJobs: [],
+  activeAssignedJob: null,
+
   // ==========================================
   // 2. DYNAMIC LAYOUT POSITIONS (4-Slot Map)
   // ==========================================
-  // Default arrangement matching your image exactly
   miscSlots: {
     main: "SystemCalendar",
     sidebar: "AccountProfiles",
@@ -38,4 +41,23 @@ export const createMoreZlice = (set, get) => ({
         },
       };
     }),
+
+  setMiscSlots: (slots) => set({ miscSlots: slots }),
+
+  setActiveAssignedJob: (job) => set({ activeAssignedJob: job }),
+
+  fetchAssignedJobs: async () => {
+    try {
+      const data = await apiClient.get("/jobs/status/assigned");
+      if (data.status === "success") {
+        const jobs = data.tasks || [];
+        set({ assignedJobs: jobs });
+        if (jobs.length > 0 && !get().activeAssignedJob) {
+          set({ activeAssignedJob: jobs[0] });
+        }
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch assigned jobs:", error);
+    }
+  },
 });
