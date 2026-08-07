@@ -10,23 +10,28 @@ export default function Dash1Worker({ viewSlug }) {
 
   const getCurrentUserId = () => {
     try {
-      const token = localStorage.getItem("handy_man_access_token");
+      const token = localStorage.getItem("handy_man_access_token") || localStorage.getItem("token") || localStorage.getItem("access_token");
       if (!token) return null;
-      const base64Payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const base64Url = token.split('.')[1];
+      if (!base64Url) return null;
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       const jsonPayload = decodeURIComponent(
-        atob(base64Payload)
-          .split("")
-          .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
-          .join("")
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
       );
-      return JSON.parse(jsonPayload).user_id;
-    } catch {
+      const parsed = JSON.parse(jsonPayload);
+      return parsed.user_id ?? parsed.id ?? parsed.sub ?? null;
+    } catch (err) {
+      console.error("Failed to parse auth token", err);
       return null;
     }
   };
   const currentUserId = getCurrentUserId();
 
   const getOtherWorkerColor = (identifier) => {
+    const safeIdentifier = String(identifier || 'Unknown');
     const lightColors = [
       { background: "#BFDBFE", color: "#1E3A8A" },
       { background: "#BBF7D0", color: "#14532D" },
@@ -37,8 +42,8 @@ export default function Dash1Worker({ viewSlug }) {
     ];
 
     let hash = 0;
-    for (let i = 0; i < identifier.length; i++) {
-      hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
+    for (let i = 0; i < safeIdentifier.length; i++) {
+      hash = safeIdentifier.charCodeAt(i) + ((hash << 5) - hash);
     }
     const index = Math.abs(hash) % lightColors.length;
     return lightColors[index];
@@ -179,31 +184,6 @@ export default function Dash1Worker({ viewSlug }) {
     }, 100);
     return () => clearTimeout(timer);
   }, [chatMessages, showBidForm]);
-
-  useEffect(() => {
-    if (activeJob && activeJob.booking_chat_id) {
-      useWorkerDashboardData.getState().connectWorkerChat(activeJob.booking_chat_id);
-      useWorkerDashboardData.getState().fetchChatHistory(activeJob.booking_chat_id);
-    }
-  }, [activeJob]);
-
-  useEffect(() => {
-    if (!viewSlug) return;
-
-    if (workspaceSlots.main !== viewSlug) {
-      const targetSlot = Object.keys(workspaceSlots).find(
-        (key) => workspaceSlots[key] === viewSlug,
-      );
-
-      if (targetSlot) {
-        swapWorkspaceSlots(targetSlot);
-      }
-    }
-  }, [viewSlug, workspaceSlots, swapWorkspaceSlots]);
-
-  useEffect(() => {
-    return () => useWorkerDashboardData.getState().disconnectWorkerChat();
-  }, []);
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/worker/workspace/${targetSlug}`);
@@ -464,27 +444,26 @@ export default function Dash1Worker({ viewSlug }) {
           </div>
 
            <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
-              {chatMessages
-                .filter(
-                  (msg) => msg.sender_role === "customer" || msg.sender_role === "worker" || msg.sender_role === "system"
-                )
-                .map((msg) => {
+              {Array.isArray(chatMessages) && chatMessages
+                .filter((msg) => msg && typeof msg === 'object' && (msg.sender_role === "customer" || msg.sender_role === "worker" || msg.sender_role === "system" || msg.sender_role === "client"))
+                .map((msg, idx) => {
                   const isSelf = Boolean(
                     currentUserId &&
                     msg.sender_id != null &&
                     String(msg.sender_id).trim() === String(currentUserId).trim()
                   );
                   const isClient = msg.sender_role === "customer" || msg.sender_role === "client";
+                  const displayName = isSelf ? "You" : (msg.sender_name || "User");
                   
                   if (msg.sender_role === "system") {
                     return (
-                      <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
+                      <div key={msg.id || `chat-msg-${idx}`} style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
                         <div style={{
                           maxWidth: "80%", padding: "4px 16px", fontSize: "0.85rem",
                           fontWeight: 600, color: "#FF6B1A", background: "rgba(255,107,26,0.1)",
                           borderRadius: "9999px", textAlign: "center"
                         }}>
-                          {msg.text}
+                          {msg.text || ''}
                         </div>
                       </div>
                     );
@@ -492,14 +471,14 @@ export default function Dash1Worker({ viewSlug }) {
                   
                   if (isSelf) {
                     return (
-                      <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
+                      <div key={msg.id || `chat-msg-${idx}`} style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
                         <div style={{
                           maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
                           background: "#FF6B1A", borderRadius: "28px 4px 28px 28px",
                           fontWeight: "normal",
                           fontStyle: "normal"
                         }}>
-                          <strong>{msg.sender_name === "You" ? "You:" : `${msg.sender_name}:`}</strong> {msg.text}
+                          <strong>{displayName}:</strong> {msg.text || ''}
                         </div>
                       </div>
                     );
@@ -507,7 +486,7 @@ export default function Dash1Worker({ viewSlug }) {
                   
                   if (isClient) {
                     return (
-                      <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
+                      <div key={msg.id || `chat-msg-${idx}`} style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
                         <div style={{
                           maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
                           background: "var(--k-raise)", borderRadius: "4px 28px 28px 28px",
@@ -516,7 +495,7 @@ export default function Dash1Worker({ viewSlug }) {
                           fontWeight: "bold",
                           fontStyle: "italic"
                         }}>
-                          <strong>{msg.sender_name}:</strong> {msg.text}
+                          <strong>{displayName}:</strong> {msg.text || ''}
                         </div>
                       </div>
                     );
@@ -524,7 +503,7 @@ export default function Dash1Worker({ viewSlug }) {
                   
                   const workerColor = getOtherWorkerColor(msg.sender_name || msg.sender_role);
                   return (
-                    <div key={msg.id} style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
+                    <div key={msg.id || `chat-msg-${idx}`} style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
                       <div style={{
                         maxWidth: "70%", padding: "8px 16px",
                         background: workerColor.background,
@@ -534,7 +513,7 @@ export default function Dash1Worker({ viewSlug }) {
                         fontWeight: "normal",
                         fontStyle: "normal"
                       }}>
-                        <strong>{msg.sender_name}:</strong> {msg.text}
+                        <strong>{displayName}:</strong> {msg.text || ''}
                       </div>
                     </div>
                   );
