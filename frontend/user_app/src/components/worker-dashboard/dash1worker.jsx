@@ -249,20 +249,20 @@ export default function Dash1Worker({ viewSlug }) {
               Manage active incoming offers and customer pricing requests.
             </p>
 
-            {matchedJobs.length === 0 ? (
-              <p style={{ opacity: 0.7, marginTop: "12px" }}>
-                No matched jobs yet. New opportunities will appear here.
-              </p>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                  marginTop: "12px",
-                }}
-              >
-                {matchedJobs.map((job) => (
+             {Array.isArray(matchedJobs) && matchedJobs.length === 0 ? (
+               <p style={{ opacity: 0.7, marginTop: "12px" }}>
+                 No matched jobs yet. New opportunities will appear here.
+               </p>
+             ) : (
+               <div
+                 style={{
+                   display: "flex",
+                   flexDirection: "column",
+                   gap: "12px",
+                   marginTop: "12px",
+                 }}
+               >
+                 {Array.isArray(matchedJobs) && matchedJobs.map((job) => (
                   <div
                     key={job.job_id}
                     style={{
@@ -692,7 +692,14 @@ export default function Dash1Worker({ viewSlug }) {
         return renderJobDetails(slotKey);
 
       default:
-        return <div className="dashboard-card slot-{slotKey}"><div className="card-header">••• MODULE PLACEHOLDER</div><div className="preview-panel"><span className="badge">No module loaded for {slotKey} slot</span></div></div>;
+        return (
+          <div className={`dashboard-card slot-${slotKey}`}>
+            <div className="card-header">••• MODULE PLACEHOLDER</div>
+            <div className="preview-panel">
+              <span className="badge">No module loaded for {slotKey} slot</span>
+            </div>
+          </div>
+        );
     }
   };
 

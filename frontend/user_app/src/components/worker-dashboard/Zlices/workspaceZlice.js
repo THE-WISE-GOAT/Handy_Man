@@ -43,17 +43,28 @@ export const createWorkspaceZlice = (set, get) => ({
     set((state) => {
       if (clickedSlotName === "main") return {};
 
+      let targetSlot = clickedSlotName;
+      if (!Object.prototype.hasOwnProperty.call(state.workspaceSlots, clickedSlotName)) {
+        targetSlot = Object.keys(state.workspaceSlots).find(
+          (key) => state.workspaceSlots[key] === clickedSlotName
+        );
+      }
+
+      if (!targetSlot || targetSlot === "main") return {};
+
       const outgoingMain = state.workspaceSlots.main;
-      const incomingTarget = state.workspaceSlots[clickedSlotName];
+      const incomingTarget = state.workspaceSlots[targetSlot];
 
       return {
         workspaceSlots: {
           ...state.workspaceSlots,
           main: incomingTarget,
-          [clickedSlotName]: outgoingMain,
+          [targetSlot]: outgoingMain,
         },
       };
     }),
+
+  setActiveModule: (moduleName) => set({ activeModule: moduleName }),
 
   workerProfession: "plumber",
   socket: null,
