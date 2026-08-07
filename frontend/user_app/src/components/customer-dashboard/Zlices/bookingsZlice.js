@@ -5,6 +5,47 @@ export const createBookingsZlice = (set, get) => ({
   userLng: 85.428,
   userLat: 27.671,
 
+  saveDraftProfile: false,
+  setSaveDraftProfile: (val) => set({ saveDraftProfile: val }),
+
+  fetchUserProfile: async () => {
+    try {
+      const data = await apiClient.get("/userDetails/profile");
+      if (data) {
+        if (data.contact_name) set({ userName: data.contact_name });
+        if (data.contact_number) set({ userCont: data.contact_number });
+        if (data.address_text) set({ userAddrText: data.address_text });
+        if (data.latitude !== null && data.latitude !== undefined) {
+          set({ userLat: data.latitude, latitude: data.latitude });
+        }
+        if (data.longitude !== null && data.longitude !== undefined) {
+          set({ userLng: data.longitude, longitude: data.longitude });
+        }
+        if (data.contact_name || data.contact_number || data.address_text) {
+          set({ saveDraftProfile: true });
+        }
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch user profile:", error);
+    }
+  },
+
+  saveUserProfileDraft: async () => {
+    const { userName, userCont, userAddrText, userLat, userLng } = get();
+    try {
+      await apiClient.put("/userDetails/profile", {
+        contact_name: userName || "",
+        contact_number: userCont || "",
+        address_text: userAddrText || "",
+        latitude: parseFloat(userLat) || 0.0,
+        longitude: parseFloat(userLng) || 0.0,
+      });
+      console.log("✅ User profile draft saved successfully.");
+    } catch (error) {
+      console.error("❌ Failed to save user profile draft:", error);
+    }
+  },
+
   setUserAddrText: (text) => set({ userAddrText: text }),
   setUserCoordinates: (lng, lat) => set({ userLng: lng, userLat: lat }),
   setUserLocation: (address, lng, lat) =>
@@ -14,8 +55,8 @@ export const createBookingsZlice = (set, get) => ({
       userLat: lat,
     }),
 
-  jobDescriptionDraft: "I want to install a smart home manager like alexa....",
-  jobTitleDraft: "SMartHoME SeTUP",
+  jobDescriptionDraft: "",
+  jobTitleDraft: "",
   aiTitle: "",
   aiDescription: "",
   chatMessages: [
@@ -29,9 +70,9 @@ export const createBookingsZlice = (set, get) => ({
   isAiGenerating: false,
   fetchedJobs: [],
 
-  userName: "ANUP G",
+  userName: "",
   userAddr: "BHAKTAPUR",
-  userCont: "+977 9814737741",
+  userCont: "",
 
   longitude: 27.671,
   latitude: 85.428,
@@ -145,7 +186,7 @@ export const createBookingsZlice = (set, get) => ({
     }
   },
 
-  createJob: async () => {
+  createJob: async (overrides = {}) => {
     const {
       booking_chat_id,
       jobTitleDraft,
@@ -156,6 +197,8 @@ export const createBookingsZlice = (set, get) => ({
       userCont,
       attachments,
       fetchBookingsPendingJobs,
+      saveDraftProfile,
+      saveUserProfileDraft,
     } = get();
 
     if (!booking_chat_id) {
@@ -163,22 +206,30 @@ export const createBookingsZlice = (set, get) => ({
       return;
     }
 
+    if (saveDraftProfile) {
+      await saveUserProfileDraft();
+    }
+
     set({ isSubmitting: true });
 
     try {
-      const data = await apiClient.post(`/dispatch/${booking_chat_id}/complete`, {
-        edited_description: jobDescriptionDraft || "",
-        location: {
-          longitude: parseFloat(userLng) || 0.0,
-          latitude: parseFloat(userLat) || 0.0
+      const data = await apiClient.post(
+        `/dispatch/${booking_chat_id}/complete`,
+        {
+          edited_description: jobDescriptionDraft || "",
+          location: {
+            longitude: parseFloat(userLng) || 0.0,
+            latitude: parseFloat(userLat) || 0.0,
+          },
+          title: jobTitleDraft || "NEW JOB REQUEST",
+          contact_name: userName || "",
+          contact_phone: userCont || "",
+          status: "pending",
+          mode: "regular",
+          attachments: attachments || [],
+          scheduled_date: overrides.scheduled_date || null,
         },
-        title: jobTitleDraft || "NEW JOB REQUEST",
-        contact_name: userName || "",
-        contact_phone: userCont || "",
-        status: "pending",
-        mode: "regular",
-        attachments: attachments || []
-      });
+      );
 
       if (data.status === "success") {
         console.log(
@@ -264,6 +315,7 @@ export const createBookingsZlice = (set, get) => ({
       editingJobId: null,
     });
     try {
+      await get().fetchUserProfile();
       const data = await apiClient.post("/dispatch/session", {});
 
       set({
@@ -317,9 +369,10 @@ export const createBookingsZlice = (set, get) => ({
         message: userMessage,
       });
 
-      const primaryCategory = data.categories && data.categories.length > 0
-        ? data.categories[0].category
-        : "";
+      const primaryCategory =
+        data.categories && data.categories.length > 0
+          ? data.categories[0].category
+          : "";
 
       set({
         booking_chat_id: data.booking_chat_id,
