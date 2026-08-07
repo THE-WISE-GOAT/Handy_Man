@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, cast, or_
+from sqlalchemy import select, func, cast
 from src.database.database import get_db
 from src.core.oauth2 import get_current_user
 from src.core import model
@@ -57,13 +57,15 @@ def get_worker_job_bids(
     current_user: model.User = Depends(get_current_user),
 ):
     job = db.execute(
-        select(model.Job).where(
-            or_(
-                model.Job.id == job_id,
-                model.Job.booking_chat_id == str(job_id),
-            )
-        )
+        select(model.Job).where(model.Job.id == job_id)
     ).scalar_one_or_none()
+
+    if not job:
+        job = db.execute(
+            select(model.Job).where(
+                model.Job.booking_chat_id == str(job_id)
+            )
+        ).scalar_one_or_none()
 
     if not job:
         raise HTTPException(

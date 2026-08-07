@@ -534,12 +534,12 @@ export default function Dash3Worker({ viewSlug }) {
       );
 
       const skillsList =
-        workerSkillList.length > 0
-          ? workerSkillList
-          : extractedSpecs.length > 0
-            ? extractedSpecs
-            : editableSpecs.length > 0
-              ? editableSpecs
+        extractedSpecs.length > 0
+          ? extractedSpecs
+          : editableSpecs.length > 0
+            ? editableSpecs
+            : workerSkillList.length > 0
+              ? workerSkillList
               : [
                   "Speciality 1",
                   "Speciality 2",
