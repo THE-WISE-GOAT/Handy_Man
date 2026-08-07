@@ -141,3 +141,6 @@ npm start     # or uvicorn src.core.main:app --reload
 
 ```
 end.
+
+bla vlbmpwnipngpinwpnf
+kwgkpnpinfp
