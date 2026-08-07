@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, TypedDict
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -13,6 +13,28 @@ class LocationCoordinates(BaseModel):
     latitude: float = Field(..., description="Latitude coordinate (Y)", ge=-90, le=90)
 
 
+class UserProfileUpdateIn(BaseModel):
+    contact_name: Optional[str] = None
+    contact_number: Optional[str] = None
+    address_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class UserProfileOut(BaseModel):
+    id: int
+    email: EmailStr
+    username: str
+    contact_name: Optional[str] = None
+    contact_number: Optional[str] = None
+    address_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
 class CompleteChatIn(BaseModel):
     edited_description: str
     location: LocationCoordinates
@@ -23,6 +45,7 @@ class CompleteChatIn(BaseModel):
     mode: str = "regular"
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
     phone_number: Optional[str] = None
+    scheduled_date: Optional[date] = None
 
 
 class CreateJobIn(BaseModel):
@@ -37,6 +60,7 @@ class CreateJobIn(BaseModel):
     mode: str = "regular"
     attachments: List[Dict[str, Any]] = Field(default_factory=list)
     phone_number: Optional[str] = None
+    scheduled_date: Optional[date] = None
 
 
 class InitializeWorkerAppIn(BaseModel):
@@ -46,7 +70,7 @@ class InitializeWorkerAppIn(BaseModel):
 class InitializeWorkerAppOut(BaseModel):
     worker_id: int
     user_id: int
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     is_rejected: bool
     worker_chat_id: int | None = None
@@ -61,17 +85,20 @@ class SubmitWorkerAppIn(BaseModel):
     address_text: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+    certificate: List[Dict[str, Any]] = Field(default_factory=list)
+    license: List[Dict[str, Any]] = Field(default_factory=list)
+    misc: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class SubmitWorkerAppOut(BaseModel):
     worker_id: int
-    stage: str
+    stage: Optional[str] = None
     message: str
 
 
 class WorkerAppStatusOut(BaseModel):
     worker_id: int
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     is_rejected: bool
     rejection_reason: str | None = None
@@ -91,7 +118,7 @@ class AdminPendingAppOut(BaseModel):
     skill_id: int
     skill_title: str
     skill_type: str
-    stage: str
+    stage: Optional[str] = None
 
     id: int
     user_id: int
@@ -177,9 +204,7 @@ class ChatMessageOut(BaseModel):
     turns_remaining: int
 
     problem_description: Optional[str] = None
-    categories: List[CategoryMatch] = Field(
-        default_factory=list
-    )
+    categories: List[CategoryMatch] = Field(default_factory=list)
 
 
 class UserCreate(BaseModel):
@@ -246,6 +271,7 @@ class ChatMessageIn(BaseModel):
 
 class HumanChatMessageIn(BaseModel):
     """Payload for human-to-human chat messages."""
+
     sender: str = Field(
         ...,
         description="Either 'customer' or 'worker' indicating the sender role.",
@@ -275,6 +301,7 @@ class HumanChatMessageIn(BaseModel):
 
 class HumanChatMessageOut(BaseModel):
     """Returned after a human-to-human chat message is sent."""
+
     booking_chat_id: int
     message: str
     sender: str
@@ -291,9 +318,11 @@ class SessionStartOut(BaseModel):
 
 class HistoryMessage(BaseModel):
     """A single turn in the client-visible conversation."""
+
     role: Literal["user", "assistant", "customer", "worker", "system"]
     content: str
     sender_name: Optional[str] = None
+
 
 class ChatHistoryOut(BaseModel):
     """Returned by GET /dispatch/{id}/history."""
@@ -377,7 +406,7 @@ class WorkerProfileSchema(BaseModel):
 class WorkerSessionStartOut(BaseModel):
     worker_chat_id: int
     ai_response: str
-    stage: str
+    stage: Optional[str] = None
 
 
 class WorkerChatMessageIn(BaseModel):
@@ -388,7 +417,7 @@ class WorkerChatMessageIn(BaseModel):
 class WorkerChatMessageOut(BaseModel):
     worker_chat_id: int
     ai_response: str
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     is_rejected: bool
     scenario_question: Optional[str] = None
@@ -399,14 +428,14 @@ class WorkerChatMessageOut(BaseModel):
 class WorkerChatHistoryOut(BaseModel):
     worker_chat_id: int
     history: List[dict]
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     turns_used: int
     turns_remaining: int
 
 
 class WorkerSummaryOut(BaseModel):
-    stage: str
+    stage: Optional[str] = None
     is_complete: bool
     is_rejected: bool
     rejection_reason: Optional[str] = None
@@ -434,6 +463,9 @@ class FindHelpOut(BaseModel):
 class WorkerCompleteChatIn(BaseModel):
     location: LocationCoordinates
     phone_number: Optional[str] = None
+    certificate: List[Dict[str, Any]] = Field(default_factory=list)
+    license: List[Dict[str, Any]] = Field(default_factory=list)
+    misc: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class WorkerSkillOut(BaseModel):
@@ -444,6 +476,13 @@ class WorkerSkillOut(BaseModel):
     scenario_score: Optional[int] = None
     is_active: bool
     has_vector: bool
+    stage: Optional[str] = None
+    certificate: List[Dict[str, Any]] = Field(default_factory=list)
+    license: List[Dict[str, Any]] = Field(default_factory=list)
+    misc: List[Dict[str, Any]] = Field(default_factory=list)
+    is_license: bool = False
+    is_certificate: bool = False
+    is_training: bool = False
 
     class Config:
         from_attributes = True
@@ -460,7 +499,7 @@ class AddSkillStartOut(BaseModel):
     worker_chat_id: int
     ai_response: str
     existing_skills: List[str]
-    stage: str
+    stage: Optional[str] = None
 
 
 class AddSkillMessageIn(BaseModel):
@@ -478,7 +517,7 @@ class AddSkillMessageIn(BaseModel):
 class AddSkillMessageOut(BaseModel):
     worker_chat_id: int
     ai_response: str
-    stage: str
+    stage: Optional[str] = None
     scenario_question: Optional[str] = None
     skill_added: bool = False
     skill_title: Optional[str] = None

@@ -3,12 +3,12 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from src.database.database import Base
-from sqlalchemy import Column, DateTime, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float, text
+from sqlalchemy import Column, DateTime, Integer, String, Boolean, ForeignKey, Enum, Text, ARRAY, Float, text, Date
 from sqlalchemy.sql.sqltypes import TIMESTAMP, UUID, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 import enum
-from datetime import datetime
+from datetime import datetime, date
 from geoalchemy2 import Geography
 from geoalchemy2.elements import WKBElement
 from sqlalchemy import JSON
@@ -29,6 +29,16 @@ class User(Base):
     lastName: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default='TRUE')
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default="now()")
+
+    contact_number:  Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    contact_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # ── Map & Geolocation Parameters ─────────────────────────────────────────
+    address_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    location: Mapped[Optional[WKBElement]] = mapped_column(Geography(geometry_type="POINT", srid=4326), nullable=True)
+
       
     
     # THE RELATIONSHIP LINK FOR USER
@@ -297,6 +307,16 @@ class WorkerSkill(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
     )
 
+
+    certificate: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    license: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    misc: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+
+    is_license: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_certificate: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_training: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
     worker: Mapped["WorkerProfile"] = relationship(
         "WorkerProfile",
         back_populates="skills",
@@ -344,6 +364,8 @@ class Job(Base):
     
     # Booking Mode: e.g., 'instant_dispatch', 'scheduled', 'emergency', 'remote_consult'
     mode: Mapped[str] = mapped_column(String(50), default="instant_dispatch", nullable=False, index=True)
+
+    scheduled_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     # Stores list of uploaded media objects: [{"url": "...", "type": "image"}, {"url": "...", "type": "video"}]
     attachments: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
