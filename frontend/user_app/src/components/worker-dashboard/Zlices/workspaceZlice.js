@@ -1,4 +1,5 @@
 import { apiClient } from "@shared/api/client";
+import { API_BASE_URL } from "@shared/config/api";
 
 export const createWorkspaceZlice = (set, get) => ({
   mapStatus: "REALTIME DISPATCH TRACKING MATRIX ACTIVE",
@@ -46,7 +47,7 @@ export const createWorkspaceZlice = (set, get) => ({
   fetchMatchedJobs: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/jobs/for-worker", {
+      const response = await fetch(`${API_BASE_URL}/jobs/for-worker`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,

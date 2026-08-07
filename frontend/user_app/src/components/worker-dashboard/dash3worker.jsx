@@ -500,19 +500,52 @@ export default function Dash3Worker({ viewSlug }) {
         editableProfile?.job_category ||
         "Plumber";
 
-      const skillsList =
+      const normalizeSpecialities = (specs) => {
+        if (!specs) return [];
+        if (Array.isArray(specs)) return specs;
+        if (typeof specs === "string") {
+          const trimmed = specs.trim();
+          if (!trimmed) return [];
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            return trimmed
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+          }
+        }
+        return [];
+      };
+
+      const workerSkillList =
         workerSkills && workerSkills.length > 0
           ? workerSkills.map((s) =>
               typeof s === "object" ? s.title || s.name || s.skill_name : s,
             )
-          : extractedProfile?.specialities?.length > 0
-            ? extractedProfile.specialities
-            : editableProfile?.specialities || [
-                "Speciality 1",
-                "Speciality 2",
-                "Speciality 3",
-                "Speciality 4",
-              ];
+          : [];
+
+      const extractedSpecs = normalizeSpecialities(
+        extractedProfile?.specialities,
+      );
+      const editableSpecs = normalizeSpecialities(
+        editableProfile?.specialities,
+      );
+
+      const skillsList =
+        workerSkillList.length > 0
+          ? workerSkillList
+          : extractedSpecs.length > 0
+            ? extractedSpecs
+            : editableSpecs.length > 0
+              ? editableSpecs
+              : [
+                  "Speciality 1",
+                  "Speciality 2",
+                  "Speciality 3",
+                  "Speciality 4",
+                ];
 
       return (
         <div className="dashboard-card slot-main">
@@ -770,9 +803,25 @@ export default function Dash3Worker({ viewSlug }) {
                 <div className="extracted-row">
                   <span className="extracted-label">Specialities:</span>
                   <span className="extracted-value">
-                    {extractedProfile.specialities?.length > 0
-                      ? extractedProfile.specialities.join(", ")
-                      : "—"}
+                    {(() => {
+                      const raw = extractedProfile?.specialities;
+                      const list = Array.isArray(raw)
+                        ? raw
+                        : typeof raw === "string"
+                          ? (() => {
+                              try {
+                                const p = JSON.parse(raw.trim());
+                                return Array.isArray(p) ? p : [];
+                              } catch {
+                                return raw
+                                  .split(",")
+                                  .map((s) => s.trim())
+                                  .filter(Boolean);
+                              }
+                            })()
+                          : [];
+                      return list.length > 0 ? list.join(", ") : "—";
+                    })()}
                   </span>
                 </div>
                 <div className="extracted-row">
@@ -1258,17 +1307,28 @@ export default function Dash3Worker({ viewSlug }) {
               )}
               {renderEmpty(
                 "Specialities",
-                (
-                  extractedProfile?.specialities ||
-                  editableProfile.specialities ||
-                  []
-                )?.length > 0
-                  ? (
-                      extractedProfile?.specialities ||
-                      editableProfile.specialities ||
-                      []
-                    ).join(", ")
-                  : "None",
+                (() => {
+                  const raw =
+                    extractedProfile?.specialities ||
+                    editableProfile.specialities ||
+                    [];
+                  const list = Array.isArray(raw)
+                    ? raw
+                    : typeof raw === "string"
+                      ? (() => {
+                          try {
+                            const p = JSON.parse(raw.trim());
+                            return Array.isArray(p) ? p : [];
+                          } catch {
+                            return raw
+                              .split(",")
+                              .map((s) => s.trim())
+                              .filter(Boolean);
+                          }
+                        })()
+                      : [];
+                  return list.length > 0 ? list.join(", ") : "None";
+                })(),
               )}
               {renderEmpty(
                 "Tools",
