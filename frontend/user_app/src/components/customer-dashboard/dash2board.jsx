@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useCustomerDashboardData } from './useCustomerDashboardData';
-import { apiClient } from '@shared/api/client';
-import './dash2board.css';
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCustomerDashboardData } from "./useCustomerDashboardData";
+import { apiClient } from "@shared/api/client";
+import "./dash2board.css";
 
 // 1. IMPORT LEAFLET
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
@@ -91,6 +91,45 @@ export default function Dash2Board({ viewSlug }) {
   const messagesEndRef = React.useRef(null);
   const [chatInput, setChatInput] = React.useState("");
 
+  const getCurrentUserId = () => {
+    try {
+      const token = localStorage.getItem("handy_man_access_token");
+      if (!token) return null;
+      const base64Payload = token
+        .split(".")[1]
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64Payload)
+          .split("")
+          .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+          .join(""),
+      );
+      return JSON.parse(jsonPayload).user_id;
+    } catch {
+      return null;
+    }
+  };
+  const currentUserId = getCurrentUserId();
+
+  const getOtherWorkerColor = (identifier) => {
+    const lightColors = [
+      { background: "#BFDBFE", color: "#1E3A8A" },
+      { background: "#BBF7D0", color: "#14532D" },
+      { background: "#E9D5FF", color: "#581C87" },
+      { background: "#FBCFE8", color: "#831843" },
+      { background: "#99F6E4", color: "#134E4A" },
+      { background: "#FEF08A", color: "#713F12" },
+    ];
+
+    let hash = 0;
+    for (let i = 0; i < identifier.length; i++) {
+      hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % lightColors.length;
+    return lightColors[index];
+  };
+
   // ── Full-width view toggle for ActiveBiddingsEngine ──
   const [viewAllBids, setViewAllBids] = useState(false);
   const [bookMultiple, setBookMultiple] = useState(false);
@@ -101,22 +140,22 @@ export default function Dash2Board({ viewSlug }) {
   const [showRatingsModal, setShowRatingsModal] = useState(false);
   const [selectedWorkersForReview, setSelectedWorkersForReview] = useState([]);
 
-   const {
-     postingsSlots,
-     swapPostingsSlots,
-     biddingsStream,
-     pendingJobs,
-     selectedJob,
-     setSelectedJob,
-     fetchPendingJobs,
-     chatMessages,
-     connectCustomerChat,
-     sendHumanMessage,
-     appendMessage,
-     disconnectCustomerChat,
-     matchedWorkersMap,
-    workerLocations,          
-    toggleWorkerInterest,     
+  const {
+    postingsSlots,
+    swapPostingsSlots,
+    biddingsStream,
+    pendingJobs,
+    selectedJob,
+    setSelectedJob,
+    fetchPendingJobs,
+    chatMessages,
+    connectCustomerChat,
+    sendHumanMessage,
+    appendMessage,
+    disconnectCustomerChat,
+    matchedWorkersMap,
+    workerLocations,
+    toggleWorkerInterest,
     selectedWorkerId,
     setSelectedWorkerId,
     fetchChatHistory,
@@ -127,9 +166,11 @@ export default function Dash2Board({ viewSlug }) {
   }, []);
 
   useEffect(() => {
-    const handleFocus = () => { useCustomerDashboardData.getState().fetchPendingJobs(); };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    const handleFocus = () => {
+      useCustomerDashboardData.getState().fetchPendingJobs();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, []);
 
   useEffect(() => {
@@ -141,40 +182,46 @@ export default function Dash2Board({ viewSlug }) {
     }
   }, [selectedWorkerId]);
 
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-      return () => clearTimeout(timer);
-    }, [chatMessages, viewAllBids]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [chatMessages, viewAllBids]);
 
-    useEffect(() => {
-      if (selectedJob && selectedJob.booking_chat_id) {
-        useCustomerDashboardData.getState().connectCustomerChat(selectedJob.booking_chat_id);
-        useCustomerDashboardData.getState().fetchChatHistory(selectedJob.booking_chat_id);
-      }
-    }, [selectedJob]);
+  useEffect(() => {
+    if (selectedJob && selectedJob.booking_chat_id) {
+      useCustomerDashboardData
+        .getState()
+        .connectCustomerChat(selectedJob.booking_chat_id);
+      useCustomerDashboardData
+        .getState()
+        .fetchChatHistory(selectedJob.booking_chat_id);
+    }
+  }, [selectedJob]);
 
-    // ── Fetch historical bids for the selected job on mount and when selectedJob changes ──
-    useEffect(() => {
-      if (selectedJob && selectedJob.id) {
-        useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
-      } else {
-        useCustomerDashboardData.getState().fetchPendingJobs();
-      }
-    }, [selectedJob]);
+  // ── Fetch historical bids for the selected job on mount and when selectedJob changes ──
+  useEffect(() => {
+    if (selectedJob && selectedJob.id) {
+      useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
+    } else {
+      useCustomerDashboardData.getState().fetchPendingJobs();
+    }
+  }, [selectedJob]);
 
-    useEffect(() => {
-      if (!viewSlug) return;
-      if (postingsSlots.main !== viewSlug) {
-        const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
-        if (targetSlot) swapPostingsSlots(targetSlot);
-      }
-    }, [viewSlug, postingsSlots, swapPostingsSlots]);
+  useEffect(() => {
+    if (!viewSlug) return;
+    if (postingsSlots.main !== viewSlug) {
+      const targetSlot = Object.keys(postingsSlots).find(
+        (key) => postingsSlots[key] === viewSlug,
+      );
+      if (targetSlot) swapPostingsSlots(targetSlot);
+    }
+  }, [viewSlug, postingsSlots, swapPostingsSlots]);
 
-    useEffect(() => {
-      return () => useCustomerDashboardData.getState().disconnectCustomerChat();
-    }, []);
+  useEffect(() => {
+    return () => useCustomerDashboardData.getState().disconnectCustomerChat();
+  }, []);
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/customer/postings/${targetSlug}`);
@@ -188,7 +235,6 @@ export default function Dash2Board({ viewSlug }) {
       if (!bookingChatId) return;
       try {
         await sendHumanMessage(bookingChatId, "customer", chatInput.trim());
-        appendMessage("customer", chatInput.trim());
         setChatInput("");
       } catch (err) {
         console.error("Failed to send message:", err);
@@ -197,14 +243,39 @@ export default function Dash2Board({ viewSlug }) {
 
     // ── Chat View: Full-width chat with "View All bids" button ──
     const renderChatView = () => (
-      <div style={{ width: "100%", height: "100%", display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", flexShrink: 0, marginBottom: "8px" }}>
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-start",
+            flexShrink: 0,
+            marginBottom: "8px",
+          }}
+        >
           <button
-            onClick={() => { setViewAllBids(true); setBookMultiple(false); setSelectedBidIds([]); }}
+            onClick={() => {
+              setViewAllBids(true);
+              setBookMultiple(false);
+              setSelectedBidIds([]);
+            }}
             style={{
-              padding: "4px 14px", background: "#FF6B1A", color: "#0D0D0D",
-              border: "none", borderRadius: "20px", fontWeight: 600,
-              fontSize: "13px", cursor: "pointer"
+              padding: "4px 14px",
+              background: "#FF6B1A",
+              color: "#0D0D0D",
+              border: "none",
+              borderRadius: "20px",
+              fontWeight: 600,
+              fontSize: "13px",
+              cursor: "pointer",
             }}
           >
             View All bids
@@ -213,45 +284,157 @@ export default function Dash2Board({ viewSlug }) {
 
         <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
           {chatMessages
-            .filter((msg) => msg.sender === "customer" || msg.sender === "worker" || msg.sender === "system")
-            .map((msg) => (
-              <div key={msg.id}>
-                {msg.sender === "system" ? (
-                  <div style={{ display: "flex", width: "100%", justifyContent: "center", marginBottom: "16px" }}>
-                    <div style={{
-                      maxWidth: "80%", padding: "4px 16px", fontSize: "0.85rem",
-                      fontWeight: 600, color: "#FF6B1A", background: "rgba(255,107,26,0.1)",
-                      borderRadius: "9999px", textAlign: "center"
-                    }}>
+            .filter(
+              (msg) =>
+                msg.sender_role === "customer" ||
+                msg.sender_role === "worker" ||
+                msg.sender_role === "system",
+            )
+            .map((msg) => {
+              const isSelf = Boolean(
+                currentUserId &&
+                msg.sender_id != null &&
+                String(msg.sender_id).trim() === String(currentUserId).trim(),
+              );
+              const isClient =
+                msg.sender_role === "customer" || msg.sender_role === "client";
+              const isOtherWorker = msg.sender_role === "worker" && !isSelf;
+
+              if (msg.sender_role === "system") {
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: "flex",
+                      width: "100%",
+                      justifyContent: "center",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: "80%",
+                        padding: "4px 16px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        color: "#FF6B1A",
+                        background: "rgba(255,107,26,0.1)",
+                        borderRadius: "9999px",
+                        textAlign: "center",
+                      }}
+                    >
                       {msg.text}
                     </div>
                   </div>
-                ) : msg.sender === "customer" ? (
-                  <div style={{ display: "flex", width: "100%", justifyContent: "flex-end", marginBottom: "16px" }}>
-                    <div style={{
-                      maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
-                      background: "#FF6B1A", borderRadius: "28px 4px 28px 28px"
-                    }}>
-                      <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                );
+              }
+
+              if (isSelf) {
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: "flex",
+                      width: "100%",
+                      justifyContent: "flex-end",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: "70%",
+                        padding: "8px 16px",
+                        color: "var(--k-ink)",
+                        background: "#FF6B1A",
+                        borderRadius: "28px 4px 28px 28px",
+                        fontWeight: "normal",
+                        fontStyle: "normal",
+                      }}
+                    >
+                      <strong>
+                        {msg.sender_name === "You"
+                          ? "You:"
+                          : `${msg.sender_name}:`}
+                      </strong>{" "}
+                      {msg.text}
                     </div>
                   </div>
-                ) : (
-                  <div style={{ display: "flex", width: "100%", justifyContent: "flex-start", marginBottom: "16px" }}>
-                    <div style={{
-                      maxWidth: "70%", padding: "8px 16px", color: "var(--k-ink)",
-                      background: "var(--k-raise)", borderRadius: "4px 28px 28px 28px",
-                      border: "1px solid var(--k-line)"
-                    }}>
-                      <strong>{msg.senderName || msg.sender.toUpperCase()}:</strong> {msg.text}
+                );
+              }
+
+              if (isClient) {
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: "flex",
+                      width: "100%",
+                      justifyContent: "flex-start",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: "70%",
+                        padding: "8px 16px",
+                        color: "var(--k-ink)",
+                        background: "var(--k-raise)",
+                        borderRadius: "4px 28px 28px 28px",
+                        border: "1px solid var(--k-line)",
+                        // dont change that font, or bold/italic format
+                        fontWeight: "bold",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      <strong>{msg.sender_name}:</strong> {msg.text}
                     </div>
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              }
+
+              const workerColor = getOtherWorkerColor(
+                msg.sender_name || msg.sender_role,
+              );
+              return (
+                <div
+                  key={msg.id}
+                  style={{
+                    display: "flex",
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      maxWidth: "70%",
+                      padding: "8px 16px",
+                      background: workerColor.background,
+                      color: workerColor.color,
+                      borderRadius: "4px 28px 28px 28px",
+                      border: "1px solid var(--k-line)",
+                      fontWeight: "normal",
+                      fontStyle: "normal",
+                    }}
+                  >
+                    <strong>{msg.sender_name}:</strong> {msg.text}
+                  </div>
+                </div>
+              );
+            })}
           <div ref={messagesEndRef} />
         </div>
 
-        <form onSubmit={handleSendChat} style={{ display: 'flex', gap: '6px', paddingTop: '8px', borderTop: '1px solid var(--k-line)', flexShrink: 0 }}>
+        <form
+          onSubmit={handleSendChat}
+          style={{
+            display: "flex",
+            gap: "6px",
+            paddingTop: "8px",
+            borderTop: "1px solid var(--k-line)",
+            flexShrink: 0,
+          }}
+        >
           <input
             type="text"
             value={chatInput}
@@ -259,19 +442,29 @@ export default function Dash2Board({ viewSlug }) {
             placeholder="Type a message..."
             disabled={!selectedJob}
             style={{
-              flex: 1, padding: '6px 10px', borderRadius: '6px',
-              border: '1px solid var(--k-border-strong)',
-              background: 'var(--k-field)', color: 'var(--k-ink)',
-              font: 'inherit', outline: 'none', fontSize: '13px'
+              flex: 1,
+              padding: "6px 10px",
+              borderRadius: "6px",
+              border: "1px solid var(--k-border-strong)",
+              background: "var(--k-field)",
+              color: "var(--k-ink)",
+              font: "inherit",
+              outline: "none",
+              fontSize: "13px",
             }}
           />
           <button
             type="submit"
             disabled={!chatInput.trim() || !selectedJob}
             style={{
-              padding: '6px 14px', background: '#FF6B1A', color: '#0D0D0D',
-              border: 'none', borderRadius: '6px', fontWeight: 700,
-              cursor: 'pointer', fontSize: '13px'
+              padding: "6px 14px",
+              background: "#FF6B1A",
+              color: "#0D0D0D",
+              border: "none",
+              borderRadius: "6px",
+              fontWeight: 700,
+              cursor: "pointer",
+              fontSize: "13px",
             }}
           >
             Send
@@ -282,30 +475,63 @@ export default function Dash2Board({ viewSlug }) {
 
     // ── Bids View: Full-width bids list ──
     const renderBidsView = () => {
-      const checkboxStyle = { width: "16px", height: "16px", accentColor: "#FF6B1A", cursor: "pointer" };
+      const checkboxStyle = {
+        width: "16px",
+        height: "16px",
+        accentColor: "#FF6B1A",
+        cursor: "pointer",
+      };
 
       return (
-        <div style={{ width: "100%", height: "100%", display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
           {/* Top Header Bar */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            flexShrink: 0, marginBottom: "12px"
-          }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexShrink: 0,
+              marginBottom: "12px",
+            }}
+          >
             <button
               onClick={handleViewChat}
               style={{
-                padding: "4px 14px", background: "#FF6B1A", color: "#0D0D0D",
-                border: "none", borderRadius: "20px", fontWeight: 600,
-                fontSize: "13px", cursor: "pointer"
+                padding: "4px 14px",
+                background: "#FF6B1A",
+                color: "#0D0D0D",
+                border: "none",
+                borderRadius: "20px",
+                fontWeight: 600,
+                fontSize: "13px",
+                cursor: "pointer",
               }}
             >
               View Chat
             </button>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "13px",
+              }}
+            >
               <input
                 type="checkbox"
                 checked={bookMultiple}
-                onChange={(e) => { setBookMultiple(e.target.checked); setSelectedBidIds([]); }}
+                onChange={(e) => {
+                  setBookMultiple(e.target.checked);
+                  setSelectedBidIds([]);
+                }}
                 style={checkboxStyle}
               />
               Book Multiple Workers
@@ -313,28 +539,58 @@ export default function Dash2Board({ viewSlug }) {
           </div>
 
           {/* Bids List */}
-          <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "8px 0" }}>
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              minHeight: 0,
+              padding: "8px 0",
+            }}
+          >
             {bidsForSelectedJob.length === 0 ? (
-              <p style={{ color: "var(--k-ink-3)", fontSize: "13px", padding: "16px" }}>No bids received yet.</p>
+              <p
+                style={{
+                  color: "var(--k-ink-3)",
+                  fontSize: "13px",
+                  padding: "16px",
+                }}
+              >
+                No bids received yet.
+              </p>
             ) : (
               bidsForSelectedJob.map((bid) => {
                 const isSelected = selectedBidIds.includes(bid.id);
                 const workerId = bid.worker_chat_id || bid.worker_id;
-                const workerName = bid.worker_name || bid.provider || `Worker ${workerId}`;
-                const bidAmount = bid.bid_amount || bid.offer || bid.amount || 0;
+                const workerName =
+                  bid.worker_name || bid.provider || `Worker ${workerId}`;
+                const bidAmount =
+                  bid.bid_amount || bid.offer || bid.amount || 0;
                 return (
                   <div
                     key={bid.id}
                     style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "10px 12px", borderRadius: "8px",
-                      border: isSelected ? "1px solid #FF6B1A" : "1px solid var(--k-line)",
-                      background: isSelected ? "var(--k-wash)" : "var(--k-raise)",
-                      marginBottom: "8px"
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: isSelected
+                        ? "1px solid #FF6B1A"
+                        : "1px solid var(--k-line)",
+                      background: isSelected
+                        ? "var(--k-wash)"
+                        : "var(--k-raise)",
+                      marginBottom: "8px",
                     }}
                   >
                     {/* Far left: checkbox + avatar + name */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                    >
                       {bookMultiple && (
                         <input
                           type="checkbox"
@@ -343,37 +599,77 @@ export default function Dash2Board({ viewSlug }) {
                           style={checkboxStyle}
                         />
                       )}
-                      <div style={{
-                        width: "32px", height: "32px", borderRadius: "50%",
-                        background: "rgba(255, 107, 26, 0.2)", display: "flex",
-                        alignItems: "center", justifyContent: "center", overflow: "hidden"
-                      }}>
-                        <span style={{ color: "#FF6B1A", fontWeight: 700, fontSize: "12px" }}>
-                          {workerName ? workerName.charAt(0).toUpperCase() : 'W'}
+                      <div
+                        style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "50%",
+                          background: "rgba(255, 107, 26, 0.2)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: "#FF6B1A",
+                            fontWeight: 700,
+                            fontSize: "12px",
+                          }}
+                        >
+                          {workerName
+                            ? workerName.charAt(0).toUpperCase()
+                            : "W"}
                         </span>
                       </div>
-                      <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--k-ink)" }}>
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          color: "var(--k-ink)",
+                        }}
+                      >
                         {workerName}
                       </span>
                     </div>
 
                     {/* Middle links - static text, no handlers for now */}
-                    <div style={{ display: "flex", gap: "16px", fontSize: "12px" }}>
-                      <span style={{ color: "#FF6B1A", textDecoration: "underline", cursor: "not-allowed" }}>
+                    <div
+                      style={{ display: "flex", gap: "16px", fontSize: "12px" }}
+                    >
+                      <span
+                        style={{
+                          color: "#FF6B1A",
+                          textDecoration: "underline",
+                          cursor: "not-allowed",
+                        }}
+                      >
                         Ratings &amp; Reviews
                       </span>
                       <a
                         href="http://localhost:5173/customer/postings/GeospatialLiveMap"
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ color: "#FF6B1A", textDecoration: "underline", cursor: "pointer" }}
+                        style={{
+                          color: "#FF6B1A",
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                        }}
                       >
                         View on Maps
                       </a>
                     </div>
 
                     {/* Bid amount */}
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#FF6B1A", margin: "0 16px" }}>
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#FF6B1A",
+                        margin: "0 16px",
+                      }}
+                    >
                       Rs {bidAmount}
                     </span>
 
@@ -382,9 +678,14 @@ export default function Dash2Board({ viewSlug }) {
                       <button
                         onClick={() => handleBookClick(bid)}
                         style={{
-                          padding: "6px 12px", background: "#FF6B1A", color: "#0D0D0D",
-                          border: "none", borderRadius: "6px", fontWeight: 700,
-                          cursor: "pointer", fontSize: "12px"
+                          padding: "6px 12px",
+                          background: "#FF6B1A",
+                          color: "#0D0D0D",
+                          border: "none",
+                          borderRadius: "6px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontSize: "12px",
                         }}
                       >
                         book &gt;
@@ -398,20 +699,36 @@ export default function Dash2Board({ viewSlug }) {
 
           {/* Multi-book bottom bar */}
           {bookMultiple && (
-            <div style={{
-              padding: "12px 16px", display: "flex", alignItems: "center",
-              justifyContent: "space-between",
-              borderTop: "1px solid var(--k-line)", flexShrink: 0
-            }}>
-              <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--k-ink)" }}>
+            <div
+              style={{
+                padding: "12px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                borderTop: "1px solid var(--k-line)",
+                flexShrink: 0,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: "var(--k-ink)",
+                }}
+              >
                 {selectedBidIds.length} selected
               </span>
               <button
                 onClick={handleMultiBook}
                 disabled={selectedBidIds.length === 0}
                 style={{
-                  padding: "8px 16px", background: "#FF6B1A", color: "#0D0D0D",
-                  border: "none", borderRadius: "6px", fontWeight: 700, cursor: "pointer"
+                  padding: "8px 16px",
+                  background: "#FF6B1A",
+                  color: "#0D0D0D",
+                  border: "none",
+                  borderRadius: "6px",
+                  fontWeight: 700,
+                  cursor: "pointer",
                 }}
               >
                 book &gt;
@@ -425,12 +742,18 @@ export default function Dash2Board({ viewSlug }) {
     if (position === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">
-            ••• COMPETITIVE MARKETPLACE METRICS
-          </div>
+          <div className="card-header">••• COMPETITIVE MARKETPLACE METRICS</div>
 
           {/* Full-width container — toggles between Chat and Bids */}
-          <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div
+            className="main-panel"
+            style={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+            }}
+          >
             {viewAllBids ? renderBidsView() : renderChatView()}
           </div>
         </div>
@@ -438,15 +761,28 @@ export default function Dash2Board({ viewSlug }) {
     }
 
     return (
-      <Card slug="ActiveBiddingsEngine" title="COMPETITIVE MARKETPLACE METRICS" position={position} onSelect={handleModuleSelect}>
+      <Card
+        slug="ActiveBiddingsEngine"
+        title="COMPETITIVE MARKETPLACE METRICS"
+        position={position}
+        onSelect={handleModuleSelect}
+      >
         {position === "sidebar" ? (
           <>
-            <span className="badge badge-highlight">Sidebar: Bids Incoming Feed Active</span>
-            <p className="card-summary">Target: {selectedJob?.title || "N/A"}</p>
-            <p className="card-summary">Pending Offers Count: {biddingsStream.length}</p>
+            <span className="badge badge-highlight">
+              Sidebar: Bids Incoming Feed Active
+            </span>
+            <p className="card-summary">
+              Target: {selectedJob?.title || "N/A"}
+            </p>
+            <p className="card-summary">
+              Pending Offers Count: {biddingsStream.length}
+            </p>
           </>
         ) : (
-          <span className="badge">Footer Slot: Bids for {selectedJob?.title || "N/A"}</span>
+          <span className="badge">
+            Footer Slot: Bids for {selectedJob?.title || "N/A"}
+          </span>
         )}
       </Card>
     );
@@ -534,15 +870,21 @@ export default function Dash2Board({ viewSlug }) {
                 )}
 
                 {/* 2. Worker Location Markers */}
-                 {currentWorkers.map((worker, index) => {
-                   const locInfo = workerLocations[worker.worker_chat_id];
-                   if (!locInfo || !locInfo.latitude || !locInfo.longitude) return null;
-                   
-                   const workerPos = [locInfo.latitude, locInfo.longitude];
-                   const rank = index + 1;
-                   const isTopThree = rank <= 3;
-                   const isInterested = worker.is_interested || locInfo.is_interested;
-                   const iconToUse = isTopThree ? goldenWorkerIcon : (isInterested ? blinkingWorkerIcon : staticWorkerIcon);
+                {currentWorkers.map((worker, index) => {
+                  const locInfo = workerLocations[worker.worker_chat_id];
+                  if (!locInfo || !locInfo.latitude || !locInfo.longitude)
+                    return null;
+
+                  const workerPos = [locInfo.latitude, locInfo.longitude];
+                  const rank = index + 1;
+                  const isTopThree = rank <= 3;
+                  const isInterested =
+                    worker.is_interested || locInfo.is_interested;
+                  const iconToUse = isTopThree
+                    ? goldenWorkerIcon
+                    : isInterested
+                      ? blinkingWorkerIcon
+                      : staticWorkerIcon;
 
                   return (
                     <Marker
@@ -749,14 +1091,16 @@ export default function Dash2Board({ viewSlug }) {
                             </span>
                           )}
                           {worker.is_interested && (
-                            <span style={{
-                              backgroundColor: '#28a745',
-                              color: '#fff',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontWeight: 700,
-                              fontSize: '0.75em'
-                            }}>
+                            <span
+                              style={{
+                                backgroundColor: "#28a745",
+                                color: "#fff",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                fontWeight: 700,
+                                fontSize: "0.75em",
+                              }}
+                            >
                               Interested
                             </span>
                           )}
@@ -960,31 +1304,41 @@ export default function Dash2Board({ viewSlug }) {
                       </div>
                     </div>
 
-                      <strong style={{ display: 'block', fontSize: '1.2em' }}>{job.title}</strong>
-                      <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{job.description}</span>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedJob(job);
-                            navigate('/customer/postings/ActiveBiddingsEngine');
-                          }}
-                          style={{
-                            padding: '8px 20px',
-                            background: '#FF6B1A',
-                            color: '#0D0D0D',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                          }}
-                        >
-                          Chat
-                        </button>
-                      </div>
+                    <strong style={{ display: "block", fontSize: "1.2em" }}>
+                      {job.title}
+                    </strong>
+                    <span style={{ fontSize: "0.9em", opacity: 0.8 }}>
+                      {job.description}
+                    </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        marginTop: "10px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedJob(job);
+                          navigate("/customer/postings/ActiveBiddingsEngine");
+                        }}
+                        style={{
+                          padding: "8px 20px",
+                          background: "#FF6B1A",
+                          color: "#0D0D0D",
+                          border: "none",
+                          borderRadius: "8px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontSize: "14px",
+                        }}
+                      >
+                        Chat
+                      </button>
                     </div>
+                  </div>
                 );
               })
             )}
@@ -1014,7 +1368,7 @@ export default function Dash2Board({ viewSlug }) {
     </Card>
   );
 
-   const resolveModuleBySlot = (slotKey) => {
+  const resolveModuleBySlot = (slotKey) => {
     switch (postingsSlots[slotKey]) {
       case "ActiveBiddingsEngine":
         return renderBiddingsEngine(slotKey);
@@ -1032,10 +1386,11 @@ export default function Dash2Board({ viewSlug }) {
   // ── Bids popup handlers ──
   const bidsForSelectedJob = biddingsStream || [];
   const selectedBidItems = bidsForSelectedJob.filter((bid) =>
-    selectedBidIds.includes(bid.id)
+    selectedBidIds.includes(bid.id),
   );
   const totalCharge = selectedBidItems.reduce(
-    (sum, bid) => sum + (bid.bid_amount || bid.offer || bid.amount || 0), 0
+    (sum, bid) => sum + (bid.bid_amount || bid.offer || bid.amount || 0),
+    0,
   );
 
   const handleViewChat = () => {
@@ -1046,7 +1401,7 @@ export default function Dash2Board({ viewSlug }) {
     setSelectedBidIds((prev) =>
       prev.includes(bidId)
         ? prev.filter((id) => id !== bidId)
-        : [...prev, bidId]
+        : [...prev, bidId],
     );
   };
 
@@ -1094,7 +1449,8 @@ export default function Dash2Board({ viewSlug }) {
       setSelectedWorkersForReview(selectedWorkers);
     } else {
       const targetWorker =
-        allWorkers.find((w) => w.worker_chat_id === worker.worker_chat_id) || worker;
+        allWorkers.find((w) => w.worker_chat_id === worker.worker_chat_id) ||
+        worker;
       setSelectedWorkersForReview([{ ...targetWorker, _highlighted: true }]);
     }
     setShowRatingsModal(true);
@@ -1103,7 +1459,8 @@ export default function Dash2Board({ viewSlug }) {
   const handleMapsClick = (worker) => {
     setViewAllBids(false);
     workerCardRefs.current[worker.worker_chat_id]?.scrollIntoView({
-      behavior: "auto", block: "center"
+      behavior: "auto",
+      block: "center",
     });
   };
 
@@ -1112,7 +1469,7 @@ export default function Dash2Board({ viewSlug }) {
     const selectedIds = bidsForSelectedJob
       .filter((bid) => selectedBidIds.includes(bid.id))
       .map((bid) => bid.worker_chat_id);
-    navigate('/customer/postings/RatingsReviewLogs');
+    navigate("/customer/postings/RatingsReviewLogs");
   };
 
   // ── Inlined Centered Modals ──
@@ -1120,69 +1477,180 @@ export default function Dash2Board({ viewSlug }) {
   const renderBookingModal = () => {
     if (!showBookingModal) return null;
     const modalStyle = {
-      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, padding: "16px"
+      position: "fixed",
+      inset: 0,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 99999,
+      padding: "16px",
     };
     const contentStyle = {
-      position: "relative", width: "100%", maxWidth: "640px", background: "var(--k-raise)",
-      color: "var(--k-ink)", border: "1px solid var(--k-line)", borderRadius: "16px",
-      boxShadow: "0 20px 60px rgba(0,0,0,0.5)", maxHeight: "90vh", overflowY: "auto", padding: "24px"
+      position: "relative",
+      width: "100%",
+      maxWidth: "640px",
+      background: "var(--k-raise)",
+      color: "var(--k-ink)",
+      border: "1px solid var(--k-line)",
+      borderRadius: "16px",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+      maxHeight: "90vh",
+      overflowY: "auto",
+      padding: "24px",
     };
     const closeBtnStyle = {
-      position: "absolute", top: "12px", right: "16px", background: "none", border: "none",
-      color: "var(--k-ink-3)", fontSize: "24px", cursor: "pointer", lineHeight: 1
+      position: "absolute",
+      top: "12px",
+      right: "16px",
+      background: "none",
+      border: "none",
+      color: "var(--k-ink-3)",
+      fontSize: "24px",
+      cursor: "pointer",
+      lineHeight: 1,
     };
-    const handleBackdropClick = (e) => { if (e.target === e.currentTarget) setShowBookingModal(false); };
+    const handleBackdropClick = (e) => {
+      if (e.target === e.currentTarget) setShowBookingModal(false);
+    };
 
     return (
       <div style={modalStyle} onClick={handleBackdropClick}>
         <div style={contentStyle}>
-          <button onClick={() => setShowBookingModal(false)} style={closeBtnStyle}>×</button>
+          <button
+            onClick={() => setShowBookingModal(false)}
+            style={closeBtnStyle}
+          >
+            ×
+          </button>
 
-          <h3 style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "var(--k-orange-ink)" }}>
+          <h3
+            style={{
+              margin: "0 0 8px",
+              fontSize: "12px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+              color: "var(--k-orange-ink)",
+            }}
+          >
             Job Title:
           </h3>
-          <p style={{ margin: "4px 0 12px", fontSize: "20px", fontWeight: 700 }}>
+          <p
+            style={{ margin: "4px 0 12px", fontSize: "20px", fontWeight: 700 }}
+          >
             {selectedJob?.title || "Untitled Job"}
           </p>
 
-          <h4 style={{ margin: "16px 0 8px", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "var(--k-orange-ink)" }}>
+          <h4
+            style={{
+              margin: "16px 0 8px",
+              fontSize: "12px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+              color: "var(--k-orange-ink)",
+            }}
+          >
             Job Description:
           </h4>
-          <p style={{ margin: "4px 0 20px", fontSize: "13px", color: "var(--k-ink-3)", lineHeight: "1.5" }}>
-            {selectedJob?.description || selectedJob?.job_description || "No description available."}
+          <p
+            style={{
+              margin: "4px 0 20px",
+              fontSize: "13px",
+              color: "var(--k-ink-3)",
+              lineHeight: "1.5",
+            }}
+          >
+            {selectedJob?.description ||
+              selectedJob?.job_description ||
+              "No description available."}
           </p>
 
-          <h4 style={{ margin: "0 0 12px", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "var(--k-ink-3)" }}>
+          <h4
+            style={{
+              margin: "0 0 12px",
+              fontSize: "11px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+              color: "var(--k-ink-3)",
+            }}
+          >
             Selected Workers &amp; Bids:
           </h4>
           <div style={{ marginBottom: "20px" }}>
             {selectedBidItems.length === 0 ? (
-              <p style={{ fontSize: "13px", color: "var(--k-ink-3)" }}>No workers selected.</p>
+              <p style={{ fontSize: "13px", color: "var(--k-ink-3)" }}>
+                No workers selected.
+              </p>
             ) : (
               selectedBidItems.map((item, idx) => {
-                const workerName = item.worker_name || item.provider || `Worker ${item.worker_chat_id}`;
-                const bidAmount = item.bid_amount || item.offer || item.amount || 0;
+                const workerName =
+                  item.worker_name ||
+                  item.provider ||
+                  `Worker ${item.worker_chat_id}`;
+                const bidAmount =
+                  item.bid_amount || item.offer || item.amount || 0;
                 return (
-                  <div key={item.id || idx} style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "10px 12px", border: "1px solid var(--k-line)", borderRadius: "8px", marginBottom: "8px"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{
-                        width: "28px", height: "28px", borderRadius: "50%",
-                        background: "rgba(255, 107, 26, 0.2)", display: "flex",
-                        alignItems: "center", justifyContent: "center", overflow: "hidden"
-                      }}>
-                        <span style={{ color: "#FF6B1A", fontWeight: 700, fontSize: "11px" }}>
+                  <div
+                    key={item.id || idx}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 12px",
+                      border: "1px solid var(--k-line)",
+                      borderRadius: "8px",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "50%",
+                          background: "rgba(255, 107, 26, 0.2)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: "#FF6B1A",
+                            fontWeight: 700,
+                            fontSize: "11px",
+                          }}
+                        >
                           {(workerName || "W").slice(0, 1).toUpperCase()}
                         </span>
                       </div>
-                      <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--k-ink)" }}>
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          color: "var(--k-ink)",
+                        }}
+                      >
                         {workerName}
                       </span>
                     </div>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#FF6B1A" }}>
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#FF6B1A",
+                      }}
+                    >
                       Rs {bidAmount}
                     </span>
                   </div>
@@ -1191,9 +1659,20 @@ export default function Dash2Board({ viewSlug }) {
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-            <span style={{ fontSize: "13px", color: "var(--k-ink-3)" }}>Total Charge:</span>
-            <span style={{ fontSize: "24px", fontWeight: 700, color: "#FF6B1A" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "20px",
+            }}
+          >
+            <span style={{ fontSize: "13px", color: "var(--k-ink-3)" }}>
+              Total Charge:
+            </span>
+            <span
+              style={{ fontSize: "24px", fontWeight: 700, color: "#FF6B1A" }}
+            >
               Rs {totalCharge}
             </span>
           </div>
@@ -1201,8 +1680,15 @@ export default function Dash2Board({ viewSlug }) {
           <button
             onClick={handleProceedToPayment}
             style={{
-              width: "100%", padding: "12px", background: "#FF6B1A", color: "#0D0D0D",
-              border: "none", borderRadius: "12px", fontWeight: 700, fontSize: "16px", cursor: "pointer"
+              width: "100%",
+              padding: "12px",
+              background: "#FF6B1A",
+              color: "#0D0D0D",
+              border: "none",
+              borderRadius: "12px",
+              fontWeight: 700,
+              fontSize: "16px",
+              cursor: "pointer",
             }}
           >
             Proceed to Payment Opt
@@ -1215,36 +1701,76 @@ export default function Dash2Board({ viewSlug }) {
   const renderRatingsModal = () => {
     if (!showRatingsModal) return null;
     const modalStyle = {
-      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, padding: "16px"
+      position: "fixed",
+      inset: 0,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 99999,
+      padding: "16px",
     };
     const contentStyle = {
-      position: "relative", width: "100%", maxWidth: "640px", background: "var(--k-raise)",
-      color: "var(--k-ink)", border: "1px solid var(--k-line)", borderRadius: "16px",
-      boxShadow: "0 20px 60px rgba(0,0,0,0.5)", maxHeight: "90vh", overflowY: "auto", padding: "24px"
+      position: "relative",
+      width: "100%",
+      maxWidth: "640px",
+      background: "var(--k-raise)",
+      color: "var(--k-ink)",
+      border: "1px solid var(--k-line)",
+      borderRadius: "16px",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+      maxHeight: "90vh",
+      overflowY: "auto",
+      padding: "24px",
     };
     const closeBtnStyle = {
-      position: "absolute", top: "12px", right: "16px", background: "none", border: "none",
-      color: "var(--k-ink-3)", fontSize: "24px", cursor: "pointer", lineHeight: 1
+      position: "absolute",
+      top: "12px",
+      right: "16px",
+      background: "none",
+      border: "none",
+      color: "var(--k-ink-3)",
+      fontSize: "24px",
+      cursor: "pointer",
+      lineHeight: 1,
     };
-    const handleBackdropClick = (e) => { if (e.target === e.currentTarget) setShowRatingsModal(false); };
+    const handleBackdropClick = (e) => {
+      if (e.target === e.currentTarget) setShowRatingsModal(false);
+    };
 
     return (
       <div style={modalStyle} onClick={handleBackdropClick}>
         <div style={contentStyle}>
-          <button onClick={() => setShowRatingsModal(false)} style={closeBtnStyle}>×</button>
+          <button
+            onClick={() => setShowRatingsModal(false)}
+            style={closeBtnStyle}
+          >
+            ×
+          </button>
 
-          <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 600 }}>Ratings &amp; Reviews</h3>
+          <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 600 }}>
+            Ratings &amp; Reviews
+          </h3>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
             {selectedWorkersForReview.length === 0 ? (
               <>
-                <p style={{ color: "var(--k-ink-3)", fontSize: "13px" }}>No worker profiles to review.</p>
+                <p style={{ color: "var(--k-ink-3)", fontSize: "13px" }}>
+                  No worker profiles to review.
+                </p>
                 <button
                   onClick={() => setShowRatingsModal(false)}
                   style={{
-                    padding: "8px 16px", background: "#FF6B1A", color: "#0D0D0D",
-                    border: "none", borderRadius: "20px", fontWeight: 600, fontSize: "13px", cursor: "pointer"
+                    padding: "8px 16px",
+                    background: "#FF6B1A",
+                    color: "#0D0D0D",
+                    border: "none",
+                    borderRadius: "20px",
+                    fontWeight: 600,
+                    fontSize: "13px",
+                    cursor: "pointer",
                   }}
                 >
                   Close
@@ -1254,31 +1780,76 @@ export default function Dash2Board({ viewSlug }) {
               selectedWorkersForReview.map((worker) => {
                 const isSelected = worker._highlighted;
                 return (
-                  <div key={worker.worker_chat_id || worker.id} style={{
-                    padding: "12px", borderRadius: "10px", cursor: "pointer",
-                    border: isSelected ? "1px solid #FF6B1A" : "1px solid var(--k-line)",
-                    background: isSelected ? "var(--k-wash)" : "var(--ind-surface)"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                      <div style={{
-                        width: "36px", height: "36px", borderRadius: "50%",
-                        background: "rgba(255, 107, 26, 0.2)", display: "flex",
-                        alignItems: "center", justifyContent: "center", overflow: "hidden"
-                      }}>
-                        <span style={{ color: "#FF6B1A", fontWeight: 700, fontSize: "14px" }}>
-                          {(worker.username || worker.worker_name || "W").slice(0, 1).toUpperCase()}
+                  <div
+                    key={worker.worker_chat_id || worker.id}
+                    style={{
+                      padding: "12px",
+                      borderRadius: "10px",
+                      cursor: "pointer",
+                      border: isSelected
+                        ? "1px solid #FF6B1A"
+                        : "1px solid var(--k-line)",
+                      background: isSelected
+                        ? "var(--k-wash)"
+                        : "var(--ind-surface)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "50%",
+                          background: "rgba(255, 107, 26, 0.2)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: "#FF6B1A",
+                            fontWeight: 700,
+                            fontSize: "14px",
+                          }}
+                        >
+                          {(worker.username || worker.worker_name || "W")
+                            .slice(0, 1)
+                            .toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <strong style={{ display: "block", color: "var(--k-ink)" }}>
-                          {worker.username || worker.worker_name || `Worker ${worker.worker_chat_id}`}
+                        <strong
+                          style={{ display: "block", color: "var(--k-ink)" }}
+                        >
+                          {worker.username ||
+                            worker.worker_name ||
+                            `Worker ${worker.worker_chat_id}`}
                         </strong>
-                        <span style={{ fontSize: "11px", color: "var(--k-ink-3)" }}>
+                        <span
+                          style={{ fontSize: "11px", color: "var(--k-ink-3)" }}
+                        >
                           ★ {worker.rating || "—"}/5
                         </span>
                       </div>
                     </div>
-                    <p style={{ margin: "0 0 8px", fontSize: "12px", color: "var(--k-ink-3)", lineHeight: "1.4", fontStyle: "italic" }}>
+                    <p
+                      style={{
+                        margin: "0 0 8px",
+                        fontSize: "12px",
+                        color: "var(--k-ink-3)",
+                        lineHeight: "1.4",
+                        fontStyle: "italic",
+                      }}
+                    >
                       {worker.review_snippet || "No review yet."}
                     </p>
                   </div>
@@ -1295,8 +1866,12 @@ export default function Dash2Board({ viewSlug }) {
     <div className="dashboard-grid-4pane">
       <div className="grid-main">{resolveModuleBySlot("main")}</div>
       <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
-      <div className="grid-bottom-left">{resolveModuleBySlot("bottomLeft")}</div>
-      <div className="grid-bottom-right">{resolveModuleBySlot("bottomRight")}</div>
+      <div className="grid-bottom-left">
+        {resolveModuleBySlot("bottomLeft")}
+      </div>
+      <div className="grid-bottom-right">
+        {resolveModuleBySlot("bottomRight")}
+      </div>
 
       {/* ── Centered Modals ── */}
       {renderBookingModal()}
