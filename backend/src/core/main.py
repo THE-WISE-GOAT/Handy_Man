@@ -81,7 +81,6 @@ async def worker_locations_stub(
 ):
     return {"status": "success", "locations": []}
 
-
 # 6. Core Alias Root Routes
 @app.post(
     "/register", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut
