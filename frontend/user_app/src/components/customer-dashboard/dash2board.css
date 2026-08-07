@@ -1,66 +1,96 @@
 /* ==========================================================================
-   1. 4-PANE STRUCTURAL LAYOUT CANVAS
+   1. 4-PANE STRUCTURAL LAYOUT CANVAS (Fixed Stacked Sidebar Layout)
    ========================================================================== */
+
+/* 
+  LAYOUT & SIZING CONTROL CONTAINER:
+  - Main Slot gets flexible 1fr, Right Sidebar gets fixed 360px width.
+*/
 .dashboard-grid-4pane {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  grid-template-rows: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 16px;
   width: 100%;
   height: calc(100vh - 120px);
   padding: 16px;
   box-sizing: border-box;
   background-color: var(--ind-concrete);
+  overflow: hidden;
 }
 
+/* 
+  MAIN SLOT (Left Large Container)
+*/
 .grid-main {
   grid-column: 1;
-  grid-row: 1;
   display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
   min-width: 0;
 }
 
-.grid-sidebar {
+/* 
+  RIGHT SIDEBAR STACK CONTAINER:
+  Occupies column 2 and stacks Slots 2, 3, and 4 vertically.
+*/
+.sidebar-stack {
   grid-column: 2;
-  grid-row: 1 / span 2;
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
   min-width: 0;
-}
-
-.grid-bottom-left {
-  grid-column: 1;
-  grid-row: 2;
-  display: flex;
-  min-width: 0;
-  padding-right: 8px;
   box-sizing: border-box;
-  width: 50%;
 }
 
+/* 
+  SLOT SIZING & HEIGHT ALLOCATION FOR RIGHT SIDEBAR SLOTS
+*/
+.grid-sidebar,
+.grid-bottom-left,
 .grid-bottom-right {
-  grid-column: 1;
-  grid-row: 2;
+  flex: 1 1 0%;
   display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
   min-width: 0;
-  margin-left: 50%;
-  padding-left: 8px;
   box-sizing: border-box;
-  width: 50%;
 }
 
 /* ==========================================================================
-   2. CARD SHELL STYLING
+   2. CARD SHELL STYLING & POSITION OVERRIDES
    ========================================================================== */
 .dashboard-card {
   background-color: var(--ind-surface);
   border: 1px solid var(--ind-border);
   border-radius: 12px;
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 16px;
   box-sizing: border-box;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+}
+
+/* Force all slot cards to lock full-width flush inside the sidebar container */
+.sidebar-stack .dashboard-card,
+.slot-sidebar,
+.slot-bottom-left,
+.slot-bottom-right {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  transform: none !important;
+  align-self: stretch !important;
+  box-sizing: border-box !important;
 }
 
 .clickable {
@@ -68,7 +98,7 @@
 }
 
 .clickable:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) !important;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   border-color: rgba(255, 107, 26, 0.3);
 }
@@ -78,9 +108,10 @@
   font-size: 0.68rem;
   font-weight: 500;
   color: var(--fixfast-ink-3, #9A9A9A);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 /* ==========================================================================
@@ -110,6 +141,7 @@
   flex-direction: column;
   justify-content: center;
   height: 100%;
+  overflow: hidden;
 }
 
 .badge {
@@ -147,9 +179,12 @@
 }
 
 .card-summary {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   color: var(--fixfast-ink-3, #9A9A9A);
-  margin: 8px 0 0;
+  margin: 4px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .calendar-box {
