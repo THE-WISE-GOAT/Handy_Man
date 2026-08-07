@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 # Core Application Imports
 from src.core import model, schema
+from src.configuration.config import settings
 from src.database.database import engine, get_db
 
 # Route Imports (Imported exactly ONCE)
@@ -44,14 +45,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # 3. CORS Configuration
-origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:3000",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-    "http://127.0.0.1:3000",
-]
+# Origins come from settings (CORS_ORIGINS in .env) rather than being hardcoded:
+# a deployed frontend runs on a domain that cannot be known at commit time, and
+# an origin missing from this list is rejected by the browser even when the API
+# is perfectly healthy.
+origins = settings.cors_origins_list
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -73,7 +71,18 @@ app.include_router(socket.router)
 app.include_router(worker_router.router)
 
 
-# 5. Worker locations stub (preserves legacy frontend contract)
+# 5. Liveness probe
+# Deliberately does NOT touch the database: hosting platforms poll this
+# frequently, and a probe that opens a DB connection turns a slow database into
+# a restart loop. It answers the question "is this process serving HTTP?", which
+# is what a health check is actually for. `/docs` was previously used for this,
+# but it renders a full HTML page on every poll.
+@app.get("/health", summary="Liveness probe", tags=["ops"])
+async def health():
+    return {"status": "ok"}
+
+
+# 6. Worker locations stub (preserves legacy frontend contract)
 @app.post("/workers/locations", summary="Get worker locations (stub)")
 async def worker_locations_stub(
     payload: dict,
@@ -82,7 +91,7 @@ async def worker_locations_stub(
     return {"status": "success", "locations": []}
 
 
-# 6. Core Alias Root Routes
+# 7. Core Alias Root Routes
 @app.post(
     "/register", status_code=status.HTTP_201_CREATED, response_model=schema.UserOut
 )
