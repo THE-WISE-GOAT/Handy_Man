@@ -399,7 +399,7 @@ export default function Dash1Board({ viewSlug }) {
               + Create Job Manually
             </button>
           </div>
-          <div className="chat-box">
+          <div className="chat-box" style={{ maxHeight: 'none'}}>
             {chatMessages.map((m) => (
               <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
                 <strong>{m.sender.toUpperCase()}:</strong> {m.text}
@@ -463,16 +463,13 @@ export default function Dash1Board({ viewSlug }) {
         onClick={() => handleModuleSelect("AiChatTerminal")}
       >
         <div className="card-header">••• AI CHAT TERMINAL</div>
-        {slotKey === "sidebar" ? (
-          <>
-            <span className="badge badge-highlight">
-              Live Dispatch — Active Session
-            </span>
-            <p className="card-summary">Logs Captured: {chatMessages.length}</p>
-          </>
-        ) : (
-          <span className="badge">AI Dispatch running asleep below...</span>
-        )}
+        <span className="badge badge-highlight">
+          Post Job through AI chat
+        </span>
+        <p className="card-summary">Logs Captured: {chatMessages.length}</p>
+        <div className="card-summary" style={{ color: "brown"}}>
+        <p>Post your job by talking to our AI assistant.</p>
+        </div>
       </div>
     );
   };
@@ -517,7 +514,7 @@ export default function Dash1Board({ viewSlug }) {
               className="title"
               style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}
             >
-              <span>·•TITLE:</span>
+              <span>·•Title:&nbsp;</span>
               <input
                 type="text"
                 value={jobTitleDraft}
@@ -537,7 +534,7 @@ export default function Dash1Board({ viewSlug }) {
               <span style={{ whiteSpace: "nowrap", flexShrink: 0 }}>•·</span>
             </h3>
 
-            <h3 className="title">DEsCRIPTION:</h3>
+            <h3 className="title">Description:</h3>
             <textarea
               className="workspace-textarea"
               value={jobDescriptionDraft}
@@ -566,7 +563,7 @@ export default function Dash1Board({ viewSlug }) {
             }}
           >
             <h3 className="title" dir="rtl" style={{ marginBottom: "4px" }}>
-              AttACHMENTs
+              Attachments
             </h3>
 
             <div
@@ -809,11 +806,11 @@ export default function Dash1Board({ viewSlug }) {
 
             <h3 className="title" dir="rtl" style={{ marginTop: "10px" }}>
               {" "}
-              UsER INFo{" "}
+              User Info{" "}
             </h3>
             <div className="user-info" style={{ lineHeight: "35px" }}>
               <span style={{ display: "inline-flex", alignItems: "baseline" }}>
-                <span>NAME:</span>
+                <span>NAME:&nbsp;</span>
                 <input
                   type="text"
                   value={userName}
@@ -835,7 +832,7 @@ export default function Dash1Board({ viewSlug }) {
               </span>
 
               <span style={{ display: "inline-flex", alignItems: "baseline" }}>
-                <span>CONTACT:</span>
+                <span>CONTACT:&nbsp;</span>
                 <input
                   type="text"
                   value={userCont}
@@ -869,7 +866,7 @@ export default function Dash1Board({ viewSlug }) {
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.75)}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}
               >
-                <span style={{ flexShrink: 0 }}>ADDRESS:</span>
+                <span style={{ flexShrink: 0 }}>ADDRESS:&nbsp;</span>
                 <span
                   style={{
                     paddingLeft: "4px",
@@ -943,19 +940,21 @@ export default function Dash1Board({ viewSlug }) {
         className={`dashboard-card asleep-view ${slotKey}-slot clickable`}
         onClick={() => handleModuleSelect("JobDescriptionWorkspace")}
       >
-        <div className="card-header">••• JOB DESCRIPTION WORKSPACE</div>
-        {slotKey === "sidebar" ? (
-          <>
-            <span className="badge">
-              Sidebar: Description Live Glance — Draft Mode
-            </span>
-          </>
-        ) : (
-          <span className="badge">
-            Footer: Draft character footprint: {jobDescriptionDraft.length}{" "}
-            chars
-          </span>
-        )}
+        <div className="card-header">••• JOB WORKSPACE</div>
+        <div>
+        <span className="badge badge-highlight">
+          Extracted Job Detail
+        </span>
+        <span className="badge badge-highlight">
+          Manual Job Posting
+        </span>
+        </div>
+        <p className="card-summary">Description Draft: {jobDescriptionDraft.length} chars</p>
+        <div className="card-summary" style={{ color: 'brown' }}>
+        <p>Extracted Job Credentials through AI appears here.</p>
+        <span>Edit and Post a job after chat finalized.</span>
+        <p>Manually Fill Job Credentials without talking to AI.</p>
+        </div>
       </div>
     );
   };
@@ -965,9 +964,11 @@ export default function Dash1Board({ viewSlug }) {
       return (
         <div
           className="dashboard-card main-view"
-          style={{ overflow: "scroll", maxHeight: "33vw" }}
+          style={{ overflow: "scroll", maxHeight: "100%" }}
         >
+          
           <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
+          
           <h2>ACTIVE PENDING POSTS</h2>
           <button
             onClick={fetchBookingsPendingJobs}
@@ -1120,20 +1121,22 @@ export default function Dash1Board({ viewSlug }) {
         onClick={() => handleModuleSelect("YourActivePosts")}
       >
         <div className="card-header">••• YOUR ACTIVE POSTS</div>
-        {slotKey === "sidebar" ? (
-          <>
-            <span className="badge badge-highlight">
-              Network Pipeline Active
-            </span>
-            <p className="card-summary">
-              Live Trackable: {activePostsCount} Positions
-            </p>
-          </>
-        ) : (
-          <span className="badge">
-            Posts Monitor sleeping below — {activePostsCount} items queued
+        <div>
+          <span className="badge badge-highlight">Active Posts</span>
+          <span className="badge badge-highlight">
+            Edit Posted Jobs
           </span>
-        )}
+        </div>
+        <div className="card-summary">
+        <span>
+          You have {activePostsCount} active posts.
+        </span>
+        </div>
+        <div className="card-summary" style={{ color: "brown"}}>
+        <p>
+          View and Edit posted jobs.
+        </p>
+        </div>
       </div>
     );
   };
@@ -1153,10 +1156,19 @@ export default function Dash1Board({ viewSlug }) {
   };
 
   return (
+    /* LAYOUT CONTAINER: Formatted into 2 columns matching Image 1 wireframe */
     <div className="dashboard-grid">
+      {/* 🟢 LEFT COLUMN: MAIN SLOT (Slot-1 / Main Slot) */}
       <div className="grid-main">{resolveAndRenderModule("main")}</div>
-      <div className="grid-bottom">{resolveAndRenderModule("bottom")}</div>
-      <div className="grid-sidebar">{resolveAndRenderModule("sidebar")}</div>
+
+      {/* 🟠 RIGHT COLUMN: VERTICAL SIDEBAR (Holds Slot-2 and Slot-3) */}
+      <div className="right-sidebar-container">
+        {/* SLOT-2: Top Right Container */}
+        <div className="grid-slot-2">{resolveAndRenderModule("sidebar")}</div>
+
+        {/* SLOT-3: Bottom Right Container */}
+        <div className="grid-slot-3">{resolveAndRenderModule("bottom")}</div>
+      </div>
 
       {/* 🎯 NEO-BRUTALIST CUTE MAP PICKER POPUP MODAL */}
       {isMapOpen && (
