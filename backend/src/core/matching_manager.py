@@ -73,7 +73,8 @@ def calculate_match_score(distance: float) -> float:
             0.0,
             min(
                 100.0,
-                round((1.0 / (1.0 + math.exp(15.0 * (distance - 0.87)))) * 100.0, 2),
+                # ONLY CHANGES: Changed steepness to 11.0 and midpoint to 0.68
+                round((1.0 / (1.0 + math.exp(11.0 * (distance - 0.68)))) * 100.0, 2),
             ),
         )
     except Exception:
