@@ -13,6 +13,28 @@ class LocationCoordinates(BaseModel):
     latitude: float = Field(..., description="Latitude coordinate (Y)", ge=-90, le=90)
 
 
+class UserProfileUpdateIn(BaseModel):
+    contact_name: Optional[str] = None
+    contact_number: Optional[str] = None
+    address_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class UserProfileOut(BaseModel):
+    id: int
+    email: EmailStr
+    username: str
+    contact_name: Optional[str] = None
+    contact_number: Optional[str] = None
+    address_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
 class CompleteChatIn(BaseModel):
     edited_description: str
     location: LocationCoordinates
@@ -299,6 +321,7 @@ class HistoryMessage(BaseModel):
     role: Literal["user", "assistant", "customer", "worker", "system"]
     content: str
     sender_name: Optional[str] = None
+
 
 class ChatHistoryOut(BaseModel):
     """Returned by GET /dispatch/{id}/history."""
