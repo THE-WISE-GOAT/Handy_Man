@@ -64,6 +64,11 @@ export default function Dash1Board({ viewSlug }) {
     isEditMode,
     editingJobId,
     exitEditMode,
+
+    saveDraftProfile,
+    setSaveDraftProfile,
+    saveUserProfileDraft,
+    fetchUserProfile,
   } = useCustomerDashboardData();
 
   const scrollRef = useRef(null);
@@ -85,8 +90,9 @@ export default function Dash1Board({ viewSlug }) {
   };
 
   useEffect(() => {
+    fetchUserProfile();
     useCustomerDashboardData.getState().startNewSession();
-  }, []);
+  }, [fetchUserProfile]);
 
   useEffect(() => {
     if (!viewSlug) return;
@@ -324,6 +330,14 @@ export default function Dash1Board({ viewSlug }) {
     navigate(`/customer/bookings/${targetSlug}`);
   };
 
+  const handleSaveDraftToggle = async (e) => {
+    const checked = e.target.checked;
+    setSaveDraftProfile(checked);
+    if (checked) {
+      await saveUserProfileDraft();
+    }
+  };
+
   const handleCreateJobFinalize = async () => {
     await createJob({ scheduled_date: scheduledDate || null });
     fetchBookingsPendingJobs();
@@ -396,7 +410,7 @@ export default function Dash1Board({ viewSlug }) {
               + Create Job Manually
             </button>
           </div>
-          <div className="chat-box" style={{ maxHeight: 'none'}}>
+          <div className="chat-box" style={{ maxHeight: "none" }}>
             {chatMessages.map((m) => (
               <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
                 <strong>{m.sender.toUpperCase()}:</strong> {m.text}
@@ -460,12 +474,10 @@ export default function Dash1Board({ viewSlug }) {
         onClick={() => handleModuleSelect("AiChatTerminal")}
       >
         <div className="card-header">••• AI CHAT TERMINAL</div>
-        <span className="badge badge-highlight">
-          Post Job through AI chat
-        </span>
+        <span className="badge badge-highlight">Post Job through AI chat</span>
         <p className="card-summary">Logs Captured: {chatMessages.length}</p>
-        <div className="card-summary" style={{ color: "brown"}}>
-        <p>Post your job by talking to our AI assistant.</p>
+        <div className="card-summary" style={{ color: "brown" }}>
+          <p>Post your job by talking to our AI assistant.</p>
         </div>
       </div>
     );
@@ -512,6 +524,7 @@ export default function Dash1Board({ viewSlug }) {
               <span>·•Title:&nbsp;</span>
               <input
                 type="text"
+                placeholder="Set Title"
                 value={jobTitleDraft}
                 onChange={(e) => setJobTitle(e.target.value)}
                 spellCheck={false}
@@ -533,6 +546,7 @@ export default function Dash1Board({ viewSlug }) {
             <textarea
               className="workspace-textarea"
               value={jobDescriptionDraft}
+              placeholder="ENTER JOB DESCRIPTION..."
               onChange={(e) => setJobDescription(e.target.value)}
               style={{
                 border: "2px dashed var(--ind-border-strong)",
@@ -805,7 +819,11 @@ export default function Dash1Board({ viewSlug }) {
                 <input
                   type="text"
                   value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="ENTER YOU NAME"
+                  onChange={(e) => {
+                    setUserName(e.target.value);
+                    if (saveDraftProfile) saveUserProfileDraft();
+                  }}
                   spellCheck={false}
                   style={{
                     outline: "none",
@@ -827,8 +845,12 @@ export default function Dash1Board({ viewSlug }) {
                 <input
                   type="text"
                   value={userCont}
-                  onChange={(e) => setUserCont(e.target.value)}
+                  onChange={(e) => {
+                    setUserCont(e.target.value);
+                    if (saveDraftProfile) saveUserProfileDraft();
+                  }}
                   spellCheck={false}
+                  placeholder="ENTER CONTACT (+977 ...)"
                   style={{
                     outline: "none",
                     border: "none",
@@ -874,6 +896,40 @@ export default function Dash1Board({ viewSlug }) {
                   {userAddrText || "SET LOCATION 🗺️"}
                 </span>
               </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginTop: "6px",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  id="saveDraftCheckbox"
+                  checked={saveDraftProfile}
+                  onChange={handleSaveDraftToggle}
+                  style={{
+                    cursor: "pointer",
+                    accentColor: "#FF6B1A",
+                    width: "16px",
+                    height: "16px",
+                  }}
+                />
+                <label
+                  htmlFor="saveDraftCheckbox"
+                  style={{
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    color: "var(--k-ink-2, #ccc)",
+                    userSelect: "none",
+                    fontWeight: 600,
+                  }}
+                >
+                  Save Draft for future reference
+                </label>
+              </div>
             </div>
 
             <div
@@ -888,16 +944,12 @@ export default function Dash1Board({ viewSlug }) {
               <div
                 style={{
                   display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
+                  flexDirection: "column",
+                  alignItems: "stretch",
                   gap: "16px",
                 }}
               >
-                <div
-                  style={{
-                    flex: 1,
-                  }}
-                >
+                <div style={{ flex: 1 }}>
                   <button
                     type="button"
                     onClick={() => console.log("🚨 Emergency toggle triggered")}
@@ -905,16 +957,11 @@ export default function Dash1Board({ viewSlug }) {
                     dir="rtl"
                     name="emergency"
                   >
-                    EmERGENcY ToGGLE
+                    Emergency Toggle
                   </button>
                 </div>
 
-                <div
-                  style={{
-                    flex: 1,
-                    position: "relative",
-                  }}
-                >
+                <div style={{ flex: 1, position: "relative" }}>
                   <button
                     type="button"
                     onClick={handleOpenDatePicker}
@@ -1014,18 +1061,16 @@ export default function Dash1Board({ viewSlug }) {
       >
         <div className="card-header">••• JOB WORKSPACE</div>
         <div>
-        <span className="badge badge-highlight">
-          Extracted Job Detail
-        </span>
-        <span className="badge badge-highlight">
-          Manual Job Posting
-        </span>
+          <span className="badge badge-highlight">Extracted Job Detail</span>
+          <span className="badge badge-highlight">Manual Job Posting</span>
         </div>
-        <p className="card-summary">Description Draft: {jobDescriptionDraft.length} chars</p>
-        <div className="card-summary" style={{ color: 'brown' }}>
-        <p>Extracted Job Credentials through AI appears here.</p>
-        <span>Edit and Post a job after chat finalized.</span>
-        <p>Manually Fill Job Credentials without talking to AI.</p>
+        <p className="card-summary">
+          Description Draft: {jobDescriptionDraft.length} chars
+        </p>
+        <div className="card-summary" style={{ color: "brown" }}>
+          <p>Extracted Job Credentials through AI appears here.</p>
+          <span>Edit and Post a job after chat finalized.</span>
+          <p>Manually Fill Job Credentials without talking to AI.</p>
         </div>
       </div>
     );
@@ -1036,11 +1081,10 @@ export default function Dash1Board({ viewSlug }) {
       return (
         <div
           className="dashboard-card main-view"
-          style={{ overflow: "scroll", maxHeight: "100%" }}
+          style={{ overflow: "scroll", maxHeight: "90vh" }}
         >
-          
           <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
-          
+
           <h2>ACTIVE PENDING POSTS</h2>
           <button
             onClick={fetchBookingsPendingJobs}
@@ -1194,19 +1238,13 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• YOUR ACTIVE POSTS</div>
         <div>
           <span className="badge badge-highlight">Active Posts</span>
-          <span className="badge badge-highlight">
-            Edit Posted Jobs
-          </span>
+          <span className="badge badge-highlight">Edit Posted Jobs</span>
         </div>
         <div className="card-summary">
-        <span>
-          You have {activePostsCount} active posts.
-        </span>
+          <span>You have {activePostsCount} active posts.</span>
         </div>
-        <div className="card-summary" style={{ color: "brown"}}>
-        <p>
-          View and Edit posted jobs.
-        </p>
+        <div className="card-summary" style={{ color: "brown" }}>
+          <p>View and Edit posted jobs.</p>
         </div>
       </div>
     );
@@ -1227,17 +1265,12 @@ export default function Dash1Board({ viewSlug }) {
   };
 
   return (
-    /* LAYOUT CONTAINER: Formatted into 2 columns matching Image 1 wireframe */
     <div className="dashboard-grid">
-      {/* 🟢 LEFT COLUMN: MAIN SLOT (Slot-1 / Main Slot) */}
       <div className="grid-main">{resolveAndRenderModule("main")}</div>
 
-      {/* 🟠 RIGHT COLUMN: VERTICAL SIDEBAR (Holds Slot-2 and Slot-3) */}
       <div className="right-sidebar-container">
-        {/* SLOT-2: Top Right Container */}
         <div className="grid-slot-2">{resolveAndRenderModule("sidebar")}</div>
 
-        {/* SLOT-3: Bottom Right Container */}
         <div className="grid-slot-3">{resolveAndRenderModule("bottom")}</div>
       </div>
 
@@ -1411,13 +1444,16 @@ export default function Dash1Board({ viewSlug }) {
 
               <button
                 type="button"
-                onClick={() => {
-                  setUserAddrText(
+                onClick={async () => {
+                  const finalAddr =
                     modalAddrText ||
-                      `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`,
-                  );
+                    `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`;
+                  setUserAddrText(finalAddr);
                   setUserCoordinates(modalLng, modalLat);
                   setIsMapOpen(false);
+                  if (saveDraftProfile) {
+                    await saveUserProfileDraft();
+                  }
                 }}
                 style={{
                   flex: 1,
