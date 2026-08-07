@@ -1,4 +1,5 @@
 import { apiClient } from "@shared/api/client";
+import { API_BASE_URL, WS_BASE_URL } from "@shared/config/api";
 
 export const createWorkspaceZlice = (set, get) => ({
   mapStatus: "REALTIME DISPATCH TRACKING MATRIX ACTIVE",
@@ -46,7 +47,7 @@ export const createWorkspaceZlice = (set, get) => ({
   fetchMatchedJobs: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/jobs/for-worker", {
+      const response = await fetch(`${API_BASE_URL}/jobs/for-worker`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -69,7 +70,7 @@ export const createWorkspaceZlice = (set, get) => ({
 
   connectToDispatch: (workerChatId, token) => {
     const socket = new WebSocket(
-      `ws://127.0.0.1:8000/ws/${workerChatId}?token=${token}`
+      `${WS_BASE_URL}/ws/${workerChatId}?token=${token}`
     );
 
     socket.onmessage = (event) => {
@@ -108,7 +109,7 @@ export const createWorkspaceZlice = (set, get) => ({
     } else {
       try {
         const token = localStorage.getItem("handy_man_access_token");
-        const res = await fetch(`http://127.0.0.1:8000/jobs/${jobId}/interest`, {
+        const res = await fetch(`${API_BASE_URL}/jobs/${jobId}/interest`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -170,9 +171,8 @@ export const createWorkspaceZlice = (set, get) => ({
       console.error("No access token found for WebSocket connection");
       return;
     }
-    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
     const socket = new WebSocket(
-      `${wsBaseUrl}/ws/worker/${workerChatId}?token=${token}`
+      `${WS_BASE_URL}/ws/worker/${workerChatId}?token=${token}`
     );
 
     socket.onopen = () => {

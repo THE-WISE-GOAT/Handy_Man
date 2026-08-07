@@ -363,7 +363,7 @@ export default function Dash2Board({ viewSlug }) {
                         Ratings &amp; Reviews
                       </span>
                       <a
-                        href="http://localhost:5173/customer/postings/GeospatialLiveMap"
+                        href="/customer/postings/GeospatialLiveMap"
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: "#FF6B1A", textDecoration: "underline", cursor: "pointer" }}

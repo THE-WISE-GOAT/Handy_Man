@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "@shared/config/api";
+
 export const createMeZlice = (set, get) => ({
   meSlots: {
     main: "MeInterview",
@@ -153,7 +155,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const res = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/skills`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/skills`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -187,7 +189,7 @@ export const createMeZlice = (set, get) => ({
 
       const token = localStorage.getItem("handy_man_access_token");
       const res = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/add-skill`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -239,7 +241,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        "http://127.0.0.1:8000/worker-interview/session",
+        `${API_BASE_URL}/worker-interview/session`,
         {
           method: "POST",
           headers: {
@@ -299,7 +301,7 @@ export const createMeZlice = (set, get) => ({
 
       if (isAddingSkill) {
         const response = await fetch(
-          `http://127.0.0.1:8000/worker-interview/${workerChatId}/add-skill/chat`,
+          `${API_BASE_URL}/worker-interview/${workerChatId}/add-skill/chat`,
           {
             method: "POST",
             headers: {
@@ -341,7 +343,7 @@ export const createMeZlice = (set, get) => ({
         }
       } else {
         const response = await fetch(
-          "http://127.0.0.1:8000/worker-interview/chat",
+          `${API_BASE_URL}/worker-interview/chat`,
           {
             method: "POST",
             headers: {
@@ -399,7 +401,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/summary`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/summary`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -460,7 +462,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/complete`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/complete`,
         {
           method: "POST",
           headers: {
@@ -514,7 +516,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        `http://127.0.0.1:8000/worker-onboarding/my-profile`,
+        `${API_BASE_URL}/worker-onboarding/my-profile`,
         {
           method: "PATCH",
           headers: {
@@ -544,7 +546,7 @@ export const createMeZlice = (set, get) => ({
   loadUserProfile: async () => {
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/users/me", {
+      const response = await fetch(`${API_BASE_URL}/users/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -574,7 +576,7 @@ export const createMeZlice = (set, get) => ({
 
     try {
       const token = localStorage.getItem("handy_man_access_token");
-      const response = await fetch("http://127.0.0.1:8000/users/me", {
+      const response = await fetch(`${API_BASE_URL}/users/me`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -605,7 +607,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        "http://127.0.0.1:8000/worker-onboarding/my-status",
+        `${API_BASE_URL}/worker-onboarding/my-status`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -678,7 +680,7 @@ export const createMeZlice = (set, get) => ({
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        `http://127.0.0.1:8000/worker-interview/${workerChatId}/history`,
+        `${API_BASE_URL}/worker-interview/${workerChatId}/history`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

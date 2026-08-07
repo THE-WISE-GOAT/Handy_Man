@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { apiClient, normalizeApiError } from "@shared/api/client";
+import { API_BASE_URL } from "@shared/config/api";
 import "./AdminUsersBoard.css";
 
 export default function AdminApplicationsBoard({ viewSlug }) {
@@ -91,7 +92,7 @@ export default function AdminApplicationsBoard({ viewSlug }) {
       try {
         const token = localStorage.getItem("handy_man_access_token");
         const response = await fetch(
-          `http://127.0.0.1:8000/worker-interview/${app.worker_chat_id}/history`,
+          `${API_BASE_URL}/worker-interview/${app.worker_chat_id}/history`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

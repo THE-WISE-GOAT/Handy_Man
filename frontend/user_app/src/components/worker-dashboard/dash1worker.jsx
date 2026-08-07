@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWorkerDashboardData } from "./useWorkerDashboardData";
+import { API_BASE_URL } from "@shared/config/api";
 import "./dash1worker.css";
 
 export default function Dash1Worker({ viewSlug }) {
@@ -60,7 +61,7 @@ export default function Dash1Worker({ viewSlug }) {
     try {
       const token = localStorage.getItem("handy_man_access_token");
       const response = await fetch(
-        `http://127.0.0.1:8000/jobs/${activeJob.job_id}/bid`,
+        `${API_BASE_URL}/jobs/${activeJob.job_id}/bid`,
         {
           method: "POST",
           headers: {
@@ -95,7 +96,7 @@ export default function Dash1Worker({ viewSlug }) {
     if (!activeJob) return;
     const token = localStorage.getItem("handy_man_access_token");
     const response = await fetch(
-      `http://127.0.0.1:8000/jobs/${activeJob.job_id}/bid`,
+      `${API_BASE_URL}/jobs/${activeJob.job_id}/bid`,
       {
         method: "POST",
         headers: {

@@ -1,4 +1,5 @@
 import { apiClient } from "@shared/api/client";
+import { WS_BASE_URL } from "@shared/config/api";
 
 export const createPostingsZlice = (set, get) => ({
   postingsSlots: {
@@ -216,9 +217,8 @@ export const createPostingsZlice = (set, get) => ({
   connectCustomerChat: async (bookingChatId) => {
     get().disconnectCustomerChat();
     const token = localStorage.getItem("handy_man_access_token");
-    const wsBaseUrl = import.meta.env?.VITE_WS_URL || "ws://127.0.0.1:8000";
     const socket = new WebSocket(
-      `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`
+      `${WS_BASE_URL}/ws/booking/${bookingChatId}?token=${token}`
     );
 
     socket.onopen = () => {
