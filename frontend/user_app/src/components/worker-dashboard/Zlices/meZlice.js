@@ -121,7 +121,7 @@ export const createMeZlice = (set, get) => ({
   setTurnsRemaining: (val) => set({ turnsRemaining: val }),
   setScenarioQuestion: (val) => set({ scenarioQuestion: val }),
 
-  setIsMapOpen: (val) => set({ setIsMapOpen: val }),
+  setIsMapOpen: (val) => set({ isMapOpen: val }),
   setMapReady: (val) => set({ mapReady: val }),
   setModalSearchQuery: (val) => set({ modalSearchQuery: val }),
   setModalLat: (val) => set({ modalLat: val }),
