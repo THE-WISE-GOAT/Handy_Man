@@ -229,15 +229,18 @@ export default function Dash1Worker({ viewSlug }) {
           {slotKey === "sidebar" ? (
             <>
               <span className="badge badge-highlight">
-                Sidebar: Live Telemetry
+                View Live Map
               </span>
 
               <p className="card-summary">Status: {mapStatus}</p>
             </>
           ) : (
-            <span className="badge">
-              Bottom: Map Feed Tracking Active ({mapStatus})
-            </span>
+                <>
+            <span className="badge badge-highlight">
+                View Live Map
+              </span>
+               <p className="card-summary">Status: {mapStatus}</p>
+              </>
           )}
         </div>
       </div>
@@ -380,21 +383,22 @@ export default function Dash1Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("WorkspaceBids")}
       >
-        <div className="card-header">••• COMPETITIVE MARKETPLACE METRICS</div>
-
+        <div className="card-header">••• Search for your next work assignment</div>
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
             <>
               <span className="badge badge-highlight">
-                Sidebar: Pipeline Tracker
+                View Matched Jobs
               </span>
 
-              <p className="card-summary">{bidsPipelineText}</p>
             </>
           ) : (
-            <span className="badge">
-              Bottom: Bids Pipeline Stream [{bidsPipelineText}]
-            </span>
+            <>
+              <span className="badge badge-highlight">
+                View Matched Jobs
+              </span>
+
+            </>
           )}
         </div>
       </div>
@@ -450,7 +454,7 @@ export default function Dash1Worker({ viewSlug }) {
                 fontSize: "13px", cursor: "pointer"
               }}
             >
-              Bid
+              View Biding Room
             </button>
           </div>
 
@@ -658,9 +662,9 @@ export default function Dash1Worker({ viewSlug }) {
           <div 
            className="main-panel"
                       >
-            <h2>Communicate and Bid of Job</h2>
+            <h2>Chat and Bid on Job</h2>
             <p className="panel-desc">
-              Select a job and "Join in Chat" to enter
+              
             </p>
           </div>
           <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -691,9 +695,13 @@ export default function Dash1Worker({ viewSlug }) {
               <p className="card-summary">{jobSpecsText}</p>
             </>
           ) : (
-            <span className="badge">
-              Bottom: Specs Monitor Active ({jobSpecsText})
-            </span>
+            <>
+              <span className="badge badge-highlight">
+                Sidebar: Requirements Desk
+              </span>
+
+              <p className="card-summary">{jobSpecsText}</p>
+            </>
           )}
         </div>
       </div>
