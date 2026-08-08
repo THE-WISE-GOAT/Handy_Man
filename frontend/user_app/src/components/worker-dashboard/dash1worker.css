@@ -1,10 +1,13 @@
 /* ==========================================================================
    1. CORE DASHBOARD WIREFRAME GRID
    ========================================================================== */
+/* ==========================================================================
+   1. CORE DASHBOARD WIREFRAME GRID
+   ========================================================================== */
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1fr 380px;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr 1fr;
   gap: 16px;
   width: 100%;
   height: calc(100vh - 120px);
@@ -13,25 +16,31 @@
   background-color: var(--ind-concrete);
 }
 
+/* Main Slot: Full height on LHS */
 .grid-main {
   grid-column: 1;
-  grid-row: 1;
-  display: flex;
-  min-width: 0;
-}
-
-.grid-bottom {
-  grid-column: 1;
-  grid-row: 2;
-  display: flex;
-  min-width: 0;
-}
-
-.grid-sidebar {
-  grid-column: 2;
   grid-row: 1 / span 2;
   display: flex;
   min-width: 0;
+  min-height: 0;
+}
+
+/* Sidebar Slot: Top RHS */
+.grid-sidebar {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Bottom Slot: Bottom RHS */
+.grid-bottom {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* ==========================================================================
