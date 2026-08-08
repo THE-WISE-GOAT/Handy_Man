@@ -63,6 +63,7 @@ export const createPostingsZlice = (set, get) => ({
   chatSocket: null,
   chatMessages: [],
   chatBookingChatId: null,
+  pendingChatBookingChatId: null,
   isChatConnected: false,
 
   fetchPendingJobs: async () => {
@@ -84,19 +85,21 @@ export const createPostingsZlice = (set, get) => ({
           };
         });
 
-        set({ pendingJobs: mappedJobs });
-        
         const currentSelected = get().selectedJob;
+        let nextSelectedJob = currentSelected;
+
         if (mappedJobs.length > 0) {
           const matchingActiveJob = currentSelected
             ? mappedJobs.find((j) => j.id === currentSelected.id)
             : null;
-          set({ selectedJob: matchingActiveJob || mappedJobs[0] });
+          nextSelectedJob = matchingActiveJob || mappedJobs[0];
         }
 
-        mappedJobs.forEach((job) => {
-          get().fetchMatchedWorkersForJob(job.id);
-        });
+        set({ pendingJobs: mappedJobs, selectedJob: nextSelectedJob });
+
+        if (nextSelectedJob?.booking_chat_id) {
+          get().fetchMatchedWorkersForJob(nextSelectedJob.booking_chat_id);
+        }
       }
     } catch (error) {
       console.error("❌ Failed to fetch pending jobs:", error);
@@ -196,20 +199,42 @@ export const createPostingsZlice = (set, get) => ({
       };
     }),
 
-  fetchMatchedWorkersForJob: async (jobId) => {
-    if (!jobId) return [];
+  fetchMatchedWorkersForJob: async (jobIdOrBookingChatId) => {
+    if (!jobIdOrBookingChatId) return [];
+
+    const job = get().pendingJobs.find(
+      (j) => j.id === jobIdOrBookingChatId || j.booking_chat_id === jobIdOrBookingChatId,
+    );
+
+    const bookingChatId = job?.booking_chat_id;
+    const jobId = job?.id || jobIdOrBookingChatId;
+    if (!bookingChatId) {
+      console.warn(
+        `Skipping dispatch/match find-help for Job ${jobIdOrBookingChatId} because booking_chat_id is missing.`,
+      );
+      if (jobId) {
+        get().updateJobMetrics(jobId, { matchedCount: 0 });
+        set((state) => ({
+          matchedWorkersMap: {
+            ...state.matchedWorkersMap,
+            [jobId]: [],
+          },
+        }));
+      }
+      return [];
+    }
 
     try {
-      const job = get().pendingJobs.find((j) => j.id === jobId);
-      const bookingChatId = job?.booking_chat_id || jobId;
       const data = await apiClient.get(`/dispatch/match/${bookingChatId}/find-help`);
       const workers = data.workers || [];
 
-      get().updateJobMetrics(jobId, {
-        matchedCount: workers.length,
-        matchCategory: data.category,
-        matchedByCategory: data.matched_by_category,
-      });
+      if (jobId) {
+        get().updateJobMetrics(jobId, {
+          matchedCount: workers.length,
+          matchCategory: data.category,
+          matchedByCategory: data.matched_by_category,
+        });
+      }
 
       set((state) => ({
         matchedWorkersMap: {
@@ -245,7 +270,7 @@ export const createPostingsZlice = (set, get) => ({
       console.error(`❌ Failed to fetch matched workers for Job ${jobId}:`, error);
       get().updateJobMetrics(jobId, { matchedCount: 0 });
       set((state) => ({
-        matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] }
+        matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] },
       }));
       return [];
     }
@@ -254,10 +279,14 @@ export const createPostingsZlice = (set, get) => ({
   setSelectedWorkerId: (workerId) => set({ selectedWorkerId: workerId }),
 
   setSelectedJob: (job) => {
+    const currentSelectedJob = get().selectedJob;
     set({ selectedJob: job, selectedWorkerId: null });
-    if (job && job.id) {
+
+    if (job && job.id && job.id !== currentSelectedJob?.id) {
       get().fetchJobBids(job.id);
-      get().fetchMatchedWorkersForJob(job.id);
+      if (job.booking_chat_id) {
+        get().fetchMatchedWorkersForJob(job.booking_chat_id);
+      }
     }
   },
 
@@ -278,6 +307,21 @@ export const createPostingsZlice = (set, get) => ({
   },
 
   connectCustomerChat: async (bookingChatId) => {
+    if (!bookingChatId) return;
+
+    const { chatSocket, chatBookingChatId, pendingChatBookingChatId } = get();
+    if (
+      chatBookingChatId === bookingChatId &&
+      (chatSocket?.readyState === WebSocket.OPEN ||
+       chatSocket?.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
+
+    if (pendingChatBookingChatId === bookingChatId) {
+      return;
+    }
+
     get().disconnectCustomerChat();
     const token = localStorage.getItem("handy_man_access_token");
     const wsBaseUrl = (import.meta.env?.VITE_WS_URL || API_BASE_URL).replace(/^http/, "ws");
@@ -285,15 +329,31 @@ export const createPostingsZlice = (set, get) => ({
       `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`
     );
 
+    set({ chatSocket: socket, chatBookingChatId: bookingChatId, pendingChatBookingChatId: bookingChatId });
+
     socket.onopen = () => {
-      set({ isChatConnected: true, chatBookingChatId: bookingChatId });
+      set({ isChatConnected: true, pendingChatBookingChatId: null });
     };
 
-    socket.onerror = (err) =>
-      console.error("❌ Customer chat WebSocket error:", err);
+    socket.onerror = (event) => {
+      if (get().chatSocket !== socket) return;
+      console.warn("⚠️ Customer chat WebSocket error:", {
+        bookingChatId,
+        readyState: socket.readyState,
+        event,
+      });
+    };
 
-    socket.onclose = () =>
-      set({ isChatConnected: false, chatBookingChatId: null });
+    socket.onclose = (event) => {
+      if (get().chatSocket !== socket) return;
+      set({ chatSocket: null, pendingChatBookingChatId: null, isChatConnected: false, chatBookingChatId: null });
+      console.info("ℹ️ Customer chat WebSocket closed", {
+        bookingChatId,
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean,
+      });
+    };
 
     socket.onmessage = (event) => {
       const rawData = JSON.parse(event.data);
@@ -354,8 +414,8 @@ export const createPostingsZlice = (set, get) => ({
     const { chatSocket } = get();
     if (chatSocket) {
       chatSocket.close();
-      set({ chatSocket: null, isChatConnected: false, chatBookingChatId: null, chatMessages: [] });
     }
+    set({ chatSocket: null, isChatConnected: false, chatBookingChatId: null, pendingChatBookingChatId: null, chatMessages: [] });
   },
 
   sendHumanMessage: async (bookingChatId, sender, text) => {

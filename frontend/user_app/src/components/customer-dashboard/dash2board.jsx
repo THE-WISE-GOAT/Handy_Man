@@ -200,19 +200,33 @@ export default function Dash2Board({ viewSlug }) {
   }, [chatMessages, viewAllBids]);
 
   useEffect(() => {
-    if (selectedJob && selectedJob.booking_chat_id) {
-      useCustomerDashboardData.getState().connectCustomerChat(selectedJob.booking_chat_id);
-      useCustomerDashboardData.getState().fetchChatHistory(selectedJob.booking_chat_id);
-    }
-  }, [selectedJob]);
+    const bookingChatId = selectedJob?.booking_chat_id;
+    if (!bookingChatId) return;
+
+    const connectTimer = setTimeout(() => {
+      useCustomerDashboardData.getState().connectCustomerChat(bookingChatId);
+      useCustomerDashboardData.getState().fetchChatHistory(bookingChatId);
+    }, 300);
+
+    const intervalId = setInterval(() => {
+      useCustomerDashboardData.getState().fetchChatHistory(bookingChatId);
+    }, 10000);
+
+    return () => {
+      clearTimeout(connectTimer);
+      clearInterval(intervalId);
+      useCustomerDashboardData.getState().disconnectCustomerChat();
+    };
+  }, [selectedJob?.booking_chat_id]);
 
   useEffect(() => {
-    if (selectedJob && selectedJob.id) {
-      useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
+    const selectedJobId = selectedJob?.id;
+    if (selectedJobId) {
+      useCustomerDashboardData.getState().fetchJobBids(selectedJobId);
     } else {
       useCustomerDashboardData.getState().fetchPendingJobs();
     }
-  }, [selectedJob]);
+  }, [selectedJob?.id]);
 
   useEffect(() => {
     if (!viewSlug) return;
@@ -225,53 +239,6 @@ export default function Dash2Board({ viewSlug }) {
   useEffect(() => {
     return () => useCustomerDashboardData.getState().disconnectCustomerChat();
   }, []);
-
-    useEffect(() => {
-
-      const bookingChatId = selectedJob?.booking_chat_id;
-      if (bookingChatId) {
-        useCustomerDashboardData.getState().connectCustomerChat(bookingChatId);
-        useCustomerDashboardData.getState().fetchChatHistory(bookingChatId);
-      }
-    }, [selectedJob?.booking_chat_id]);
-
-// 1. Fetch historical bids on mount and when selectedJob changes
-useEffect(() => {
-  const selectedJobId = selectedJob?.id;
-  if (selectedJobId) {
-    useCustomerDashboardData.getState().fetchJobBids(selectedJobId);
-  } else {
-    useCustomerDashboardData.getState().fetchPendingJobs();
-  }
-}, [selectedJob?.id]);
-
-// 2. Handle view slug slot swapping
-useEffect(() => {
-  if (!viewSlug) return;
-  if (postingsSlots.main !== viewSlug) {
-    const targetSlot = Object.keys(postingsSlots).find((key) => postingsSlots[key] === viewSlug);
-    if (targetSlot) swapPostingsSlots(targetSlot);
-  }
-}, [viewSlug, swapPostingsSlots]);
-
-// 3. Disconnect chat on component unmount
-useEffect(() => {
-  return () => useCustomerDashboardData.getState().disconnectCustomerChat();
-}, []);
-
-// 4. Poll chat history when a valid booking chat ID exists
-useEffect(() => {
-  const chatId = selectedJob?.booking_chat_id;
-  if (!chatId) return;
-
-  const intervalId = setInterval(() => {
-    useCustomerDashboardData.getState().fetchChatHistory(chatId);
-  }, 3000);
-
-  return () => clearInterval(intervalId);
-}, [selectedJob?.booking_chat_id]);
-
-
 
   const handleModuleSelect = (targetSlug) => {
     navigate(`/customer/postings/${targetSlug}`);

@@ -208,21 +208,23 @@ def get_worker_matched_jobs(
     current_user: model.User = Depends(get_current_user)
 ):
     try:
-        worker_profile = db.execute(
+        worker_profiles = db.execute(
             select(model.WorkerProfile).where(
                 model.WorkerProfile.user_id == current_user.id
             )
-        ).scalar_one_or_none()
+        ).scalars().all()
 
-        if not worker_profile:
+        if not worker_profiles:
             return {"status": "success", "jobs": []}
+
+        worker_profile_ids = [profile.id for profile in worker_profiles]
 
         stmt = (
             select(model.JobWorkerMatch, model.Job, func.coalesce(interest_subquery.c.interested_count, 0))
             .join(model.Job, model.JobWorkerMatch.job_id == model.Job.id)
             .outerjoin(interest_subquery, model.Job.id == interest_subquery.c.job_id)
             .where(
-                model.JobWorkerMatch.worker_id == worker_profile.id,
+                model.JobWorkerMatch.worker_id.in_(worker_profile_ids),
                 model.JobWorkerMatch.is_active == True,
                 model.JobWorkerMatch.is_rejected == False,
             )
@@ -262,19 +264,21 @@ def express_interest_in_job(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    worker_profile = db.execute(
+    worker_profiles = db.execute(
         select(model.WorkerProfile).where(
             model.WorkerProfile.user_id == current_user.id
         )
-    ).scalar_one_or_none()
+    ).scalars().all()
 
-    if not worker_profile:
+    if not worker_profiles:
         raise HTTPException(status_code=404, detail="Worker profile not found")
+
+    worker_profile_ids = [profile.id for profile in worker_profiles]
 
     match = db.execute(
         select(model.JobWorkerMatch).where(
             model.JobWorkerMatch.job_id == job_id,
-            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.worker_id.in_(worker_profile_ids),
             model.JobWorkerMatch.is_active == True,
         )
     ).scalar_one_or_none()
@@ -312,25 +316,32 @@ async def place_bid_on_job(
     current_user: model.User = Depends(get_current_user),
 ):
     """Record (or update) the worker's bid amount and proposal text."""
-    worker_profile = db.execute(
+    worker_profiles = db.execute(
         select(model.WorkerProfile).where(
             model.WorkerProfile.user_id == current_user.id
         )
-    ).scalar_one_or_none()
+    ).scalars().all()
 
-    if not worker_profile:
+    if not worker_profiles:
         raise HTTPException(status_code=404, detail="Worker profile not found")
+
+    worker_profile_ids = [profile.id for profile in worker_profiles]
 
     match = db.execute(
         select(model.JobWorkerMatch).where(
             model.JobWorkerMatch.job_id == job_id,
-            model.JobWorkerMatch.worker_id == worker_profile.id,
+            model.JobWorkerMatch.worker_id.in_(worker_profile_ids),
             model.JobWorkerMatch.is_active == True,
         )
     ).scalar_one_or_none()
 
     if not match:
         raise HTTPException(status_code=404, detail="No active match found for this job")
+
+    matched_profile = next(
+        (profile for profile in worker_profiles if profile.id == match.worker_id),
+        worker_profiles[0],
+    )
 
     bid_amount = payload.get("bid_amount")
     bid_message = payload.get("bid_message", "")
@@ -370,7 +381,7 @@ async def place_bid_on_job(
             "data": {
                 "job_id": job_id,
                 "bid_amount": float(match.bid_amount) if match.bid_amount else 0,
-                "worker_chat_id": worker_profile.worker_chat_id,
+                "worker_chat_id": matched_profile.worker_chat_id,
                 "worker_name": worker_name,
                 "bid_message": match.bid_message or "",
                 "booking_chat_id": job.booking_chat_id,

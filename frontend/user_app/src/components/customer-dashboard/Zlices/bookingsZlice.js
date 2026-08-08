@@ -245,10 +245,10 @@ export const createBookingsZlice = (set, get) => ({
         );
         if (
           newJob &&
-          newJob.id &&
+          newJob.booking_chat_id &&
           typeof fetchMatchedWorkersForJob === "function"
         ) {
-          await fetchMatchedWorkersForJob(newJob.id);
+          await fetchMatchedWorkersForJob(newJob.booking_chat_id);
         }
       }
     } catch (error) {
