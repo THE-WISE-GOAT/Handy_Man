@@ -67,13 +67,16 @@ def _ensure_geography(location: Any):
 
 
 def calculate_match_score(distance: float) -> float:
-    """The system's single source of truth scoring mechanism (Sigmoid)."""
+    """
+    The system's single source of truth scoring mechanism (Sigmoid).
+    Uses a gentler curve (8.0 multiplier) to prevent "cliff edge" drop-offs.
+    """
     try:
         return max(
             0.0,
             min(
                 100.0,
-                round((1.0 / (1.0 + math.exp(15.0 * (distance - 0.87)))) * 100.0, 2),
+                round((1.0 / (1.0 + math.exp(8.0 * (distance - 0.60)))) * 100.0, 2),
             ),
         )
     except Exception:
@@ -118,7 +121,7 @@ def _search_workers(
     query_vector: list[float],
     customer_location: Any,
     radius_meters: int,
-    job_category: Optional[str] = None,
+    job_category: Optional[str] = None, # Kept for signature compatibility, but strict ILIKE filtering is removed
 ) -> list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]:
     distance_expr = model.WorkerSkill.embedding.cosine_distance(query_vector)
     spatial_point = _ensure_geography(customer_location)
@@ -141,15 +144,8 @@ def _search_workers(
         )
     )
 
-    # Dynamic category pre-filtering with escaped ILIKE wildcards
-    if job_category:
-        safe_category = (
-            job_category.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        )
-        stmt = stmt.where(
-            (model.WorkerProfile.category_tag.ilike(f"%{safe_category}%"))
-            | (model.WorkerProfile.job_category.ilike(f"%{safe_category}%"))
-        )
+    # Strict ILIKE category filtering removed here to make Client & Worker flows symmetrical. 
+    # We now trust the vector search + LLM Reranker to handle the job_category semantically.
 
     if spatial_point is not None:
         stmt = stmt.where(
@@ -207,14 +203,15 @@ def _llm_rerank_matches(
     candidates = rich_matches[:MAX_CANDIDATES_FOR_RERANK]
     candidate_payload = [_build_candidate_summary(m) for m in candidates]
 
+    # Softer prompt focused on ranking rather than aggressive deletion
     prompt = (
-        "You are the final filter deciding which tradespeople genuinely fit a customer's job.\n\n"
+        "You are a helpful assistant sorting tradespeople for a customer's job.\n\n"
         f"Job category: {job_category or 'unknown'}\n"
         f"Job description:\n{job_description}\n\n"
         f"Candidates (JSON):\n{json.dumps(candidate_payload)}\n\n"
-        "Only keep candidates whose trade and skills genuinely match this specific job. "
-        "Drop anyone from a different trade.\n\n"
-        "Return ONLY a JSON array of worker_id integers kept, best fit first."
+        "Rank these candidates from best fit to worst fit based on how well their skills match the job description. "
+        "Omit candidates ONLY if their trade is completely irrelevant to the job.\n\n"
+        "Return ONLY a JSON array of worker_id integers, ordered best fit first."
     )
 
     try:
@@ -222,6 +219,7 @@ def _llm_rerank_matches(
         response = client.chat.completions.create(
             model=RERANK_MODEL,
             max_tokens=1024,
+            temperature=0.0, # STABILIZES THE OUTPUT - No more mood swings
             messages=[{"role": "user", "content": prompt}],
         )
         raw_text = response.choices[0].message.content or ""
@@ -292,12 +290,14 @@ def _llm_rerank_jobs_for_worker(
         for m in candidates
     ]
 
+    # Softer prompt focused on ranking rather than aggressive deletion
     prompt = (
-        "You are matching a tradesperson to posted customer jobs.\n\n"
+        "You are a helpful assistant matching a tradesperson to available customer jobs.\n\n"
         f"Worker Capabilities:\n{json.dumps(worker_summary, indent=2)}\n\n"
         f"Candidate Jobs:\n{json.dumps(candidate_payload, indent=2)}\n\n"
-        "Filter and rank these jobs. Keep ONLY jobs this worker is qualified to perform.\n\n"
-        "Return ONLY a JSON array of the job_id integers kept, ordered best fit first."
+        "Rank these jobs from best fit to worst fit based on the worker's capabilities. "
+        "Omit jobs ONLY if the worker is completely unqualified to perform them.\n\n"
+        "Return ONLY a JSON array of the job_id integers, ordered best fit first."
     )
 
     try:
@@ -305,6 +305,7 @@ def _llm_rerank_jobs_for_worker(
         response = client.chat.completions.create(
             model=RERANK_MODEL,
             max_tokens=1024,
+            temperature=0.0, # STABILIZES THE OUTPUT - No more mood swings
             messages=[{"role": "user", "content": prompt}],
         )
         raw_text = response.choices[0].message.content or ""
@@ -338,8 +339,8 @@ def create_matches_for_job(
     job_id: int,
     query_vector: list[float],
     customer_location: Any,
-    radius_meters: int,
-    job_description: str,
+    radius_meters: int = 60_000, # Matched default fallback with worker function
+    job_description: str = "",
     job_category: Optional[str] = None,
 ) -> MatchingResult:
     """Creates/Updates matches for a customer job without destroying user interaction state."""

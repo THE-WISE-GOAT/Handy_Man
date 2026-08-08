@@ -479,7 +479,7 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-header">••• AI CHAT TERMINAL</div>
         <span className="badge badge-highlight">Post Job through AI chat</span>
         <p className="card-summary">Logs Captured: {chatMessages.length}</p>
-        <div className="card-summary" style={{ color: "brown" }}>
+        <div className="card-summary" >
           <p>Post your job by talking to our AI assistant.</p>
         </div>
       </div>
@@ -1070,7 +1070,7 @@ export default function Dash1Board({ viewSlug }) {
         <p className="card-summary">
           Description Draft: {jobDescriptionDraft.length} chars
         </p>
-        <div className="card-summary" style={{ color: "brown" }}>
+        <div className="card-summary">
           <p>Extracted Job Credentials through AI appears here.</p>
           <span>Edit and Post a job after chat finalized.</span>
           <p>Manually Fill Job Credentials without talking to AI.</p>
@@ -1246,7 +1246,7 @@ export default function Dash1Board({ viewSlug }) {
         <div className="card-summary">
           <span>You have {activePostsCount} active posts.</span>
         </div>
-        <div className="card-summary" style={{ color: "brown" }}>
+        <div className="card-summary" >
           <p>View and Edit posted jobs.</p>
         </div>
       </div>

@@ -207,48 +207,52 @@ def get_worker_matched_jobs(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user)
 ):
-    worker_profile = db.execute(
-        select(model.WorkerProfile).where(
-            model.WorkerProfile.user_id == current_user.id
+    try:
+        worker_profile = db.execute(
+            select(model.WorkerProfile).where(
+                model.WorkerProfile.user_id == current_user.id
+            )
+        ).scalar_one_or_none()
+
+        if not worker_profile:
+            return {"status": "success", "jobs": []}
+
+        stmt = (
+            select(model.JobWorkerMatch, model.Job, func.coalesce(interest_subquery.c.interested_count, 0))
+            .join(model.Job, model.JobWorkerMatch.job_id == model.Job.id)
+            .outerjoin(interest_subquery, model.Job.id == interest_subquery.c.job_id)
+            .where(
+                model.JobWorkerMatch.worker_id == worker_profile.id,
+                model.JobWorkerMatch.is_active == True,
+                model.JobWorkerMatch.is_rejected == False,
+            )
+            .order_by(model.JobWorkerMatch.created_at.desc())
         )
-    ).scalar_one_or_none()
 
-    if not worker_profile:
-        return {"status": "success", "jobs": []}
+        results = db.execute(stmt).all()
 
-    stmt = (
-        select(model.JobWorkerMatch, model.Job, func.coalesce(interest_subquery.c.interested_count, 0))
-        .join(model.Job, model.JobWorkerMatch.job_id == model.Job.id)
-        .outerjoin(interest_subquery, model.Job.id == interest_subquery.c.job_id)
-        .where(
-            model.JobWorkerMatch.worker_id == worker_profile.id,
-            model.JobWorkerMatch.is_active == True,
-            model.JobWorkerMatch.is_rejected == False,
-        )
-        .order_by(model.JobWorkerMatch.created_at.desc())
-    )
+        jobs = [
+            {
+                "job_id": job.id,
+                "booking_chat_id": job.booking_chat_id,
+                "title": job.title,
+                "description": job.description,
+                "status": job.status,
+                "worker_id": job.worker_id,
+                "location": job.address_text,
+                "match_score": match.match_score,
+                "match_rank": match.match_rank,
+                "created_at": match.created_at,
+                "is_interested": match.is_interested,
+                "interested_count": int(interest_count),
+            }
+            for match, job, interest_count in results
+        ]
 
-    results = db.execute(stmt).all()
-
-    jobs = [
-        {
-            "job_id": job.id,
-            "booking_chat_id": job.booking_chat_id,
-            "title": job.title,
-            "description": job.description,
-            "status": job.status,
-            "worker_id": job.worker_id,
-            "location": job.address_text,
-            "match_score": match.match_score,
-            "match_rank": match.match_rank,
-            "created_at": match.created_at,
-            "is_interested": match.is_interested,
-            "interested_count": int(interest_count),
-        }
-        for match, job, interest_count in results
-    ]
-
-    return {"status": "success", "jobs": jobs}
+        return {"status": "success", "jobs": jobs}
+    except Exception as exc:
+        logger.error("Error in get_worker_matched_jobs: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to fetch matched jobs.")
 
 
 @router.post("/{job_id}/interest", summary="Worker expresses interest in a job")

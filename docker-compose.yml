@@ -1,6 +1,5 @@
 services:
   db:
-    # 1. Instruct compose to build a customized layer instead of using a static image
     build:
       context: .
       dockerfile_inline: |
@@ -59,14 +58,20 @@ services:
     depends_on:
       - backend
     ports:
-      - "${USER_APP_PROD_PORT:-5173}:5173"
+      - "${USER_APP_PORT:-5173}:5173"
     environment:
-      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      VITE_PORT: 5173
+      VITE_HMR_HOST: localhost
+      VITE_HMR_CLIENT_PORT: 5173
+      VITE_HMR_PROTOCOL: ws
       VITE_USE_POLLING: "true"
-      VITE_HMR_HOST: "0.0.0.0"
+      CHOKIDAR_USEPOLLING: "true"
     volumes:
-      - ./frontend:/app
-      - /app/user_app/node_modules
+      - ./frontend/user_app:/app/user_app
+      - ./frontend/shared:/app/shared
+      - user_node_modules:/app/user_app/node_modules
 
 volumes:
   postgres_data:
+  user_node_modules:

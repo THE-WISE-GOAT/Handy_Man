@@ -1,1856 +1,1228 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCustomerDashboardData } from "./useCustomerDashboardData";
-import { apiClient } from "@shared/api/client";
-import "./dash2board.css";
+import "./dash1board.css";
 
-// 1. IMPORT LEAFLET
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-
-// 2. VITE-COMPATIBLE ICON IMPORTS
-import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
-import iconUrl from "leaflet/dist/images/marker-icon.png";
-import shadowUrl from "leaflet/dist/images/marker-shadow.png";
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl,
-  iconUrl,
-  shadowUrl,
-});
-
-// --- CUSTOM SVG WORKER ICONS ---
-const personSvg = `
-  <svg viewBox="0 0 24 24" fill="currentColor" width="30px" height="30px">
-    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-  </svg>
-`;
-
-const staticWorkerIcon = L.divIcon({
-  className: "custom-worker-icon",
-  html: `<div style="color: #1F1F1F; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
-  popupAnchor: [0, -15],
-});
-
-const blinkingWorkerIcon = L.divIcon({
-  className: "custom-worker-icon blinking-red-icon",
-  html: `<div style="display: flex; justify-content: center; align-items: center;">${personSvg}</div>`,
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
-  popupAnchor: [0, -15],
-});
-
-const goldenWorkerIcon = L.divIcon({
-  className: "custom-worker-icon golden-worker-icon",
-  html: `<div style="color: #FF6B1A; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));">${personSvg}</div>`,
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
-  popupAnchor: [0, -15],
-});
-
-const MapUpdater = ({ center }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (center && center[0] && center[1]) {
-      map.setView(center, map.getZoom());
-    }
-  }, [center, map]);
-  return null;
-};
-
-const Card = ({ slug, title, position, onSelect, children }) => {
-  const isMain = position === "main";
-  return (
-    <div
-      className={`dashboard-card slot-${position} ${!isMain ? "clickable" : ""}`}
-      onClick={!isMain ? () => onSelect(slug) : undefined}
-    >
-      <div className="card-header">••• {title}</div>
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-};
-
-export default function Dash2Board({ viewSlug }) {
+export default function Dash1Board({ viewSlug }) {
   const navigate = useNavigate();
-  const workerCardRefs = React.useRef({});
-  const chatEndRef = React.useRef(null);
-  const messagesEndRef = React.useRef(null);
-  const [chatInput, setChatInput] = React.useState("");
+  const [chatInput, setChatInput] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const dateInputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  const getCurrentUserId = () => {
-    try {
-      const token = localStorage.getItem("handy_man_access_token");
-      if (!token) return null;
-      const base64Payload = token
-        .split(".")[1]
-        .replace(/-/g, "+")
-        .replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(
-        atob(base64Payload)
-          .split("")
-          .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
-          .join(""),
-      );
-      return JSON.parse(jsonPayload).user_id;
-    } catch {
-      return null;
-    }
-  };
-  const currentUserId = getCurrentUserId();
-
-  const getOtherWorkerColor = (identifier) => {
-    const lightColors = [
-      { background: "#BFDBFE", color: "#1E3A8A" },
-      { background: "#BBF7D0", color: "#14532D" },
-      { background: "#E9D5FF", color: "#581C87" },
-      { background: "#FBCFE8", color: "#831843" },
-      { background: "#99F6E4", color: "#134E4A" },
-      { background: "#FEF08A", color: "#713F12" },
-    ];
-
-    let hash = 0;
-    for (let i = 0; i < identifier.length; i++) {
-      hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % lightColors.length;
-    return lightColors[index];
-  };
-
-  // ── Full-width view toggle for ActiveBiddingsEngine ──
-  const [viewAllBids, setViewAllBids] = useState(false);
-  const [bookMultiple, setBookMultiple] = useState(false);
-  const [selectedBidIds, setSelectedBidIds] = useState([]);
-
-  // ── Centered modal state ──
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [showRatingsModal, setShowRatingsModal] = useState(false);
-  const [selectedWorkersForReview, setSelectedWorkersForReview] = useState([]);
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [modalSearchQuery, setModalSearchQuery] = useState("");
+  const [modalLat, setModalLat] = useState(27.7172);
+  const [modalLng, setModalLng] = useState(85.324);
+  const [modalAddrText, setModalAddrText] = useState("");
+  const mapContainerRef = useRef(null);
+  const leafletMapRef = useRef(null);
+  const leafletMarkerRef = useRef(null);
 
   const {
-    postingsSlots,
-    swapPostingsSlots,
-    biddingsStream,
-    pendingJobs,
-    selectedJob,
-    setSelectedJob,
-    fetchPendingJobs,
+    slots,
+    swapSlots,
+    jobDescriptionDraft,
+    jobTitleDraft,
+    setJobTitle,
+    setJobDescription,
     chatMessages,
-    connectCustomerChat,
-    sendHumanMessage,
-    appendMessage,
-    disconnectCustomerChat,
-    matchedWorkersMap,
-    workerLocations,
-    toggleWorkerInterest,
-    selectedWorkerId,
-    setSelectedWorkerId,
-    fetchChatHistory,
+    addChatMessage,
+    activePostsCount,
+    userCont,
+    fetchBookingsPendingJobs,
+    userAddrText,
+    userLng,
+    userLat,
+    setUserAddrText,
+    setUserCoordinates,
+    fetchedJobs,
+    userName,
+    setUserName,
+    setUserCont,
+    jobProfessional,
+    cust_id,
+    setProfessional,
+    setId,
+    createJob,
+    startNewSession,
+    sendCustomerMessage,
+    turns_remaining,
+    ai_response,
+    current_tags,
+    categories,
+    is_complete,
+    createJobDirect,
+    isSubmitting,
+    attachments,
+    isUploadingAttachment,
+    uploadAttachment,
+    removeAttachment,
+
+    loadJobForEdit,
+    isEditMode,
+    editingJobId,
+    exitEditMode,
+
+    saveDraftProfile,
+    setSaveDraftProfile,
+    saveUserProfileDraft,
+    fetchUserProfile,
   } = useCustomerDashboardData();
 
-  useEffect(() => {
-    useCustomerDashboardData.getState().fetchPendingJobs();
-  }, []);
+  const scrollRef = useRef(null);
+  const isDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeftState = useRef(0);
 
-  useEffect(() => {
-    const handleFocus = () => {
-      useCustomerDashboardData.getState().fetchPendingJobs();
-    };
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, []);
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  useEffect(() => {
-    if (selectedWorkerId && workerCardRefs.current[selectedWorkerId]) {
-      workerCardRefs.current[selectedWorkerId].scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+    try {
+      await uploadAttachment(file);
+    } catch (err) {
+      alert("Failed to upload image. Please check Cloudinary config.");
+    } finally {
+      e.target.value = "";
     }
-  }, [selectedWorkerId]);
+  };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [chatMessages, viewAllBids]);
-
-  useEffect(() => {
-    if (selectedJob && selectedJob.booking_chat_id) {
-      useCustomerDashboardData
-        .getState()
-        .connectCustomerChat(selectedJob.booking_chat_id);
-      useCustomerDashboardData
-        .getState()
-        .fetchChatHistory(selectedJob.booking_chat_id);
-    }
-  }, [selectedJob]);
-
-  // ── Fetch historical bids for the selected job on mount and when selectedJob changes ──
-  useEffect(() => {
-    if (selectedJob && selectedJob.id) {
-      useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
-    } else {
-      useCustomerDashboardData.getState().fetchPendingJobs();
-    }
-  }, [selectedJob]);
+    fetchUserProfile();
+    useCustomerDashboardData.getState().startNewSession();
+  }, [fetchUserProfile]);
 
   useEffect(() => {
     if (!viewSlug) return;
-    if (postingsSlots.main !== viewSlug) {
-      const targetSlot = Object.keys(postingsSlots).find(
-        (key) => postingsSlots[key] === viewSlug,
+    if (slots.main !== viewSlug) {
+      const targetSlot = Object.keys(slots).find(
+        (key) => slots[key] === viewSlug,
       );
-      if (targetSlot) swapPostingsSlots(targetSlot);
+      if (targetSlot) swapSlots(targetSlot);
     }
-  }, [viewSlug, postingsSlots, swapPostingsSlots]);
+  }, [viewSlug, slots, swapSlots]);
 
   useEffect(() => {
-    return () => useCustomerDashboardData.getState().disconnectCustomerChat();
-  }, []);
+    fetchBookingsPendingJobs();
+  }, [fetchBookingsPendingJobs]);
 
-  const handleModuleSelect = (targetSlug) => {
-    navigate(`/customer/postings/${targetSlug}`);
-  };
+  useEffect(() => {
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
 
-  const renderBiddingsEngine = (position) => {
-    const handleSendChat = async (e) => {
+    const handleWheel = (e) => {
       e.preventDefault();
-      if (!chatInput.trim() || !selectedJob) return;
-      const bookingChatId = selectedJob.booking_chat_id;
-      if (!bookingChatId) return;
+      e.stopPropagation();
+      scrollContainer.scrollLeft += e.deltaY;
+    };
+
+    scrollContainer.addEventListener("wheel", handleWheel, { passive: false });
+    return () => scrollContainer.removeEventListener("wheel", handleWheel);
+  }, [slots.main]);
+
+  const [hasNavigatedForCompletion, setHasNavigatedForCompletion] =
+    useState(false);
+
+  useEffect(() => {
+    if (is_complete && !hasNavigatedForCompletion) {
+      setHasNavigatedForCompletion(true);
+      navigate("/customer/bookings/JobDescriptionWorkspace");
+    } else if (!is_complete && hasNavigatedForCompletion) {
+      setHasNavigatedForCompletion(false);
+    }
+  }, [is_complete, hasNavigatedForCompletion, navigate]);
+
+  useEffect(() => {
+    if (isMapOpen) {
+      if (userLat && userLng) {
+        setModalLat(userLat);
+        setModalLng(userLng);
+        setModalAddrText(userAddrText || "");
+      } else {
+        setModalLat(27.7172);
+        setModalLng(85.324);
+        setModalAddrText("");
+      }
+
+      if (!document.getElementById("leaflet-cdn-css")) {
+        const link = document.createElement("link");
+        link.id = "leaflet-cdn-css";
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+      }
+
+      if (!window.L) {
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = () => setMapReady(true);
+        document.body.appendChild(script);
+      } else {
+        setMapReady(true);
+      }
+    } else {
+      setMapReady(false);
+      leafletMapRef.current = null;
+      leafletMarkerRef.current = null;
+    }
+  }, [isMapOpen]);
+
+  useEffect(() => {
+    if (!mapReady || !mapContainerRef.current || !window.L) return;
+    const L = window.L;
+
+    const stylizedPinIcon = L.divIcon({
+      html: `<div style="font-size: 30px; transform: translate(-3px, -24px); filter: drop-shadow(2px 3px 0px rgba(0,0,0,0.6));">📍</div>`,
+      className: "cute-custom-pin",
+      iconSize: [30, 30],
+      iconAnchor: [15, 30],
+    });
+
+    const map = L.map(mapContainerRef.current, { zoomControl: false }).setView(
+      [modalLat, modalLng],
+      14,
+    );
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    leafletMapRef.current = map;
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    const marker = L.marker([modalLat, modalLng], {
+      icon: stylizedPinIcon,
+      draggable: true,
+    }).addTo(map);
+    leafletMarkerRef.current = marker;
+
+    const runReverseGeocode = async (lat, lng) => {
       try {
-        await sendHumanMessage(bookingChatId, "customer", chatInput.trim());
-        setChatInput("");
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          const cleanString = data.display_name
+            .split(",")
+            .slice(0, 3)
+            .join(",")
+            .toUpperCase();
+          setModalAddrText(cleanString.trim());
+        }
       } catch (err) {
-        console.error("Failed to send message:", err);
+        console.warn("Reverse lookup throttled:", err);
       }
     };
 
-    // ── Chat View: Full-width chat with "View All bids" button ──
-    const renderChatView = () => (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          minHeight: 0,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            flexShrink: 0,
-            marginBottom: "8px",
-          }}
-        >
-          <button
-            onClick={() => {
-              setViewAllBids(true);
-              setBookMultiple(false);
-              setSelectedBidIds([]);
-            }}
-            style={{
-              padding: "4px 14px",
-              background: "#FF6B1A",
-              color: "#0D0D0D",
-              border: "none",
-              borderRadius: "20px",
-              fontWeight: 600,
-              fontSize: "13px",
-              cursor: "pointer",
-            }}
-          >
-            View All bids
-          </button>
-        </div>
+    if (!modalAddrText) {
+      runReverseGeocode(modalLat, modalLng);
+    }
 
-        <div className="chat-box" style={{ flex: 1, minHeight: 0 }}>
-          {chatMessages
-            .filter(
-              (msg) =>
-                msg.sender_role === "customer" ||
-                msg.sender_role === "worker" ||
-                msg.sender_role === "system",
-            )
-            .map((msg) => {
-              const isSelf = Boolean(
-                currentUserId &&
-                msg.sender_id != null &&
-                String(msg.sender_id).trim() === String(currentUserId).trim(),
-              );
-              const isClient =
-                msg.sender_role === "customer" || msg.sender_role === "client";
-              const isOtherWorker = msg.sender_role === "worker" && !isSelf;
+    marker.on("dragend", () => {
+      const point = marker.getLatLng();
+      setModalLat(point.lat);
+      setModalLng(point.lng);
+      runReverseGeocode(point.lat, point.lng);
+    });
 
-              if (msg.sender_role === "system") {
-                return (
-                  <div
-                    key={msg.id}
-                    style={{
-                      display: "flex",
-                      width: "100%",
-                      justifyContent: "center",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        maxWidth: "80%",
-                        padding: "4px 16px",
-                        fontSize: "0.85rem",
-                        fontWeight: 600,
-                        color: "#FF6B1A",
-                        background: "rgba(255,107,26,0.1)",
-                        borderRadius: "9999px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {msg.text}
-                    </div>
-                  </div>
-                );
-              }
+    map.on("click", (e) => {
+      marker.setLatLng(e.latlng);
+      setModalLat(e.latlng.lat);
+      setModalLng(e.latlng.lng);
+      runReverseGeocode(e.latlng.lat, e.latlng.lng);
+    });
 
-              if (isSelf) {
-                return (
-                  <div
-                    key={msg.id}
-                    style={{
-                      display: "flex",
-                      width: "100%",
-                      justifyContent: "flex-end",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        maxWidth: "70%",
-                        padding: "8px 16px",
-                        color: "var(--k-ink)",
-                        background: "#FF6B1A",
-                        borderRadius: "28px 4px 28px 28px",
-                        fontWeight: "normal",
-                        fontStyle: "normal",
-                      }}
-                    >
-                      <strong>
-                        {msg.sender_name === "You"
-                          ? "You:"
-                          : `${msg.sender_name}:`}
-                      </strong>{" "}
-                      {msg.text}
-                    </div>
-                  </div>
-                );
-              }
+    return () => {
+      map.remove();
+    };
+  }, [mapReady]);
 
-              if (isClient) {
-                return (
-                  <div
-                    key={msg.id}
-                    style={{
-                      display: "flex",
-                      width: "100%",
-                      justifyContent: "flex-start",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        maxWidth: "70%",
-                        padding: "8px 16px",
-                        color: "var(--k-ink)",
-                        background: "var(--k-raise)",
-                        borderRadius: "4px 28px 28px 28px",
-                        border: "1px solid var(--k-line)",
-                        // dont change that font, or bold/italic format
-                        fontWeight: "bold",
-                        fontStyle: "italic",
-                      }}
-                    >
-                      <strong>{msg.sender_name}:</strong> {msg.text}
-                    </div>
-                  </div>
-                );
-              }
+  const executeModalAddressSearch = async (e) => {
+    e.preventDefault();
+    if (
+      !modalSearchQuery.trim() ||
+      !leafletMapRef.current ||
+      !leafletMarkerRef.current
+    )
+      return;
 
-              const workerColor = getOtherWorkerColor(
-                msg.sender_name || msg.sender_role,
-              );
-              return (
-                <div
-                  key={msg.id}
-                  style={{
-                    display: "flex",
-                    width: "100%",
-                    justifyContent: "flex-start",
-                    marginBottom: "16px",
-                  }}
-                >
-                  <div
-                    style={{
-                      maxWidth: "70%",
-                      padding: "8px 16px",
-                      background: workerColor.background,
-                      color: workerColor.color,
-                      borderRadius: "4px 28px 28px 28px",
-                      border: "1px solid var(--k-line)",
-                      fontWeight: "normal",
-                      fontStyle: "normal",
-                    }}
-                  >
-                    <strong>{msg.sender_name}:</strong> {msg.text}
-                  </div>
-                </div>
-              );
-            })}
-          <div ref={messagesEndRef} />
-        </div>
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(modalSearchQuery)}&countrycodes=np&limit=1`,
+      );
+      if (response.ok) {
+        const results = await response.json();
+        if (results && results.length > 0) {
+          const firstResult = results[0];
+          const newLat = parseFloat(firstResult.lat);
+          const newLng = parseFloat(firstResult.lon);
 
-        <form
-          onSubmit={handleSendChat}
-          style={{
-            display: "flex",
-            gap: "6px",
-            paddingTop: "8px",
-            borderTop: "1px solid var(--k-line)",
-            flexShrink: 0,
-          }}
-        >
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            placeholder="Type a message..."
-            disabled={!selectedJob}
-            style={{
-              flex: 1,
-              padding: "6px 10px",
-              borderRadius: "6px",
-              border: "1px solid var(--k-border-strong)",
-              background: "var(--k-field)",
-              color: "var(--k-ink)",
-              font: "inherit",
-              outline: "none",
-              fontSize: "13px",
-            }}
-          />
-          <button
-            type="submit"
-            disabled={!chatInput.trim() || !selectedJob}
-            style={{
-              padding: "6px 14px",
-              background: "#FF6B1A",
-              color: "#0D0D0D",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: 700,
-              cursor: "pointer",
-              fontSize: "13px",
-            }}
-          >
-            Send
-          </button>
-        </form>
-      </div>
+          setModalLat(newLat);
+          setModalLng(newLng);
+
+          const title = firstResult.display_name
+            .split(",")
+            .slice(0, 3)
+            .join(",")
+            .toUpperCase();
+          setModalAddrText(title.trim());
+
+          leafletMapRef.current.setView([newLat, newLng], 15);
+          leafletMarkerRef.current.setLatLng([newLat, newLng]);
+        } else {
+          alert(
+            "NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.",
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Search pipeline execution exception error:", err);
+    }
+  };
+
+  const handleModalLiveTracking = () => {
+    if (!navigator.geolocation) {
+      alert(
+        "GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.",
+      );
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setModalLat(latitude);
+        setModalLng(longitude);
+
+        if (leafletMapRef.current && leafletMarkerRef.current) {
+          leafletMapRef.current.setView([latitude, longitude], 15);
+          leafletMarkerRef.current.setLatLng([latitude, longitude]);
+        }
+
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+          );
+          if (!response.ok) throw new Error("Reverse lookup failed");
+          const data = await response.json();
+          const cleanString = data.display_name
+            .split(",")
+            .slice(0, 3)
+            .join(",")
+            .toUpperCase();
+          setModalAddrText(cleanString.trim());
+        } catch (err) {
+          setModalAddrText("CURRENT LIVE LOCATION");
+        }
+      },
+      (error) => {
+        alert(
+          "LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 7000 },
     );
+  };
 
-    // ── Bids View: Full-width bids list ──
-    const renderBidsView = () => {
-      const checkboxStyle = {
-        width: "16px",
-        height: "16px",
-        accentColor: "#FF6B1A",
-        cursor: "pointer",
+  const handleModuleSelect = (targetSlug) => {
+    navigate(`/customer/bookings/${targetSlug}`);
+  };
+
+  const handleSaveDraftToggle = async (e) => {
+    const checked = e.target.checked;
+    setSaveDraftProfile(checked);
+    if (checked) {
+      await saveUserProfileDraft();
+    }
+  };
+
+  const handleCreateJobFinalize = async () => {
+    await createJob({ scheduled_date: scheduledDate || null });
+    fetchBookingsPendingJobs();
+  };
+
+  const handleOpenDatePicker = () => {
+    if (dateInputRef.current) {
+      if (typeof dateInputRef.current.showPicker === "function") {
+        dateInputRef.current.showPicker();
+      } else {
+        dateInputRef.current.focus();
+      }
+    }
+  };
+
+  const renderAiChat = (slotKey) => {
+    if (slotKey === "main") {
+      const handleSend = (e) => {
+        e.preventDefault();
+        if (!chatInput.trim() || is_complete || isEditMode) return;
+        sendCustomerMessage(chatInput);
+        setChatInput("");
       };
 
       return (
         <div
-          style={{
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 0,
-          }}
+          className="dashboard-card main-view"
+          style={{ overflow: "scroll", maxHeight: '85vh' }}
         >
-          {/* Top Header Bar */}
+          <span className="card-flag">
+            INTERACTIVE DISPATCH MANAGER
+            {turns_remaining !== undefined &&
+              ` — TURNS LEFT: ${turns_remaining}`}
+          </span>
           <div
             style={{
               display: "flex",
-              alignItems: "center",
               justifyContent: "space-between",
-              flexShrink: 0,
+              alignItems: "center",
               marginBottom: "12px",
             }}
           >
+            <h2 style={{ margin: 0 }}>AI CHAT TERMINAL</h2>
             <button
-              onClick={handleViewChat}
+              type="button"
+              onClick={() => {
+                navigate("/customer/bookings/JobDescriptionWorkspace");
+              }}
               style={{
-                padding: "4px 14px",
                 background: "#FF6B1A",
                 color: "#0D0D0D",
                 border: "none",
-                borderRadius: "20px",
-                fontWeight: 600,
-                fontSize: "13px",
+                borderRadius: "8px",
+                padding: "8px 14px",
+                fontWeight: 700,
                 cursor: "pointer",
+                fontSize: "12px",
+                transition: "transform 120ms ease, opacity 120ms ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = 0.85;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = 1;
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "scale(0.95)";
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              View Chat
+              + Create Job Manually
             </button>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                fontSize: "13px",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={bookMultiple}
-                onChange={(e) => {
-                  setBookMultiple(e.target.checked);
-                  setSelectedBidIds([]);
-                }}
-                style={checkboxStyle}
-              />
-              Book Multiple Workers
-            </label>
           </div>
-
-          {/* Bids List */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              minHeight: 0,
-              padding: "8px 0",
-            }}
-          >
-            {bidsForSelectedJob.length === 0 ? (
-              <p
-                style={{
-                  color: "var(--k-ink-3)",
-                  fontSize: "13px",
-                  padding: "16px",
-                }}
-              >
-                No bids received yet.
+          <div className="chat-box" style={{ maxHeight: "none" }}>
+            {chatMessages.map((m) => (
+              <p key={m.id} className={`chat-msg chat-msg--${m.sender}`}>
+                <strong>{m.sender.toUpperCase()}:</strong> {m.text}
               </p>
-            ) : (
-              bidsForSelectedJob.map((bid) => {
-                const isSelected = selectedBidIds.includes(bid.id);
-                const workerId = bid.worker_chat_id || bid.worker_id;
-                const workerName =
-                  bid.worker_name || bid.provider || `Worker ${workerId}`;
-                const bidAmount =
-                  bid.bid_amount || bid.offer || bid.amount || 0;
-                return (
-                  <div
-                    key={bid.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 12px",
-                      borderRadius: "8px",
-                      border: isSelected
-                        ? "1px solid #FF6B1A"
-                        : "1px solid var(--k-line)",
-                      background: isSelected
-                        ? "var(--k-wash)"
-                        : "var(--k-raise)",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    {/* Far left: checkbox + avatar + name */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      {bookMultiple && (
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleToggleBidSelection(bid.id)}
-                          style={checkboxStyle}
-                        />
-                      )}
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "50%",
-                          background: "rgba(255, 107, 26, 0.2)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "#FF6B1A",
-                            fontWeight: 700,
-                            fontSize: "12px",
-                          }}
-                        >
-                          {workerName
-                            ? workerName.charAt(0).toUpperCase()
-                            : "W"}
-                        </span>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 500,
-                          color: "var(--k-ink)",
-                        }}
-                      >
-                        {workerName}
-                      </span>
-                    </div>
-
-                    {/* Middle links - static text, no handlers for now */}
-                    <div
-                      style={{ display: "flex", gap: "16px", fontSize: "12px" }}
-                    >
-                      <span
-                        style={{
-                          color: "#FF6B1A",
-                          textDecoration: "underline",
-                          cursor: "not-allowed",
-                        }}
-                      >
-                        Ratings &amp; Reviews
-                      </span>
-                      <a
-                        href="http://localhost:5173/customer/postings/GeospatialLiveMap"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          color: "#FF6B1A",
-                          textDecoration: "underline",
-                          cursor: "pointer",
-                        }}
-                      >
-                        View on Maps
-                      </a>
-                    </div>
-
-                    {/* Bid amount */}
-                    <span
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        color: "#FF6B1A",
-                        margin: "0 16px",
-                      }}
-                    >
-                      Rs {bidAmount}
-                    </span>
-
-                    {/* Book button (hidden in multi-book mode) */}
-                    {!bookMultiple && (
-                      <button
-                        onClick={() => handleBookClick(bid)}
-                        style={{
-                          padding: "6px 12px",
-                          background: "#FF6B1A",
-                          color: "#0D0D0D",
-                          border: "none",
-                          borderRadius: "6px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          fontSize: "12px",
-                        }}
-                      >
-                        book &gt;
-                      </button>
-                    )}
-                  </div>
-                );
-              })
-            )}
+            ))}
           </div>
-
-          {/* Multi-book bottom bar */}
-          {bookMultiple && (
-            <div
-              style={{
-                padding: "12px 16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                borderTop: "1px solid var(--k-line)",
-                flexShrink: 0,
-              }}
-            >
-              <span
+          <form onSubmit={handleSend} className="chat-form">
+            {isEditMode ? (
+              <div
                 style={{
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  color: "var(--k-ink)",
+                  flex: 1,
+                  padding: "10px 14px",
+                  background: "var(--k-raise, #1a1a1a)",
+                  border: "1px solid var(--k-line, #333)",
+                  borderRadius: "8px",
+                  color: "#888",
+                  fontSize: "0.85rem",
+                  display: "flex",
+                  alignItems: "center",
                 }}
               >
-                {selectedBidIds.length} selected
-              </span>
-              <button
-                onClick={handleMultiBook}
-                disabled={selectedBidIds.length === 0}
-                style={{
-                  padding: "8px 16px",
-                  background: "#FF6B1A",
-                  color: "#0D0D0D",
-                  border: "none",
-                  borderRadius: "6px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                book &gt;
-              </button>
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    if (position === "main") {
-      return (
-        <div className="dashboard-card slot-main">
-          <div className="card-header">••• COMPETITIVE MARKETPLACE METRICS</div>
-
-          {/* Full-width container — toggles between Chat and Bids */}
-          <div
-            className="main-panel"
-            style={{
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              minHeight: 0,
-            }}
-          >
-            {viewAllBids ? renderBidsView() : renderChatView()}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <Card
-        slug="ActiveBiddingsEngine"
-        title="COMPETITIVE MARKETPLACE METRICS"
-        position={position}
-        onSelect={handleModuleSelect}
-      >
-        {position === "sidebar" ? (
-          <>
-            <span className="badge badge-highlight">
-              Sidebar: Bids Incoming Feed Active
-            </span>
-            <p className="card-summary">
-              Target: {selectedJob?.title || "N/A"}
-            </p>
-            <p className="card-summary">
-              Pending Offers Count: {biddingsStream.length}
-            </p>
-          </>
-        ) : (
-          <span className="badge">
-            Footer Slot: Bids for {selectedJob?.title || "N/A"}
-          </span>
-        )}
-      </Card>
-    );
-  };
-
-  const renderLiveMap = (position) => {
-    // 🛠️ ARCHITECTURAL FIX: Consumes seamlessly flattened store coordinates safely
-    const centerPoint =
-      selectedJob && selectedJob.latitude && selectedJob.longitude
-        ? [parseFloat(selectedJob.latitude), parseFloat(selectedJob.longitude)]
-        : [27.7172, 85.324];
-
-    const currentWorkers =
-      selectedJob && matchedWorkersMap[selectedJob.id]
-        ? matchedWorkersMap[selectedJob.id]
-        : [];
-
-    return (
-      <Card
-        slug="GeospatialLiveMap"
-        title="GEOSPATIAL LIVE MAP"
-        position={position}
-        onSelect={handleModuleSelect}
-      >
-        <style>
-          {`
-            @keyframes blinkRedIcon {
-              0% { color: #E5484D; transform: scale(1); filter: drop-shadow(0 0 2px rgba(229,72,77,0.6)); }
-              50% { color: #FF8A8E; transform: scale(1.3); filter: drop-shadow(0 0 10px rgba(229,72,77,1)); }
-              100% { color: #E5484D; transform: scale(1); filter: drop-shadow(0 0 2px rgba(229,72,77,0.6)); }
-            }
-            .blinking-red-icon div {
-              animation: blinkRedIcon 1.2s infinite ease-in-out;
-            }
-            @keyframes goldGlow {
-              0% { filter: drop-shadow(0 0 2px rgba(255, 107, 26, 0.6)); }
-              50% { filter: drop-shadow(0 0 10px rgba(255, 107, 26, 1)); }
-              100% { filter: drop-shadow(0 0 2px rgba(255, 107, 26, 0.6)); }
-            }
-            .golden-worker-icon div {
-              animation: goldGlow 1.5s infinite ease-in-out;
-            }
-          `}
-        </style>
-
-        {position === "main" ? (
-          <div
-            className="main-panel"
-            style={{
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              minHeight: 0,
-            }}
-          >
-            <h2 style={{ flexShrink: 0 }}>GEOSPATIAL ENGINE FULL DISPLAY</h2>
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                borderRadius: "12px",
-                overflow: "hidden",
-                marginTop: "10px",
-              }}
-            >
-              <MapContainer
-                center={centerPoint}
-                zoom={13}
-                style={{ height: "100%", width: "100%" }}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                />
-                <MapUpdater center={centerPoint} />
-
-                {selectedJob && selectedJob.latitude && (
-                  <Marker position={centerPoint}>
-                    <Popup>
-                      <strong>{selectedJob.title}</strong>
-                      <br />
-                      Job Location
-                    </Popup>
-                  </Marker>
-                )}
-
-                {/* 2. Worker Location Markers */}
-                {currentWorkers.map((worker, index) => {
-                  const locInfo = workerLocations[worker.worker_chat_id];
-                  if (!locInfo || !locInfo.latitude || !locInfo.longitude)
-                    return null;
-
-                  const workerPos = [locInfo.latitude, locInfo.longitude];
-                  const rank = index + 1;
-                  const isTopThree = rank <= 3;
-                  const isInterested =
-                    worker.is_interested || locInfo.is_interested;
-                  const iconToUse = isTopThree
-                    ? goldenWorkerIcon
-                    : isInterested
-                      ? blinkingWorkerIcon
-                      : staticWorkerIcon;
-
-                  return (
-                    <Marker
-                      key={`map-worker-${worker.worker_chat_id}`}
-                      position={workerPos}
-                      icon={iconToUse}
-                      eventHandlers={{
-                        click: () => setSelectedWorkerId(worker.worker_chat_id),
-                      }}
-                    >
-                      <Popup>
-                        <div style={{ textAlign: "center" }}>
-                          <strong>{worker.username}</strong>
-                          <br />
-                          {isTopThree
-                            ? `🏆 Rank #${rank} Match`
-                            : `Rank #${rank}`}
-                          <br />
-                          Match Score: {worker.match_score}%<br />
-                          <button
-                            onClick={() =>
-                              toggleWorkerInterest(worker.worker_chat_id)
-                            }
-                            style={{
-                              marginTop: "8px",
-                              padding: "4px 8px",
-                              backgroundColor: "#FF6B1A",
-                              color: "#0D0D0D",
-                              border: "none",
-                              borderRadius: "4px",
-                              cursor: "pointer",
-                            }}
-                          >
-                            Toggle Interest (Test)
-                          </button>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  );
-                })}
-              </MapContainer>
-            </div>
-          </div>
-        ) : (
-          <div className="preview-panel">
-            {position === "sidebar" ? (
-              <>
-                <span className="badge badge-highlight">
-                  Sidebar: GPS Map Node Tracker
-                </span>
-                <p className="card-summary">
-                  Lat: {selectedJob?.latitude || "N/A"} | Lng:{" "}
-                  {selectedJob?.longitude || "N/A"}
-                </p>
-                <p className="card-summary">
-                  Workers Rendered: {currentWorkers.length}
-                </p>
-              </>
-            ) : (
-              <span className="badge">Footer Slot: Map Tracking Active</span>
-            )}
-          </div>
-        )}
-      </Card>
-    );
-  };
-
-  const renderReviewLogs = (position) => {
-    const currentWorkers =
-      selectedJob && matchedWorkersMap[selectedJob.id]
-        ? matchedWorkersMap[selectedJob.id]
-        : [];
-
-    return (
-      <Card
-        slug="RatingsReviewLogs"
-        title="MATCHED PROFESSIONALS LOGS"
-        position={position}
-        onSelect={handleModuleSelect}
-      >
-        {position === "main" ? (
-          <div
-            className="main-panel"
-            style={{
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              minHeight: 0,
-            }}
-          >
-            <h2 style={{ flexShrink: 0 }}>QUALIFIED WORKER NETWORK</h2>
-
-            <h3
-              style={{
-                color: "var(--text-primary)",
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-              }}
-            >
-              <span>
-                Matched Profiles For:{" "}
-                {selectedJob ? selectedJob.title : "No Job Selected"}
-              </span>
-
-              {selectedJob?.matchCategory && (
                 <span
+                  onClick={() => handleModuleSelect("YourActivePosts")}
                   style={{
-                    fontSize: "0.65em",
-                    backgroundColor: "var(--k-wash)",
-                    color: selectedJob.matchedByCategory
-                      ? "var(--k-orange-ink)"
-                      : "var(--k-ink-3)",
-                    padding: "4px 8px",
-                    borderRadius: "4px",
-                    border: `1px solid ${selectedJob.matchedByCategory ? "rgba(255, 107, 26, 0.5)" : "var(--k-border-strong)"}`,
+                    color: "#FF6B1A",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    marginRight: "4px",
                   }}
                 >
-                  {selectedJob.matchedByCategory
-                    ? `Category Match: ${selectedJob.matchCategory}`
-                    : `Semantic Radius Fallback`}
-                </span>
-              )}
-            </h3>
-
-            <div
-              style={{
-                flex: 1,
-                overflowY: "scroll",
-                maxHeight: "23vw",
-                minHeight: 0,
-                marginTop: "15px",
-                paddingRight: "10px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-              }}
+                  exit out of edit mode
+                </span>{" "}
+                to start new chat
+              </div>
+            ) : (
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder={
+                  is_complete ? "Conversation finalized." : "Instruct AI..."
+                }
+                disabled={is_complete}
+              />
+            )}
+            <button
+              type="submit"
+              className="chat-btn"
+              disabled={is_complete || isEditMode || !chatInput.trim()}
             >
-              {currentWorkers.length === 0 ? (
-                <p style={{ opacity: 0.7 }}>
-                  No professionals matched yet or scanning network...
-                </p>
-              ) : (
-                currentWorkers.map((worker, index) => {
-                  const isSelected =
-                    selectedWorkerId &&
-                    worker.worker_chat_id === selectedWorkerId;
-                  const rank = index + 1;
-                  return (
-                    <div
-                      key={worker.worker_chat_id}
-                      ref={(el) =>
-                        (workerCardRefs.current[worker.worker_chat_id] = el)
-                      }
-                      style={{
-                        border: isSelected
-                          ? "2px solid #FF6B1A"
-                          : "1px solid var(--k-line)",
-                        borderRadius: "8px",
-                        padding: "15px",
-                        backgroundColor: isSelected
-                          ? "var(--k-wash)"
-                          : "var(--k-raise)",
-                        boxShadow: isSelected
-                          ? "0 0 0 4px rgba(255, 107, 26, 0.12)"
-                          : "0 2px 8px rgba(0, 0, 0, 0.3)",
-                        transform: isSelected ? "scale(1.02)" : "none",
-                        transition: "all 0.2s ease-in-out",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          marginBottom: "8px",
-                          alignItems: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                          }}
-                        >
-                          <strong
-                            style={{ fontSize: "1.1em", color: "var(--k-ink)" }}
-                          >
-                            {worker.username}
-                          </strong>
-                          {isSelected && (
-                            <span
-                              style={{
-                                backgroundColor: "#FF6B1A",
-                                color: "#0D0D0D",
-                                padding: "2px 8px",
-                                borderRadius: "4px",
-                                fontWeight: 700,
-                                fontSize: "0.75em",
-                              }}
-                            >
-                              🏆 Rank #{rank}
-                            </span>
-                          )}
-                          {worker.is_interested && (
-                            <span
-                              style={{
-                                backgroundColor: "#28a745",
-                                color: "#fff",
-                                padding: "2px 8px",
-                                borderRadius: "4px",
-                                fontWeight: 700,
-                                fontSize: "0.75em",
-                              }}
-                            >
-                              Interested
-                            </span>
-                          )}
-                        </div>
-                        <span
-                          style={{
-                            fontSize: "0.85em",
-                            color: "var(--k-ink-3)",
-                            border: "1px solid var(--k-border-strong)",
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                          }}
-                        >
-                          ID: {worker.worker_chat_id}
-                        </span>
-                      </div>
-
-                      <p
-                        style={{
-                          margin: "0 0 10px 0",
-                          fontSize: "0.9em",
-                          color: "var(--k-ink-3)",
-                          fontStyle: "italic",
-                          lineHeight: "1.4",
-                        }}
-                      >
-                        "{worker.job_description}"
-                      </p>
-
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "flex-start",
-                          alignItems: "center",
-                          fontSize: "0.85em",
-                        }}
-                      >
-                        <span
-                          style={{
-                            backgroundColor: "var(--k-wash)",
-                            color: "var(--k-orange-ink)",
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            fontWeight: 700,
-                          }}
-                        >
-                          Vector Match Score: {worker.match_score}%
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="preview-panel">
-            {position === "sidebar" ? (
-              <>
-                <span className="badge badge-highlight">
-                  Sidebar: Network Discovery
-                </span>
-                <p className="card-summary">
-                  Scanning: {selectedJob?.title || "N/A"}
-                </p>
-                <p className="card-summary">
-                  Available Matches: {currentWorkers.length}
-                </p>
-              </>
-            ) : (
-              <span className="badge">
-                Footer Slot: Matches for {selectedJob?.title || "N/A"}
-              </span>
-            )}
-          </div>
-        )}
-      </Card>
-    );
-  };
-
-  const renderPostsDashboard = (position) => (
-    <Card
-      slug="ActivePostsDashboard"
-      title="ACTIVE POSTS DASHBOARD"
-      position={position}
-      onSelect={handleModuleSelect}
-    >
-      <style>
-        {`
-          @keyframes blinkDot {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.4; transform: scale(1.2); }
-            100% { opacity: 1; transform: scale(1); }
-          }
-          .status-indicator-dot {
-            animation: blinkDot 1.5s infinite ease-in-out;
-            width: 8px;
-            height: 8px;
-            background-color: #E5484D;
-            border-radius: 50%;
-            display: inline-block;
-          }
-          ::-webkit-scrollbar { width: 8px; }
-          ::-webkit-scrollbar-track { background: transparent; }
-          ::-webkit-scrollbar-thumb { background-color: var(--k-border-strong); border-radius: 4px; }
-          ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 107, 26, 0.6); }
-        `}
-      </style>
-
-      {position === "main" ? (
-        <div
-          className="main-panel"
-          style={{
-            height: "100%",
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 0,
-          }}
-        >
-          <h2 style={{ flexShrink: 0 }}>ACTIVE POSTS PIPELINE NETWORK</h2>
-
-          <div
-            className="jobs-selector-list"
-            style={{
-              flex: 1,
-              overflowY: "scroll",
-              maxHeight: "23vw",
-              minHeight: 0,
-              marginTop: "20px",
-              paddingRight: "10px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}
-          >
-            {pendingJobs.length === 0 ? (
-              <p>No pending jobs found.</p>
-            ) : (
-              pendingJobs.map((job) => {
-                const isActive = selectedJob && selectedJob.id === job.id;
-                return (
-                  <div
-                    key={job.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedJob(job);
-                    }}
-                    style={{
-                      border: isActive
-                        ? "2px solid #FF6B1A"
-                        : "1px solid var(--k-border-strong)",
-                      padding: "15px",
-                      cursor: "pointer",
-                      backgroundColor: isActive
-                        ? "var(--k-wash)"
-                        : "transparent",
-                      color: "inherit",
-                      borderRadius: "5px",
-                      transition: "all 0.2s ease-in-out",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "20px",
-                        marginBottom: "8px",
-                        fontSize: "0.85em",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          color: "var(--k-ink-3)",
-                        }}
-                      >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                        </svg>
-                        <span>
-                          {job.matchedCount || 0} matched professionals
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          color: "var(--k-alert-ink)",
-                        }}
-                      >
-                        <span className="status-indicator-dot"></span>
-                        <span>{job.interestedCount || 0} interested</span>
-                      </div>
-                    </div>
-
-                    <strong style={{ display: "block", fontSize: "1.2em" }}>
-                      {job.title}
-                    </strong>
-                    <span style={{ fontSize: "0.9em", opacity: 0.8 }}>
-                      {job.description}
-                    </span>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        marginTop: "10px",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedJob(job);
-                          navigate("/customer/postings/ActiveBiddingsEngine");
-                        }}
-                        style={{
-                          padding: "8px 20px",
-                          background: "#FF6B1A",
-                          color: "#0D0D0D",
-                          border: "none",
-                          borderRadius: "8px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          fontSize: "14px",
-                        }}
-                      >
-                        Chat
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+              Send
+            </button>
+          </form>
         </div>
-      ) : (
-        <div className="preview-panel">
-          {position === "sidebar" ? (
-            <>
-              <span className="badge badge-highlight">
-                Sidebar: Pipeline Stream
-              </span>
-              <p className="card-summary">
-                Selected: {selectedJob?.title || "None"}
-              </p>
-              <p className="card-summary">
-                Total Pending: {pendingJobs.length}
-              </p>
-            </>
-          ) : (
-            <span className="badge">
-              Footer Slot: Active Job ({selectedJob?.title || "None"})
-            </span>
-          )}
-        </div>
-      )}
-    </Card>
-  );
-
-  const resolveModuleBySlot = (slotKey) => {
-    switch (postingsSlots[slotKey]) {
-      case "ActiveBiddingsEngine":
-        return renderBiddingsEngine(slotKey);
-      case "GeospatialLiveMap":
-        return renderLiveMap(slotKey);
-      case "ActivePostsDashboard":
-        return renderPostsDashboard(slotKey);
-      case "RatingsReviewLogs":
-        return renderReviewLogs(slotKey);
-      default:
-        return null;
+      );
     }
-  };
-
-  // ── Bids popup handlers ──
-  const bidsForSelectedJob = biddingsStream || [];
-  const selectedBidItems = bidsForSelectedJob.filter((bid) =>
-    selectedBidIds.includes(bid.id),
-  );
-  const totalCharge = selectedBidItems.reduce(
-    (sum, bid) => sum + (bid.bid_amount || bid.offer || bid.amount || 0),
-    0,
-  );
-
-  const handleViewChat = () => {
-    setViewAllBids(false);
-  };
-
-  const handleToggleBidSelection = (bidId) => {
-    setSelectedBidIds((prev) =>
-      prev.includes(bidId)
-        ? prev.filter((id) => id !== bidId)
-        : [...prev, bidId],
-    );
-  };
-
-  const handleBookClick = (bid) => {
-    setSelectedBidIds([bid.id]);
-    setShowBookingModal(true);
-    setViewAllBids(false);
-  };
-
-  const handleMultiBook = () => {
-    if (selectedBidIds.length > 0) {
-      setShowBookingModal(true);
-      setViewAllBids(false);
-    }
-  };
-
-  const handleProceedToPayment = async () => {
-    setShowBookingModal(false);
-    try {
-      const data = await apiClient.post(`/jobs/${selectedJob.id}/book`, {
-        selected_bid_ids: selectedBidIds,
-      });
-
-      if (data.status === "success") {
-        useCustomerDashboardData.getState().updateJobMetrics(selectedJob.id, {
-          worker_id: data.worker_id,
-          status: data.job_status || "assigned",
-        });
-        useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
-      }
-    } catch (error) {
-      console.error("Failed to book worker(s):", error);
-    }
-  };
-
-  const handleRatingsClick = (worker) => {
-    const allWorkers = matchedWorkersMap[selectedJob?.id] || [];
-    if (bookMultiple && selectedBidIds.length > 0) {
-      const selectedWorkers = bidsForSelectedJob
-        .filter((bid) => selectedBidIds.includes(bid.id))
-        .map((bid) => ({
-          ...allWorkers.find((w) => w.worker_chat_id === bid.worker_chat_id),
-          _highlighted: true,
-        }));
-      setSelectedWorkersForReview(selectedWorkers);
-    } else {
-      const targetWorker =
-        allWorkers.find((w) => w.worker_chat_id === worker.worker_chat_id) ||
-        worker;
-      setSelectedWorkersForReview([{ ...targetWorker, _highlighted: true }]);
-    }
-    setShowRatingsModal(true);
-  };
-
-  const handleMapsClick = (worker) => {
-    setViewAllBids(false);
-    workerCardRefs.current[worker.worker_chat_id]?.scrollIntoView({
-      behavior: "auto",
-      block: "center",
-    });
-  };
-
-  const handleMapsClickMulti = () => {
-    setViewAllBids(false);
-    const selectedIds = bidsForSelectedJob
-      .filter((bid) => selectedBidIds.includes(bid.id))
-      .map((bid) => bid.worker_chat_id);
-    navigate("/customer/postings/RatingsReviewLogs");
-  };
-
-  // ── Inlined Centered Modals ──
-
-  const renderBookingModal = () => {
-    if (!showBookingModal) return null;
-    const modalStyle = {
-      position: "fixed",
-      inset: 0,
-      backgroundColor: "rgba(0,0,0,0.6)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 99999,
-      padding: "16px",
-    };
-    const contentStyle = {
-      position: "relative",
-      width: "100%",
-      maxWidth: "640px",
-      background: "var(--k-raise)",
-      color: "var(--k-ink)",
-      border: "1px solid var(--k-line)",
-      borderRadius: "16px",
-      boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-      maxHeight: "90vh",
-      overflowY: "auto",
-      padding: "24px",
-    };
-    const closeBtnStyle = {
-      position: "absolute",
-      top: "12px",
-      right: "16px",
-      background: "none",
-      border: "none",
-      color: "var(--k-ink-3)",
-      fontSize: "24px",
-      cursor: "pointer",
-      lineHeight: 1,
-    };
-    const handleBackdropClick = (e) => {
-      if (e.target === e.currentTarget) setShowBookingModal(false);
-    };
 
     return (
-      <div style={modalStyle} onClick={handleBackdropClick}>
-        <div style={contentStyle}>
-          <button
-            onClick={() => setShowBookingModal(false)}
-            style={closeBtnStyle}
-          >
-            ×
-          </button>
-
-          <h3
-            style={{
-              margin: "0 0 8px",
-              fontSize: "12px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-              color: "var(--k-orange-ink)",
-            }}
-          >
-            Job Title:
-          </h3>
-          <p
-            style={{ margin: "4px 0 12px", fontSize: "20px", fontWeight: 700 }}
-          >
-            {selectedJob?.title || "Untitled Job"}
-          </p>
-
-          <h4
-            style={{
-              margin: "16px 0 8px",
-              fontSize: "12px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-              color: "var(--k-orange-ink)",
-            }}
-          >
-            Job Description:
-          </h4>
-          <p
-            style={{
-              margin: "4px 0 20px",
-              fontSize: "13px",
-              color: "var(--k-ink-3)",
-              lineHeight: "1.5",
-            }}
-          >
-            {selectedJob?.description ||
-              selectedJob?.job_description ||
-              "No description available."}
-          </p>
-
-          <h4
-            style={{
-              margin: "0 0 12px",
-              fontSize: "11px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-              color: "var(--k-ink-3)",
-            }}
-          >
-            Selected Workers &amp; Bids:
-          </h4>
-          <div style={{ marginBottom: "20px" }}>
-            {selectedBidItems.length === 0 ? (
-              <p style={{ fontSize: "13px", color: "var(--k-ink-3)" }}>
-                No workers selected.
-              </p>
-            ) : (
-              selectedBidItems.map((item, idx) => {
-                const workerName =
-                  item.worker_name ||
-                  item.provider ||
-                  `Worker ${item.worker_chat_id}`;
-                const bidAmount =
-                  item.bid_amount || item.offer || item.amount || 0;
-                return (
-                  <div
-                    key={item.id || idx}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 12px",
-                      border: "1px solid var(--k-line)",
-                      borderRadius: "8px",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "28px",
-                          height: "28px",
-                          borderRadius: "50%",
-                          background: "rgba(255, 107, 26, 0.2)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: "#FF6B1A",
-                            fontWeight: 700,
-                            fontSize: "11px",
-                          }}
-                        >
-                          {(workerName || "W").slice(0, 1).toUpperCase()}
-                        </span>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 500,
-                          color: "var(--k-ink)",
-                        }}
-                      >
-                        {workerName}
-                      </span>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        color: "#FF6B1A",
-                      }}
-                    >
-                      Rs {bidAmount}
-                    </span>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "20px",
-            }}
-          >
-            <span style={{ fontSize: "13px", color: "var(--k-ink-3)" }}>
-              Total Charge:
-            </span>
-            <span
-              style={{ fontSize: "24px", fontWeight: 700, color: "#FF6B1A" }}
-            >
-              Rs {totalCharge}
-            </span>
-          </div>
-
-          <button
-            onClick={handleProceedToPayment}
-            style={{
-              width: "100%",
-              padding: "12px",
-              background: "#FF6B1A",
-              color: "#0D0D0D",
-              border: "none",
-              borderRadius: "12px",
-              fontWeight: 700,
-              fontSize: "16px",
-              cursor: "pointer",
-            }}
-          >
-            Proceed to Payment Opt
-          </button>
+      <div
+        className={`dashboard-card asleep-view ${slotKey}-slot clickable`}
+        onClick={() => handleModuleSelect("AiChatTerminal")}
+      >
+        <div className="card-header">••• AI CHAT TERMINAL</div>
+        <span className="badge badge-highlight">Post Job through AI chat</span>
+        <p className="card-summary">Logs Captured: {chatMessages.length}</p>
+        <div className="card-summary" >
+          <p>Post your job by talking to our AI assistant.</p>
         </div>
       </div>
     );
   };
 
-  const renderRatingsModal = () => {
-    if (!showRatingsModal) return null;
-    const modalStyle = {
-      position: "fixed",
-      inset: 0,
-      backgroundColor: "rgba(0,0,0,0.6)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 99999,
-      padding: "16px",
-    };
-    const contentStyle = {
-      position: "relative",
-      width: "100%",
-      maxWidth: "640px",
-      background: "var(--k-raise)",
-      color: "var(--k-ink)",
-      border: "1px solid var(--k-line)",
-      borderRadius: "16px",
-      boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-      maxHeight: "90vh",
-      overflowY: "auto",
-      padding: "24px",
-    };
-    const closeBtnStyle = {
-      position: "absolute",
-      top: "12px",
-      right: "16px",
-      background: "none",
-      border: "none",
-      color: "var(--k-ink-3)",
-      fontSize: "24px",
-      cursor: "pointer",
-      lineHeight: 1,
-    };
-    const handleBackdropClick = (e) => {
-      if (e.target === e.currentTarget) setShowRatingsModal(false);
-    };
+  const renderJobDescription = (slotKey) => {
+    if (slotKey === "main") {
+      return (
+        <div
+          className="dashboard-card main-view"
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            gap: "16px",
+            width: "100%",
+            boxSizing: "border-box",
+            minWidth: 0,
+          }}
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            style={{ display: "none" }}
+          />
+
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              minWidth: 0,
+            }}
+          >
+            <span className="card-flag" style={{ marginTop: "-14px" }}>
+              EDIT OR CREATE JOB POSTING
+            </span>
+            <h3
+              className="title"
+              style={{ display: "flex", alignItems: "baseline", minWidth: 0 }}
+            >
+              <span>·•Title:&nbsp;</span>
+              <input
+                type="text"
+                placeholder="Set Title"
+                value={jobTitleDraft}
+                onChange={(e) => setJobTitle(e.target.value)}
+                spellCheck={false}
+                style={{
+                  outline: "none",
+                  border: "none",
+                  background: "transparent",
+                  font: "inherit",
+                  color: "inherit",
+                  padding: 0,
+                  margin: 0,
+                  width: "100%",
+                }}
+              />
+              <span style={{ whiteSpace: "nowrap", flexShrink: 0 }}>•·</span>
+            </h3>
+
+            <h3 className="title">Description:</h3>
+            <textarea
+              className="workspace-textarea"
+              value={jobDescriptionDraft}
+              placeholder="ENTER JOB DESCRIPTION..."
+              onChange={(e) => setJobDescription(e.target.value)}
+              style={{
+                border: "2px dashed var(--ind-border-strong)",
+                borderRadius: "4px",
+                padding: "10px",
+                outline: "none",
+                flex: 1,
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              width: "35%",
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              flexShrink: 0,
+            }}
+          >
+            <h3 className="title" dir="rtl" style={{ marginBottom: "4px" }}>
+              Attachments
+            </h3>
+
+            <div
+              style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (scrollRef.current)
+                    scrollRef.current.scrollBy({
+                      left: -120,
+                      behavior: "smooth",
+                    });
+                }}
+                style={{
+                  position: "absolute",
+                  left: "-5px",
+                  zIndex: 10,
+                  background: "#FF6B1A",
+                  color: "#0D0D0D",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "22px",
+                  height: "22px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "bold",
+                  fontSize: "12px",
+                }}
+              >
+                ‹
+              </button>
+
+              <div
+                ref={scrollRef}
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: "8px",
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  scrollbarWidth: "none",
+                  WebkitOverflowScrolling: "touch",
+                  width: "100%",
+                  padding: "6px 15px",
+                  cursor: "grab",
+                  userSelect: "none",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseDown={(e) => {
+                  isDown.current = true;
+                  if (scrollRef.current) {
+                    scrollRef.current.style.cursor = "grabbing";
+                    startX.current = e.pageX - scrollRef.current.offsetLeft;
+                    scrollLeftState.current = scrollRef.current.scrollLeft;
+                  }
+                }}
+                onMouseLeave={() => {
+                  isDown.current = false;
+                  if (scrollRef.current)
+                    scrollRef.current.style.cursor = "grab";
+                }}
+                onMouseUp={() => {
+                  isDown.current = false;
+                  if (scrollRef.current)
+                    scrollRef.current.style.cursor = "grab";
+                }}
+                onMouseMove={(e) => {
+                  if (!isDown.current || !scrollRef.current) return;
+                  e.preventDefault();
+                  const x = e.pageX - scrollRef.current.offsetLeft;
+                  const walk = (x - startX.current) * 1.5;
+                  scrollRef.current.scrollLeft = scrollLeftState.current - walk;
+                }}
+              >
+                <div
+                  onClick={() =>
+                    !isUploadingAttachment && fileInputRef.current?.click()
+                  }
+                  style={{
+                    display: "inline-flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: "65px",
+                    maxWidth: "65px",
+                    height: "65px",
+                    border: "1px dashed #FF6B1A",
+                    borderRadius: "8px",
+                    background: "rgba(255, 107, 26, 0.08)",
+                    color: "#FF6B1A",
+                    cursor: isUploadingAttachment ? "not-allowed" : "pointer",
+                    fontSize: "11px",
+                    padding: "4px",
+                    boxSizing: "border-box",
+                    flexShrink: 0,
+                  }}
+                >
+                  {isUploadingAttachment ? (
+                    <span style={{ fontSize: "10px", fontWeight: "bold" }}>
+                      ...
+                    </span>
+                  ) : (
+                    <>
+                      <span
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                          lineHeight: 1,
+                        }}
+                      >
+                        +
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          marginTop: "2px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ADD FILE
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {attachments.map((file, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      position: "relative",
+                      display: "inline-flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      minWidth: "65px",
+                      maxWidth: "65px",
+                      height: "65px",
+                      border: "1px solid var(--k-border-strong)",
+                      borderRadius: "8px",
+                      background: "var(--k-raise)",
+                      color: "var(--k-ink)",
+                      fontSize: "11px",
+                      padding: "4px",
+                      boxSizing: "border-box",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeAttachment(idx);
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: "2px",
+                        right: "2px",
+                        background: "rgba(255, 0, 0, 0.2)",
+                        color: "#ff4d4d",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "14px",
+                        height: "14px",
+                        fontSize: "10px",
+                        lineHeight: "1",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0,
+                      }}
+                      title="Remove attachment"
+                    >
+                      ×
+                    </button>
+
+                    <span
+                      style={{ fontWeight: 700, color: "var(--k-orange-ink)" }}
+                    >
+                      [{file.type || "FILE"}]
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        textOverflow: "ellipsis",
+                        overflow: "hidden",
+                        width: "100%",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={file.name}
+                    >
+                      {file.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (scrollRef.current)
+                    scrollRef.current.scrollBy({
+                      left: 120,
+                      behavior: "smooth",
+                    });
+                }}
+                style={{
+                  position: "absolute",
+                  right: "-5px",
+                  zIndex: 10,
+                  background: "#FF6B1A",
+                  color: "#0D0D0D",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "22px",
+                  height: "22px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "bold",
+                  fontSize: "12px",
+                }}
+              >
+                ›
+              </button>
+            </div>
+
+            <h3 className="title" dir="rtl" style={{ marginTop: "10px" }}>
+              {" "}
+              User Info{" "}
+            </h3>
+            <div className="user-info" style={{ lineHeight: "35px" }}>
+              <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                <span>NAME:&nbsp;</span>
+                <input
+                  type="text"
+                  value={userName}
+                  placeholder="ENTER YOU NAME"
+                  onChange={(e) => {
+                    setUserName(e.target.value);
+                    if (saveDraftProfile) saveUserProfileDraft();
+                  }}
+                  spellCheck={false}
+                  style={{
+                    outline: "none",
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: "inherit",
+                    padding: 0,
+                    margin: 0,
+                    width: "auto",
+                    minWidth: "50px",
+                    maxWidth: "100%",
+                  }}
+                />
+              </span>
+
+              <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                <span>CONTACT:&nbsp;</span>
+                <input
+                  type="text"
+                  value={userCont}
+                  onChange={(e) => {
+                    setUserCont(e.target.value);
+                    if (saveDraftProfile) saveUserProfileDraft();
+                  }}
+                  spellCheck={false}
+                  placeholder="ENTER CONTACT (+977 ...)"
+                  style={{
+                    outline: "none",
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: "inherit",
+                    padding: 0,
+                    margin: 0,
+                    width: "auto",
+                    minWidth: "50px",
+                    maxWidth: "100%",
+                  }}
+                />
+              </span>
+
+              <div
+                onClick={() => setIsMapOpen(true)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "baseline",
+                  cursor: "pointer",
+                  width: "100%",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.75)}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}
+              >
+                <span style={{ flexShrink: 0 }}>ADDRESS:&nbsp;</span>
+                <span
+                  style={{
+                    paddingLeft: "4px",
+                    textTransform: "uppercase",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    color: "var(--k-orange-ink)",
+                    textDecoration: "underline",
+                    fontWeight: 700,
+                  }}
+                  title={userAddrText || "CLICK TO SET LOCATION"}
+                >
+                  {userAddrText || "SET LOCATION 🗺️"}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginTop: "6px",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  id="saveDraftCheckbox"
+                  checked={saveDraftProfile}
+                  onChange={handleSaveDraftToggle}
+                  style={{
+                    cursor: "pointer",
+                    accentColor: "#FF6B1A",
+                    width: "16px",
+                    height: "16px",
+                  }}
+                />
+                <label
+                  htmlFor="saveDraftCheckbox"
+                  style={{
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    color: "var(--k-ink-2, #ccc)",
+                    userSelect: "none",
+                    fontWeight: 600,
+                  }}
+                >
+                  Save Draft for future reference
+                </label>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+                marginTop: "24px",
+                width: "100%",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                  gap: "16px",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <button
+                    type="button"
+                    onClick={() => console.log("🚨 Emergency toggle triggered")}
+                    className="title"
+                    dir="rtl"
+                    name="emergency"
+                  >
+                    Emergency Toggle
+                  </button>
+                </div>
+
+                <div style={{ flex: 1, position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={handleOpenDatePicker}
+                    style={{
+                      width: "100%",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      padding: "12px 20px",
+                      background: "#1e293b",
+                      color: "#ffffff",
+                      borderRadius: "8px",
+                      border: "1px solid #475569",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      lineHeight: "1.2",
+                      textAlign: "center",
+                      transition: "opacity 120ms ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = 0.85;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = 1;
+                    }}
+                  >
+                    📅 {scheduledDate ? scheduledDate : "Select Date"}
+                  </button>
+                  <input
+                    type="date"
+                    ref={dateInputRef}
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                    style={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      width: "1px",
+                      height: "1px",
+                      opacity: 0,
+                      pointerEvents: "none",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCreateJobFinalize}
+                disabled={isSubmitting}
+                className="title"
+                dir="rtl"
+                name="post"
+                style={{
+                  width: "100%",
+                  padding: "16px",
+                  background: "#FF6B1A",
+                  color: "#0D0D0D",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontWeight: "bold",
+                  cursor: isSubmitting ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                  transition: "transform 120ms ease, opacity 120ms ease",
+                  opacity: isSubmitting ? 0.6 : 1,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSubmitting) e.currentTarget.style.opacity = 0.85;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = 1;
+                }}
+                onMouseDown={(e) => {
+                  if (!isSubmitting)
+                    e.currentTarget.style.transform = "scale(0.95)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                {isSubmitting ? "Posting..." : "<- Post Job"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
-      <div style={modalStyle} onClick={handleBackdropClick}>
-        <div style={contentStyle}>
-          <button
-            onClick={() => setShowRatingsModal(false)}
-            style={closeBtnStyle}
-          >
-            ×
-          </button>
+      <div
+        className={`dashboard-card asleep-view ${slotKey}-slot clickable`}
+        onClick={() => handleModuleSelect("JobDescriptionWorkspace")}
+      >
+        <div className="card-header">••• JOB WORKSPACE</div>
+        <div>
+          <span className="badge badge-highlight">Extracted Job Detail</span>
+          <span className="badge badge-highlight">Manual Job Posting</span>
+        </div>
+        <p className="card-summary">
+          Description Draft: {jobDescriptionDraft.length} chars
+        </p>
+        <div className="card-summary">
+          <p>Extracted Job Credentials through AI appears here.</p>
+          <span>Edit and Post a job after chat finalized.</span>
+          <p>Manually Fill Job Credentials without talking to AI.</p>
+        </div>
+      </div>
+    );
+  };
 
-          <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 600 }}>
-            Ratings &amp; Reviews
-          </h3>
+  const renderActivePosts = (slotKey) => {
+    if (slotKey === "main") {
+      return (
+        <div
+          className="dashboard-card main-view"
+          style={{ overflow: "scroll", maxHeight: '80vh' }}
+        >
+          <span className="card-flag">REAL-TIME DISPATCH PIPELINE</span>
+
+          <h2>ACTIVE PENDING POSTS</h2>
+          <button
+            onClick={fetchBookingsPendingJobs}
+            style={{
+              background: "transparent",
+              color: "var(--k-orange-ink)",
+              border: "1px solid rgba(255, 107, 26, 0.5)",
+              borderRadius: "12px",
+              padding: "8px 16px",
+              fontWeight: 600,
+              cursor: "pointer",
+              marginBottom: "16px",
+              width: "fit-content",
+            }}
+          >
+            🔄 REFRESH LIVE PIPELINE
+          </button>
 
           <div
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}
           >
-            {selectedWorkersForReview.length === 0 ? (
-              <>
-                <p style={{ color: "var(--k-ink-3)", fontSize: "13px" }}>
-                  No worker profiles to review.
-                </p>
-                <button
-                  onClick={() => setShowRatingsModal(false)}
-                  style={{
-                    padding: "8px 16px",
-                    background: "#FF6B1A",
-                    color: "#0D0D0D",
-                    border: "none",
-                    borderRadius: "20px",
-                    fontWeight: 600,
-                    fontSize: "13px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Close
-                </button>
-              </>
+            {fetchedJobs.length === 0 ? (
+              <p
+                style={{
+                  fontFamily: "Courier New",
+                  color: "var(--k-ink-3)",
+                  fontSize: "0.9rem",
+                }}
+              >
+                No active pending jobs found in your database instance.
+              </p>
             ) : (
-              selectedWorkersForReview.map((worker) => {
-                const isSelected = worker._highlighted;
+              fetchedJobs.map((job) => {
+                const isThisJobEditing = isEditMode && editingJobId === job.id;
                 return (
                   <div
-                    key={worker.worker_chat_id || worker.id}
+                    key={job.id}
                     style={{
-                      padding: "12px",
-                      borderRadius: "10px",
-                      cursor: "pointer",
-                      border: isSelected
-                        ? "1px solid #FF6B1A"
-                        : "1px solid var(--k-line)",
-                      background: isSelected
-                        ? "var(--k-wash)"
-                        : "var(--ind-surface)",
+                      border: "1px solid var(--k-line)",
+                      borderRadius: "16px",
+                      padding: "16px",
+                      background: "var(--k-raise)",
+                      color: "var(--k-ink)",
+                      boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)",
                     }}
                   >
                     <div
                       style={{
                         display: "flex",
+                        justifyContent: "space-between",
                         alignItems: "center",
-                        gap: "10px",
                         marginBottom: "8px",
                       }}
                     >
-                      <div
+                      <span
                         style={{
-                          width: "36px",
-                          height: "36px",
-                          borderRadius: "50%",
-                          background: "rgba(255, 107, 26, 0.2)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          overflow: "hidden",
+                          fontFamily: "Courier New",
+                          fontWeight: "bold",
+                          fontSize: "1.1rem",
                         }}
                       >
-                        <span
+                        {job.title
+                          ? job.title.toUpperCase()
+                          : "NEW JOB REQUEST"}
+                      </span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isThisJobEditing) {
+                              exitEditMode();
+                            } else {
+                              loadJobForEdit(job);
+                              navigate(
+                                "/customer/bookings/JobDescriptionWorkspace",
+                              );
+                            }
+                          }}
                           style={{
-                            color: "#FF6B1A",
+                            background: isThisJobEditing
+                              ? "#ff4d4d"
+                              : "#FF6B1A",
+                            color: isThisJobEditing ? "#ffffff" : "#0D0D0D",
+                            border: "none",
+                            borderRadius: "8px",
+                            padding: "4px 12px",
                             fontWeight: 700,
-                            fontSize: "14px",
+                            cursor: "pointer",
+                            fontSize: "0.75rem",
+                            transition:
+                              "transform 120ms ease, opacity 120ms ease",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.opacity = 0.85)
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.opacity = 1)
+                          }
+                          onMouseDown={(e) =>
+                            (e.currentTarget.style.transform = "scale(0.95)")
+                          }
+                          onMouseUp={(e) =>
+                            (e.currentTarget.style.transform = "scale(1)")
+                          }
+                        >
+                          {isThisJobEditing ? "❌ EXIT EDIT" : "✏️ EDIT"}
+                        </button>
+
+                        <span
+                          className="badge badge-highlight"
+                          style={{
+                            textTransform: "uppercase",
+                            fontSize: "0.75rem",
+                            padding: "4px 8px",
                           }}
                         >
-                          {(worker.username || worker.worker_name || "W")
-                            .slice(0, 1)
-                            .toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <strong
-                          style={{ display: "block", color: "var(--k-ink)" }}
-                        >
-                          {worker.username ||
-                            worker.worker_name ||
-                            `Worker ${worker.worker_chat_id}`}
-                        </strong>
-                        <span
-                          style={{ fontSize: "11px", color: "var(--k-ink-3)" }}
-                        >
-                          ★ {worker.rating || "—"}/5
+                          ⚙️ {job.status || "PENDING"}
                         </span>
                       </div>
                     </div>
                     <p
                       style={{
-                        margin: "0 0 8px",
-                        fontSize: "12px",
+                        margin: "4px 0",
+                        fontSize: "0.9rem",
                         color: "var(--k-ink-3)",
                         lineHeight: "1.4",
-                        fontStyle: "italic",
                       }}
                     >
-                      {worker.review_snippet || "No review yet."}
+                      {job.description}
                     </p>
                   </div>
                 );
@@ -1858,24 +1230,253 @@ export default function Dash2Board({ viewSlug }) {
             )}
           </div>
         </div>
+      );
+    }
+
+    return (
+      <div
+        className={`dashboard-card asleep-view ${slotKey}-slot clickable`}
+        onClick={() => handleModuleSelect("YourActivePosts")}
+      >
+        <div className="card-header">••• YOUR ACTIVE POSTS</div>
+        <div>
+          <span className="badge badge-highlight">Active Posts</span>
+          <span className="badge badge-highlight">Edit Posted Jobs</span>
+        </div>
+        <div className="card-summary">
+          <span>You have {activePostsCount} active posts.</span>
+        </div>
+        <div className="card-summary" >
+          <p>View and Edit posted jobs.</p>
+        </div>
       </div>
     );
   };
 
+  const resolveAndRenderModule = (slotKey) => {
+    const moduleName = slots[slotKey];
+    switch (moduleName) {
+      case "AiChatTerminal":
+        return renderAiChat(slotKey);
+      case "JobDescriptionWorkspace":
+        return renderJobDescription(slotKey);
+      case "YourActivePosts":
+        return renderActivePosts(slotKey);
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="dashboard-grid-4pane">
-      <div className="grid-main">{resolveModuleBySlot("main")}</div>
-      <div className="grid-sidebar">{resolveModuleBySlot("sidebar")}</div>
-      <div className="grid-bottom-left">
-        {resolveModuleBySlot("bottomLeft")}
-      </div>
-      <div className="grid-bottom-right">
-        {resolveModuleBySlot("bottomRight")}
+    <div className="dashboard-grid">
+      <div className="grid-main">{resolveAndRenderModule("main")}</div>
+
+      <div className="right-sidebar-container">
+        <div className="grid-slot-2">{resolveAndRenderModule("sidebar")}</div>
+
+        <div className="grid-slot-3">{resolveAndRenderModule("bottom")}</div>
       </div>
 
-      {/* ── Centered Modals ── */}
-      {renderBookingModal()}
-      {renderRatingsModal()}
+      {isMapOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(3px)",
+          }}
+        >
+          <div
+            style={{
+              background: "var(--ind-surface)",
+              border: "1px solid var(--ind-border)",
+              borderRadius: "16px",
+              boxShadow: "var(--ind-shadow-tight)",
+              width: "450px",
+              maxWidth: "90%",
+              padding: "20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              fontFamily: "inherit",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  textTransform: "uppercase",
+                  letterSpacing: "1px",
+                }}
+              >
+                🗺️ CHOOSE DELIVERY PIN (NEPAL)
+              </span>
+            </div>
+
+            <div style={{ display: "flex", gap: "6px", width: "100%" }}>
+              <form
+                onSubmit={executeModalAddressSearch}
+                style={{ display: "flex", gap: "6px", flex: 1 }}
+              >
+                <input
+                  type="text"
+                  placeholder="SEARCH LALITPUR, THAMEL, ETC..."
+                  value={modalSearchQuery}
+                  onChange={(e) => setModalSearchQuery(e.target.value)}
+                  style={{
+                    flex: 1,
+                    border: "1px solid var(--ind-border)",
+                    borderRadius: "6px",
+                    padding: "6px 10px",
+                    outline: "none",
+                    font: "inherit",
+                    fontSize: "11px",
+                    background: "var(--ind-surface-alpha-40)",
+                    color: "var(--ind-white)",
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    background: "#FF6B1A",
+                    color: "#0D0D0D",
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "0 12px",
+                    font: "inherit",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  FIND
+                </button>
+              </form>
+
+              <button
+                type="button"
+                onClick={handleModalLiveTracking}
+                title="Snap to My Current Position"
+                style={{
+                  background: "rgba(255, 107, 26, 0.12)",
+                  border: "1px solid rgba(255, 107, 26, 0.4)",
+                  borderRadius: "6px",
+                  padding: "0 10px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                📍
+              </button>
+            </div>
+
+            <div
+              ref={mapContainerRef}
+              style={{
+                width: "100%",
+                height: "260px",
+                border: "1px solid var(--ind-border)",
+                borderRadius: "8px",
+                background: "var(--ind-surface-alpha-40)",
+                position: "relative",
+              }}
+            />
+
+            <div
+              style={{
+                fontSize: "11px",
+                background: "var(--ind-surface-alpha-40)",
+                padding: "8px",
+                border: "1px dashed var(--ind-border)",
+                borderRadius: "6px",
+              }}
+            >
+              <strong style={{ color: "var(--text-secondary)" }}>
+                SELECTED ADDRESS:
+              </strong>
+              <div
+                style={{
+                  textTransform: "uppercase",
+                  marginTop: "2px",
+                  fontWeight: "bold",
+                  wordBreak: "break-word",
+                }}
+              >
+                {modalAddrText ||
+                  "DRAG THE PIN OR CLICK ON THE MAP TO CHOOSE..."}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+              <button
+                type="button"
+                onClick={() => setIsMapOpen(false)}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  background: "var(--ind-surface-alpha-40)",
+                  border: "1px solid var(--ind-border)",
+                  borderRadius: "8px",
+                  font: "inherit",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                CANCEL
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const finalAddr =
+                    modalAddrText ||
+                    `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`;
+                  setUserAddrText(finalAddr);
+                  setUserCoordinates(modalLng, modalLat);
+                  setIsMapOpen(false);
+                  if (saveDraftProfile) {
+                    await saveUserProfileDraft();
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  background: "#FF6B1A",
+                  border: "1px solid #FF6B1A",
+                  borderRadius: "8px",
+                  font: "inherit",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  color: "#0D0D0D",
+                }}
+              >
+                CONFIRM LOCATION
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,16 +1,32 @@
-import { apiClient } from "@shared/api/client";
+import { apiClient, ApiClientError } from "@shared/api/client";
 import { API_BASE_URL } from "@shared/config/api";
 
-const normalizeMessage = (msg) => ({
-  id: msg.id || msg.message_id || `msg-${Math.random()}`,
-  sender_id: msg.sender_id ?? msg.senderId ?? msg.user_id ?? msg.author_id,
-  sender_role: String(
-    msg.sender_role || msg.role || msg.sender_type || "",
-  ).toLowerCase(),
-  sender_name: msg.sender_name || msg.username || msg.sender || "Unknown",
-  text: msg.text || msg.message || msg.content || "",
-  timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
-});
+const normalizeMessage = (msg) => {
+  if (!msg || typeof msg !== 'object') {
+    return {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      sender_id: null,
+      sender_role: 'system',
+      sender_name: 'System',
+      text: '',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  const rawId = msg.id ?? msg.message_id ?? msg._id;
+  const safeId = rawId != null ? String(rawId) : `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+  const rawSenderId = msg.sender_id ?? msg.senderId ?? msg.user_id ?? msg.author_id;
+
+  return {
+    id: safeId,
+    sender_id: rawSenderId != null ? rawSenderId : null,
+    sender_role: String(msg.sender_role || msg.role || msg.sender_type || '').toLowerCase(),
+    sender_name: msg.sender_name || msg.username || msg.sender || 'User',
+    text: typeof msg.text === 'string' ? msg.text : (msg.message || msg.content || ''),
+    timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
+  };
+};
 
 export const createPostingsZlice = (set, get) => ({
   postingsSlots: {
@@ -55,8 +71,8 @@ export const createPostingsZlice = (set, get) => ({
 
       if (data.status === "success") {
         const jobs = data.tasks || [];
-
-        const mappedJobs = jobs.map((job) => {
+        
+        const mappedJobs = jobs.map(job => {
           const lat = job.latitude ?? job.location?.latitude;
           const lng = job.longitude ?? job.location?.longitude;
           return {
@@ -64,12 +80,12 @@ export const createPostingsZlice = (set, get) => ({
             latitude: lat,
             longitude: lng,
             matchedCount: job.matched_count || 0,
-            interestedCount: job.interested_count || 0,
+            interestedCount: job.interested_count || 0
           };
         });
 
         set({ pendingJobs: mappedJobs });
-
+        
         const currentSelected = get().selectedJob;
         if (mappedJobs.length > 0) {
           const matchingActiveJob = currentSelected
@@ -88,7 +104,7 @@ export const createPostingsZlice = (set, get) => ({
   },
 
   fetchJobBids: async (jobId) => {
-    if (!jobId) return;
+    if (!jobId) return [];
     try {
       const data = await apiClient.get(`/workers/jobs/${jobId}/bids`);
 
@@ -100,8 +116,7 @@ export const createPostingsZlice = (set, get) => ({
           return {
             id: bid.id || crypto.randomUUID(),
             worker_chat_id: workerId,
-            worker_name:
-              bid.worker_name || bid.provider || `Worker ${workerId}`,
+            worker_name: bid.worker_name || bid.provider || `Worker ${workerId}`,
             provider: bid.worker_name || bid.provider || `Worker ${workerId}`,
             bid_amount: bidAmount,
             amount: bidAmount,
@@ -112,9 +127,17 @@ export const createPostingsZlice = (set, get) => ({
           };
         });
         set({ biddingsStream: normalizedBids });
+        return normalizedBids;
       }
+      set({ biddingsStream: [] });
+      return [];
     } catch (error) {
+      if (error instanceof ApiClientError && error.status === 404) {
+        set({ biddingsStream: [] });
+        return [];
+      }
       console.error(`❌ Failed to fetch bids for Job ${jobId}:`, error);
+      return [];
     }
   },
 
@@ -140,10 +163,8 @@ export const createPostingsZlice = (set, get) => ({
     if (!workerChatIds || workerChatIds.length === 0) return;
 
     try {
-      const data = await apiClient.post("/workers/locations", {
-        worker_chat_ids: workerChatIds,
-      });
-
+      const data = await apiClient.post("/workers/locations", { worker_chat_ids: workerChatIds });
+      
       if (data.status === "success") {
         const locationsMap = { ...get().workerLocations };
         data.locations.forEach((loc) => {
@@ -176,14 +197,12 @@ export const createPostingsZlice = (set, get) => ({
     }),
 
   fetchMatchedWorkersForJob: async (jobId) => {
-    if (!jobId) return;
+    if (!jobId) return [];
 
     try {
       const job = get().pendingJobs.find((j) => j.id === jobId);
       const bookingChatId = job?.booking_chat_id || jobId;
-      const data = await apiClient.get(
-        `/dispatch/match/${bookingChatId}/find-help`,
-      );
+      const data = await apiClient.get(`/dispatch/match/${bookingChatId}/find-help`);
       const workers = data.workers || [];
 
       get().updateJobMetrics(jobId, {
@@ -203,15 +222,32 @@ export const createPostingsZlice = (set, get) => ({
       if (workerIds.length > 0) {
         get().fetchWorkerLocations(workerIds);
       }
+
+      return workers;
     } catch (error) {
-      console.error(
-        `❌ Failed to fetch matched workers for Job ${jobId}:`,
-        error,
-      );
+      const is404 = error instanceof ApiClientError && error.status === 404;
+      const noMatchingWorkers =
+        error instanceof ApiClientError &&
+        typeof error.message === "string" &&
+        error.message.toLowerCase().includes("no matching workers");
+
+      if (is404 || noMatchingWorkers) {
+        get().updateJobMetrics(jobId, { matchedCount: 0 });
+        set((state) => ({
+          matchedWorkersMap: {
+            ...state.matchedWorkersMap,
+            [jobId]: [],
+          },
+        }));
+        return [];
+      }
+
+      console.error(`❌ Failed to fetch matched workers for Job ${jobId}:`, error);
       get().updateJobMetrics(jobId, { matchedCount: 0 });
       set((state) => ({
-        matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] },
+        matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] }
       }));
+      return [];
     }
   },
 
@@ -226,32 +262,27 @@ export const createPostingsZlice = (set, get) => ({
   },
 
   appendMessage: (senderOrMsg, text, senderName, senderId) => {
-    const raw =
-      typeof senderOrMsg === "object" && senderOrMsg !== null
-        ? senderOrMsg
-        : {
-            sender: senderOrMsg,
-            role: senderOrMsg,
-            text,
-            sender_name:
-              senderName || (senderOrMsg === "customer" ? "You" : undefined),
-            sender_id: senderId,
-          };
+    const raw = typeof senderOrMsg === "object" && senderOrMsg !== null
+      ? senderOrMsg
+      : { 
+          sender: senderOrMsg, 
+          role: senderOrMsg,
+          text, 
+          sender_name: senderName || (senderOrMsg === "customer" ? "You" : undefined), 
+          sender_id: senderId 
+        };
     const msg = normalizeMessage(raw);
     set((state) => ({
-      chatMessages: [...state.chatMessages, msg],
+      chatMessages: [...state.chatMessages, msg]
     }));
   },
 
   connectCustomerChat: async (bookingChatId) => {
     get().disconnectCustomerChat();
     const token = localStorage.getItem("handy_man_access_token");
-    const wsBaseUrl = (import.meta.env?.VITE_WS_URL || API_BASE_URL).replace(
-      /^http/,
-      "ws",
-    );
+    const wsBaseUrl = (import.meta.env?.VITE_WS_URL || API_BASE_URL).replace(/^http/, "ws");
     const socket = new WebSocket(
-      `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`,
+      `${wsBaseUrl}/ws/booking/${bookingChatId}?token=${token}`
     );
 
     socket.onopen = () => {
@@ -269,12 +300,11 @@ export const createPostingsZlice = (set, get) => ({
       if (rawData.type === "HUMAN_MESSAGE") {
         const normalized = normalizeMessage(rawData.data);
         set((state) => {
-          const exists = state.chatMessages.some((m) => m.id === normalized.id);
+          const exists = state.chatMessages.some(m => m.id === normalized.id);
           if (exists) return state;
 
           const filtered = state.chatMessages.filter(
-            (m) =>
-              !String(m.id).startsWith("temp-") || m.text !== normalized.text,
+            m => !String(m.id).startsWith("temp-") || m.text !== normalized.text
           );
           return { chatMessages: [...filtered, normalized] };
         });
@@ -284,18 +314,18 @@ export const createPostingsZlice = (set, get) => ({
         const { bid_amount, worker_chat_id, worker_name } = rawData.data;
         const bidAmount = bid_amount || 0;
         const workerName = worker_name || `Worker ${worker_chat_id}`;
-
-        const bidMessage = {
+        
+        const bidMessage = normalizeMessage({
           id: crypto.randomUUID(),
           sender_id: null,
           sender_role: "system",
           sender_name: "BID SYSTEM",
           text: `${workerName} placed a bid: Rs ${bidAmount}`,
           timestamp: new Date().toISOString(),
-        };
-
+        });
+        
         set((state) => ({
-          chatMessages: [...state.chatMessages, bidMessage],
+          chatMessages: [...state.chatMessages, bidMessage]
         }));
 
         set((state) => ({
@@ -310,9 +340,9 @@ export const createPostingsZlice = (set, get) => ({
               amount: bidAmount,
               offer: bidAmount,
               message: rawData.data.bid_message || "",
-              status: "Incoming",
-            },
-          ],
+              status: "Incoming"
+            }
+          ]
         }));
       }
     };
@@ -324,12 +354,7 @@ export const createPostingsZlice = (set, get) => ({
     const { chatSocket } = get();
     if (chatSocket) {
       chatSocket.close();
-      set({
-        chatSocket: null,
-        isChatConnected: false,
-        chatBookingChatId: null,
-        chatMessages: [],
-      });
+      set({ chatSocket: null, isChatConnected: false, chatBookingChatId: null, chatMessages: [] });
     }
   },
 
@@ -338,15 +363,12 @@ export const createPostingsZlice = (set, get) => ({
     let currentUserId = null;
     try {
       if (token) {
-        const base64Payload = token
-          .split(".")[1]
-          .replace(/-/g, "+")
-          .replace(/_/g, "/");
+        const base64Payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
         const jsonPayload = decodeURIComponent(
           atob(base64Payload)
             .split("")
             .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
-            .join(""),
+            .join("")
         );
         currentUserId = JSON.parse(jsonPayload).user_id;
       }
@@ -367,7 +389,7 @@ export const createPostingsZlice = (set, get) => ({
     try {
       const data = await apiClient.post(
         `/dispatch/chat/${bookingChatId}/message`,
-        { sender, message: text },
+        { sender, message: text }
       );
       return data;
     } catch (error) {
@@ -377,26 +399,23 @@ export const createPostingsZlice = (set, get) => ({
   },
 
   fetchChatHistory: async (bookingChatId) => {
-    try {
-      const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
-      const history = data.history || [];
-      const sanitizedHistory = history.filter((msg) => {
-        if (msg.role !== "system") return true;
-        if (msg.role === "system" && msg.content && msg.content.length < 200)
-          return true;
-        return false;
-      });
-      const messages = sanitizedHistory.map((msg) => normalizeMessage(msg));
-      set({ chatMessages: messages });
-    } catch (error) {
-      if (error.status === 500) {
-        console.error(
-          "❌ Chat history fetch failed (server error), skipping retry:",
-          error.message,
-        );
-      } else {
-        console.error("❌ Failed to fetch chat history:", error);
+      try {
+        const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
+        const history = data.history || [];
+        const sanitizedHistory = history.filter((msg) => {
+          if (!msg) return false;
+          if (msg.role !== "system") return true;
+          if (msg.role === "system" && msg.content && msg.content.length < 200) return true;
+          return false;
+        });
+        const messages = sanitizedHistory.map((msg) => normalizeMessage(msg));
+        set({ chatMessages: messages });
+      } catch (error) {
+        if (error.status === 500) {
+          console.error("❌ Chat history fetch failed (server error), skipping retry:", error.message);
+        } else {
+          console.error("❌ Failed to fetch chat history:", error);
+        }
       }
-    }
-  },
+    },
 });

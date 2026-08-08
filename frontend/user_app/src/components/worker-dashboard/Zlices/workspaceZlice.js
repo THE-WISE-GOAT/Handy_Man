@@ -1,14 +1,32 @@
 import { apiClient } from "@shared/api/client";
 import { API_BASE_URL } from "@shared/config/api";
 
-const normalizeMessage = (msg) => ({
-  id: msg.id || msg.message_id || `msg-${Math.random()}`,
-  sender_id: msg.sender_id ?? msg.senderId ?? msg.user_id ?? msg.author_id,
-  sender_role: String(msg.sender_role || msg.role || msg.sender_type || '').toLowerCase(),
-  sender_name: msg.sender_name || msg.username || msg.sender || 'Unknown',
-  text: msg.text || msg.message || msg.content || '',
-  timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
-});
+const normalizeMessage = (msg) => {
+  if (!msg || typeof msg !== 'object') {
+    return {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      sender_id: null,
+      sender_role: 'system',
+      sender_name: 'System',
+      text: '',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  const rawId = msg.id ?? msg.message_id ?? msg._id;
+  const safeId = rawId != null ? String(rawId) : `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+  const rawSenderId = msg.sender_id ?? msg.senderId ?? msg.user_id ?? msg.author_id;
+
+  return {
+    id: safeId,
+    sender_id: rawSenderId != null ? rawSenderId : null,
+    sender_role: String(msg.sender_role || msg.role || msg.sender_type || '').toLowerCase(),
+    sender_name: msg.sender_name || msg.username || msg.sender || 'User',
+    text: typeof msg.text === 'string' ? msg.text : (msg.message || msg.content || ''),
+    timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
+  };
+};
 
 export const createWorkspaceZlice = (set, get) => ({
   mapStatus: "REALTIME DISPATCH TRACKING MATRIX ACTIVE",
@@ -25,17 +43,28 @@ export const createWorkspaceZlice = (set, get) => ({
     set((state) => {
       if (clickedSlotName === "main") return {};
 
+      let targetSlot = clickedSlotName;
+      if (!Object.prototype.hasOwnProperty.call(state.workspaceSlots, clickedSlotName)) {
+        targetSlot = Object.keys(state.workspaceSlots).find(
+          (key) => state.workspaceSlots[key] === clickedSlotName
+        );
+      }
+
+      if (!targetSlot || targetSlot === "main") return {};
+
       const outgoingMain = state.workspaceSlots.main;
-      const incomingTarget = state.workspaceSlots[clickedSlotName];
+      const incomingTarget = state.workspaceSlots[targetSlot];
 
       return {
         workspaceSlots: {
           ...state.workspaceSlots,
           main: incomingTarget,
-          [clickedSlotName]: outgoingMain,
+          [targetSlot]: outgoingMain,
         },
       };
     }),
+
+  setActiveModule: (moduleName) => set({ activeModule: moduleName }),
 
   workerProfession: "plumber",
   socket: null,
@@ -284,6 +313,7 @@ export const createWorkspaceZlice = (set, get) => ({
         const data = await apiClient.get(`/dispatch/${bookingChatId}/history`);
         const history = data.history || [];
         const sanitizedHistory = history.filter((msg) => {
+          if (!msg) return false;
           if (msg.role !== "system") return true;
           if (msg.role === "system" && msg.content && msg.content.length < 200) return true;
           return false;

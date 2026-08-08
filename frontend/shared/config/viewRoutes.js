@@ -53,7 +53,7 @@ export const CUSTOMER_VIEWS = {
   RATINGS_REVIEWS: { 
     id: "RATINGS_REVIEWS", 
     slug: "RatingsReviewLogs", 
-    label: "Ratings & Review Logs", 
+    label: "MATCHED PROFESSIONALS LOGS", 
     section: "postings", 
     categoryKey: "postings" 
   },

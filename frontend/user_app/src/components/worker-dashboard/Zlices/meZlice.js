@@ -3,14 +3,14 @@ import { API_BASE_URL } from "@shared/config/api";
 export const createMeZlice = (set, get) => ({
   meSlots: {
     main: "MeInterview",
-    sidebar: "MeProfile",
-    bottomLeft: "MeConfiguration",
-    bottomRight: "MeCollectedTags",
+    slot1: "MeConfiguration",
+    slot2: "MeProfile",
+    slot3: "MeCollectedTags",
   },
 
   swapMeSlots: (clickedSlotName) =>
     set((state) => {
-      if (clickedSlotName === "main") return {};
+      if (!clickedSlotName || clickedSlotName === "main" || !state.meSlots[clickedSlotName]) return {};
       const outgoingMainModule = state.meSlots.main;
       const incomingTargetModule = state.meSlots[clickedSlotName];
       return {
@@ -121,7 +121,7 @@ export const createMeZlice = (set, get) => ({
   setTurnsRemaining: (val) => set({ turnsRemaining: val }),
   setScenarioQuestion: (val) => set({ scenarioQuestion: val }),
 
-  setIsMapOpen: (val) => set({ isMapOpen: val }),
+  setIsMapOpen: (val) => set({ setIsMapOpen: val }),
   setMapReady: (val) => set({ mapReady: val }),
   setModalSearchQuery: (val) => set({ modalSearchQuery: val }),
   setModalLat: (val) => set({ modalLat: val }),
@@ -158,7 +158,7 @@ export const createMeZlice = (set, get) => ({
         `${API_BASE_URL}/worker-interview/${workerChatId}/skills`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        },
+        }
       );
       if (res.ok) {
         const data = await res.json();
@@ -178,13 +178,14 @@ export const createMeZlice = (set, get) => ({
       if (meSlots.main !== "MeInterview") {
         const slots = { ...meSlots };
         const slotKeyWithInterview = Object.keys(slots).find(
-          (k) => slots[k] === "MeInterview",
+          (k) => slots[k] === "MeInterview"
         );
-        if (slotKeyWithInterview) {
-          slots[slotKeyWithInterview] = slots.main;
+        if (slotKeyWithInterview && slotKeyWithInterview !== "main") {
+          const outgoingMain = slots.main;
+          slots.main = "MeInterview";
+          slots[slotKeyWithInterview] = outgoingMain;
+          set({ meSlots: slots });
         }
-        slots.main = "MeInterview";
-        set({ meSlots: slots });
       }
 
       const token = localStorage.getItem("handy_man_access_token");
@@ -193,7 +194,7 @@ export const createMeZlice = (set, get) => ({
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
-        },
+        }
       );
 
       if (res.ok) {
@@ -248,7 +249,7 @@ export const createMeZlice = (set, get) => ({
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-        },
+        }
       );
 
       if (!response.ok) {
@@ -309,7 +310,7 @@ export const createMeZlice = (set, get) => ({
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({ message: userMessage }),
-          },
+          }
         );
 
         if (!response.ok)
@@ -354,7 +355,7 @@ export const createMeZlice = (set, get) => ({
               worker_chat_id: parseInt(workerChatId),
               message: userMessage,
             }),
-          },
+          }
         );
 
         if (!response.ok)
@@ -406,7 +407,7 @@ export const createMeZlice = (set, get) => ({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        },
+        }
       );
 
       if (response.ok) {
@@ -479,12 +480,12 @@ export const createMeZlice = (set, get) => ({
             license: licenseAttachments,
             misc: miscAttachments,
           }),
-        },
+        }
       );
 
       if (!response.ok) {
         throw new Error(
-          `Completion / submit pipeline failed: ${response.status}`,
+          `Completion / submit pipeline failed: ${response.status}`
         );
       }
 
@@ -524,7 +525,7 @@ export const createMeZlice = (set, get) => ({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(editableProfile),
-        },
+        }
       );
 
       if (!response.ok) {
@@ -612,7 +613,7 @@ export const createMeZlice = (set, get) => ({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        },
+        }
       );
 
       if (response.ok) {
@@ -685,7 +686,7 @@ export const createMeZlice = (set, get) => ({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        },
+        }
       );
 
       if (response.ok) {
