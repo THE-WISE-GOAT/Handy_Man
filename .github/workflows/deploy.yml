@@ -119,9 +119,7 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      # The repo-root requirements.txt is encoded as UTF-16, so CI normalises
-      # it to UTF-8 before Docker builds. This keeps the backend image build
-      # consistent with the local Windows-generated file.
+      # Same UTF-16 problem as the test job
       - name: Normalise requirements encoding
         run: |
           python3 - <<'PY'
@@ -140,8 +138,7 @@ jobs:
           Path("requirements.txt").write_text(text, encoding="utf-8")
           PY
 
-      # Build only — no push. Confirms both Dockerfiles are still valid before
-      # a release tag tries to publish them for real.
+      # Build backend image
       - name: Build backend image
         uses: docker/build-push-action@v6
         with:
@@ -151,10 +148,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Build frontend image - Context is set to './frontend' so it can access 'user_app' and 'shared'
       - name: Build frontend image
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend/user_app
+          context: ./frontend
           file: ./frontend/user_app/Dockerfile
           target: production
           push: false
