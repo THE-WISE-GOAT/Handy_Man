@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI, status
+import logging
+from fastapi import Depends, FastAPI, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -44,6 +46,9 @@ async def lifespan(app: FastAPI):
 # 2. Initialize FastAPI exactly ONCE
 app = FastAPI(lifespan=lifespan)
 
+# App logger
+logger = logging.getLogger(__name__)
+
 # 3. CORS Configuration
 origins = [
     "http://localhost:5173",
@@ -55,12 +60,29 @@ origins = [
 ]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all exception handler to ensure JSON response and CORS headers.
+
+    FastAPI's CORS middleware sometimes doesn't add headers for error
+    responses generated early — return a JSONResponse and echo the
+    Origin header so browsers still receive CORS headers on 5xx errors.
+    """
+    logger.exception("Unhandled exception: %s", exc)
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"}, headers=headers)
 
 # 4. Include Routers sequentially (Exactly ONCE)
 app.include_router(user.router)
