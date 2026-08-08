@@ -52,7 +52,7 @@ services:
       dockerfile: ./user_app/Dockerfile
       target: dev
       args:
-        VITE_API_URL: http://3.95.60.14:8000
+        VITE_API_URL: https://kamigo.sushantsinghraut.com.np/api
     container_name: handy_man_user_app
     restart: unless-stopped
     depends_on:
@@ -60,9 +60,9 @@ services:
     ports:
       - "${USER_APP_PORT:-5173}:5173"
     environment:
-      VITE_API_URL: http://3.95.60.14:8000
+      VITE_API_URL: https://kamigo.sushantsinghraut.com.np/api
       VITE_PORT: 5173
-      VITE_HMR_HOST: 3.95.60.14
+      VITE_HMR_HOST: kamigo.sushantsinghraut.com.np
       VITE_HMR_CLIENT_PORT: 5173
       VITE_HMR_PROTOCOL: ws
       VITE_USE_POLLING: "true"

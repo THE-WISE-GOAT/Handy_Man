@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 const devPort = Number(process.env.VITE_PORT || 5173);
-const hmrHost = process.env.VITE_HMR_HOST || "3.95.60.14";
+const hmrHost = process.env.VITE_HMR_HOST || "kamigo.sushantsinghraut.com.np";
 const hmrClientPort = Number(process.env.VITE_HMR_CLIENT_PORT || 5173);
 const hmrProtocol = process.env.VITE_HMR_PROTOCOL || "ws";
 const usePolling = process.env.VITE_USE_POLLING === "true";
