@@ -687,7 +687,20 @@ def get_worker_history(
     db: Session = Depends(get_db),
     current_user: model.User = Depends(get_current_user),
 ):
-    chat_session = _get_own_worker_session(worker_chat_id, db, current_user)
+    try:
+        chat_session = _get_own_worker_session(worker_chat_id, db, current_user)
+    except HTTPException as exc:
+        # If the session is not found or not owned, return an empty history
+        if exc.status_code == status.HTTP_404_NOT_FOUND:
+            return {
+                "worker_chat_id": worker_chat_id,
+                "history": [],
+                "stage": None,
+                "is_complete": False,
+                "turns_used": 0,
+                "turns_remaining": MAX_PRETEST_TURNS,
+            }
+        raise
 
     visible_history = [
         {
