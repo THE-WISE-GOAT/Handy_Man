@@ -2,14 +2,12 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: ["main"] # Change to "master" if your default branch is named master
+    branches: ["project_deploy"] # Changed from main to project_deploy
 
 jobs:
-  # Gate: Runs tests in ci.yml first before deploying
   run-ci:
     uses: ./.github/workflows/ci.yml
 
-  # Deploy: Runs only if run-ci succeeds
   deploy-to-ec2:
     needs: run-ci
     runs-on: ubuntu-latest
@@ -23,7 +21,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd Handy_Man
-            git pull origin main
+            git checkout project_deploy
+            git pull origin project_deploy
             docker compose down
             docker compose up --build -d
             docker image prune -f
