@@ -235,9 +235,13 @@ export default function Dash1Worker({ viewSlug }) {
               <p className="card-summary">Status: {mapStatus}</p>
             </>
           ) : (
-            <span className="badge">
-              Bottom: Map Feed Tracking Active ({mapStatus})
-            </span>
+            <>
+              <span className="badge badge-highlight">
+                Sidebar: Live Telemetry
+              </span>
+
+              <p className="card-summary">Status: {mapStatus}</p>
+            </>
           )}
         </div>
       </div>
@@ -248,16 +252,16 @@ export default function Dash1Worker({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">••• COMPETITIVE MARKETPLACE METRICS</div>
+          <div className="card-header">••• view available jobs</div>
 
           <div
             className="main-panel"
             style={{ flex: 1, overflowY: "auto", minHeight: 0 }}
           >
-            <h2>Active Biddings Portal</h2>
+            <h2>Browse Jobs</h2>
 
             <p className="panel-desc">
-              Manage active incoming offers and customer pricing requests.
+              Join active incoming jobs and join customer chat room.
             </p>
 
              {Array.isArray(matchedJobs) && matchedJobs.length === 0 ? (
@@ -380,21 +384,23 @@ export default function Dash1Worker({ viewSlug }) {
         className={`dashboard-card slot-${slotKey} clickable`}
         onClick={() => handleModuleSelect("WorkspaceBids")}
       >
-        <div className="card-header">••• COMPETITIVE MARKETPLACE METRICS</div>
+        <div className="card-header">••• view available jobs</div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
             <>
               <span className="badge badge-highlight">
-                Sidebar: Pipeline Tracker
+                Browse Jobs
               </span>
 
-              <p className="card-summary">{bidsPipelineText}</p>
             </>
           ) : (
-            <span className="badge">
-              Bottom: Bids Pipeline Stream [{bidsPipelineText}]
-            </span>
+            <>
+              <span className="badge badge-highlight">
+                Browse Jobs
+              </span>
+
+            </>
           )}
         </div>
       </div>
@@ -651,9 +657,14 @@ export default function Dash1Worker({ viewSlug }) {
       );
 
       return (
+
+
+        
         <div className="dashboard-card slot-main">
-          <div className="card-header">
-            ••• DEPLOYED ASSIGNMENT SPECIFICATIONS
+          <div className="card-header">••• REALTIME CHATTING and Biddings</div>
+
+          <div className="main-panel">
+            <h2>Chat with customer and place bids</h2>
           </div>
 
           <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -669,22 +680,24 @@ export default function Dash1Worker({ viewSlug }) {
         onClick={() => handleModuleSelect("WorkspaceJobDetails")}
       >
         <div className="card-header">
-          ••• DEPLOYED ASSIGNMENT SPECIFICATIONS
+          ••• REALTIME CHATTING and Biddings
         </div>
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
             <>
               <span className="badge badge-highlight">
-                Sidebar: Requirements Desk
+                Chat with customer and place bids
               </span>
 
-              <p className="card-summary">{jobSpecsText}</p>
             </>
           ) : (
-            <span className="badge">
-              Bottom: Specs Monitor Active ({jobSpecsText})
-            </span>
+            <>
+              <span className="badge badge-highlight">
+                Chat with customer and place bids
+              </span>
+
+            </>
           )}
         </div>
       </div>
