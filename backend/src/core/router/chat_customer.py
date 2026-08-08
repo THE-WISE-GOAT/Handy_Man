@@ -101,17 +101,18 @@ def _get_booking_or_worker_access(
     ).scalar_one_or_none()
 
     if matched_job:
-        worker_profile = db.execute(
+        worker_profiles = db.execute(
             select(model.WorkerProfile).where(
                 model.WorkerProfile.user_id == current_user.id
             )
-        ).scalar_one_or_none()
+        ).scalars().all()
 
-        if worker_profile:
+        if worker_profiles:
+            worker_profile_ids = [profile.id for profile in worker_profiles]
             match = db.execute(
                 select(model.JobWorkerMatch).where(
                     model.JobWorkerMatch.job_id == matched_job.id,
-                    model.JobWorkerMatch.worker_id == worker_profile.id,
+                    model.JobWorkerMatch.worker_id.in_(worker_profile_ids),
                     model.JobWorkerMatch.is_active == True,
                 )
             ).scalar_one_or_none()

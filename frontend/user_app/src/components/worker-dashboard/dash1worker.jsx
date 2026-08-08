@@ -655,17 +655,14 @@ export default function Dash1Worker({ viewSlug }) {
       );
 
       return (
+
+
+        
         <div className="dashboard-card slot-main">
-          <div className="card-header">
-            ••• Active biddings and chat
-          </div>
-          <div 
-           className="main-panel"
-                      >
-            <h2>Chat and Bid on Job</h2>
-            <p className="panel-desc">
-              
-            </p>
+          <div className="card-header">••• REALTIME CHATTING and Biddings</div>
+
+          <div className="main-panel">
+            <h2>Chat with customer and place bids</h2>
           </div>
           <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             {showBidForm ? renderBidView() : renderChatView()}
@@ -680,7 +677,7 @@ export default function Dash1Worker({ viewSlug }) {
         onClick={() => handleModuleSelect("WorkspaceJobDetails")}
       >
         <div className="card-header">
-          ••• Active biddings and chat  
+          ••• REALTIME CHATTING and Biddings
         </div>
 
         
@@ -689,18 +686,16 @@ export default function Dash1Worker({ viewSlug }) {
           {slotKey === "sidebar" ? (
             <>
               <span className="badge badge-highlight">
-                Sidebar: Requirements Desk
+                Chat with customer and place bids
               </span>
 
-              <p className="card-summary">{jobSpecsText}</p>
             </>
           ) : (
             <>
               <span className="badge badge-highlight">
-                Sidebar: Requirements Desk
+                Chat with customer and place bids
               </span>
 
-              <p className="card-summary">{jobSpecsText}</p>
             </>
           )}
         </div>

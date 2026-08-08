@@ -200,7 +200,7 @@ export const CUSTOMER_SECTIONS = {
 };
 
 export const WORKER_SECTIONS = {
-  Me: { id: "me", label: "Me", defaultViewId: "INTERVIEW" },
+  Me: { id: "me", label: "Me", defaultViewId: "INTERVIEW" },  
   WorkSpace: { id: "workspace", label: "WorkSpace", defaultViewId: "BIDDINGS" },
   Scheduled: { id: "scheduled", label: "Scheduled", defaultViewId: "CALENDAR" },
   Mics: { id: "mics", label: "Mics", defaultViewId: "EMPTY_VIEW" }
