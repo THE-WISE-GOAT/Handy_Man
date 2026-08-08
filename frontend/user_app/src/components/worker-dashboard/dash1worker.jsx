@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWorkerDashboardData } from "./useWorkerDashboardData";
+import { useAuth } from "@shared/context/AuthContext";
 import "./dash1worker.css";
 
 export default function Dash1Worker({ viewSlug }) {
@@ -28,7 +29,9 @@ export default function Dash1Worker({ viewSlug }) {
       return null;
     }
   };
-  const currentUserId = getCurrentUserId();
+  const rawUserId = getCurrentUserId();
+  const { user } = useAuth();
+  const authUserId = user?.id ?? user?.user_id ?? rawUserId;
 
   const getOtherWorkerColor = (identifier) => {
     const safeIdentifier = String(identifier || 'Unknown');
@@ -185,6 +188,14 @@ export default function Dash1Worker({ viewSlug }) {
     return () => clearTimeout(timer);
   }, [chatMessages, showBidForm]);
 
+  useEffect(() => {
+    if (!activeJob?.booking_chat_id) return;
+    const intervalId = setInterval(() => {
+      useWorkerDashboardData.getState().fetchChatHistory(activeJob.booking_chat_id);
+    }, 3000);
+    return () => clearInterval(intervalId);
+  }, [activeJob?.booking_chat_id]);
+
   const handleModuleSelect = (targetSlug) => {
     navigate(`/worker/workspace/${targetSlug}`);
   };
@@ -338,22 +349,22 @@ export default function Dash1Worker({ viewSlug }) {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (job.status === 'assigned' || job.worker_id === currentUserId) return;
+                         if (job.status === 'assigned' || job.worker_id === authUserId) return;
                         expressInterest(job.job_id, workerChatId);
                       }}
                       style={{
                         padding: '6px 14px',
-                        backgroundColor: (job.status === 'assigned' || job.worker_id === currentUserId) ? '#22c55e' : (job.is_interested ? '#FF6B1A' : 'transparent'),
-                        color: (job.status === 'assigned' || job.worker_id === currentUserId) ? '#0D0D0D' : (job.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)'),
-                        border: (job.status === 'assigned' || job.worker_id === currentUserId) ? '1px solid #22c55e' : (job.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)'),
+                        backgroundColor: (job.status === 'assigned' || job.worker_id === authUserId) ? '#22c55e' : (job.is_interested ? '#FF6B1A' : 'transparent'),
+                        color: (job.status === 'assigned' || job.worker_id === authUserId) ? '#0D0D0D' : (job.is_interested ? '#0D0D0D' : 'var(--k-orange-ink)'),
+                        border: (job.status === 'assigned' || job.worker_id === authUserId) ? '1px solid #22c55e' : (job.is_interested ? '1px solid #FF6B1A' : '1px solid rgba(255, 107, 26, 0.5)'),
                         borderRadius: '6px',
-                        cursor: (job.status === 'assigned' || job.worker_id === currentUserId) ? 'default' : (job.is_interested ? 'default' : 'pointer'),
+                        cursor: (job.status === 'assigned' || job.worker_id === authUserId) ? 'default' : (job.is_interested ? 'default' : 'pointer'),
                         fontWeight: 600,
                         fontSize: '13px'
                       }}
-                      disabled={job.status === 'assigned' || job.worker_id === currentUserId || job.is_interested}
+                      disabled={job.status === 'assigned' || job.worker_id === authUserId || job.is_interested}
                     >
-                      {(job.status === 'assigned' || job.worker_id === currentUserId) ? 'Assigned ✓' : (job.is_interested ? 'Interested ✓' : "I'm Interested")}
+                      {(job.status === 'assigned' || job.worker_id === authUserId) ? 'Assigned ✓' : (job.is_interested ? 'Interested ✓' : "I'm Interested")}
                     </button>
                   </div>
                 ))}
@@ -448,9 +459,9 @@ export default function Dash1Worker({ viewSlug }) {
                 .filter((msg) => msg && typeof msg === 'object' && (msg.sender_role === "customer" || msg.sender_role === "worker" || msg.sender_role === "system" || msg.sender_role === "client"))
                 .map((msg, idx) => {
                   const isSelf = Boolean(
-                    currentUserId &&
+                    authUserId &&
                     msg.sender_id != null &&
-                    String(msg.sender_id).trim() === String(currentUserId).trim()
+                     String(msg.sender_id).trim() === String(authUserId).trim()
                   );
                   const isClient = msg.sender_role === "customer" || msg.sender_role === "client";
                   const displayName = isSelf ? "You" : (msg.sender_name || "User");

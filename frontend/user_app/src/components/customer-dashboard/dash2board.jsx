@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerDashboardData } from './useCustomerDashboardData';
 import { apiClient } from '@shared/api/client';
+import { useAuth } from '@shared/context/AuthContext';
 import './dash2board.css';
 
 // 1. IMPORT LEAFLET
@@ -111,7 +112,9 @@ export default function Dash2Board({ viewSlug }) {
       return null;
     }
   };
-  const currentUserId = getCurrentUserId();
+  const rawUserId = getCurrentUserId();
+  const { user } = useAuth();
+  const authUserId = user?.id ?? user?.user_id ?? rawUserId;
 
   const getOtherWorkerColor = (identifier) => {
     const safeIdentifier = String(identifier || 'Unknown');
@@ -217,6 +220,14 @@ export default function Dash2Board({ viewSlug }) {
       return () => useCustomerDashboardData.getState().disconnectCustomerChat();
     }, []);
 
+    useEffect(() => {
+      if (!selectedJob?.booking_chat_id) return;
+      const intervalId = setInterval(() => {
+        useCustomerDashboardData.getState().fetchChatHistory(selectedJob.booking_chat_id);
+      }, 3000);
+      return () => clearInterval(intervalId);
+    }, [selectedJob?.booking_chat_id]);
+
   const handleModuleSelect = (targetSlug) => {
     navigate(`/customer/postings/${targetSlug}`);
   };
@@ -256,9 +267,9 @@ export default function Dash2Board({ viewSlug }) {
             .filter((msg) => msg && typeof msg === 'object' && (msg.sender_role === "customer" || msg.sender_role === "worker" || msg.sender_role === "system" || msg.sender_role === "client"))
             .map((msg, idx) => {
               const isSelf = Boolean(
-                currentUserId &&
+                authUserId &&
                 msg.sender_id != null &&
-                String(msg.sender_id).trim() === String(currentUserId).trim()
+                 String(msg.sender_id).trim() === String(authUserId).trim()
               );
               const isClient = msg.sender_role === "customer" || msg.sender_role === "client";
               const isOtherWorker = msg.sender_role === "worker" && !isSelf;
