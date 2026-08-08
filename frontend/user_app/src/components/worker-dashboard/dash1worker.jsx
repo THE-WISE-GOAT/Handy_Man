@@ -248,16 +248,16 @@ export default function Dash1Worker({ viewSlug }) {
     if (slotKey === "main") {
       return (
         <div className="dashboard-card slot-main">
-          <div className="card-header">••• COMPETITIVE MARKETPLACE METRICS</div>
+          <div className="card-header">••• Search for your next work assignment</div>
 
           <div
             className="main-panel"
             style={{ flex: 1, overflowY: "auto", minHeight: 0 }}
           >
-            <h2>Active Biddings Portal</h2>
+            <h2>View Matched Jobs</h2>
 
             <p className="panel-desc">
-              Manage active incoming offers and customer pricing requests.
+              Select a job and "Join in Chat" to enter
             </p>
 
              {Array.isArray(matchedJobs) && matchedJobs.length === 0 ? (
@@ -653,9 +653,16 @@ export default function Dash1Worker({ viewSlug }) {
       return (
         <div className="dashboard-card slot-main">
           <div className="card-header">
-            ••• DEPLOYED ASSIGNMENT SPECIFICATIONS
+            ••• Active biddings and chat
           </div>
-
+          <div 
+           className="main-panel"
+                      >
+            <h2>Communicate and Bid of Job</h2>
+            <p className="panel-desc">
+              Select a job and "Join in Chat" to enter
+            </p>
+          </div>
           <div className="main-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             {showBidForm ? renderBidView() : renderChatView()}
           </div>
@@ -669,8 +676,10 @@ export default function Dash1Worker({ viewSlug }) {
         onClick={() => handleModuleSelect("WorkspaceJobDetails")}
       >
         <div className="card-header">
-          ••• DEPLOYED ASSIGNMENT SPECIFICATIONS
+          ••• Active biddings and chat  
         </div>
+
+        
 
         <div className="preview-panel">
           {slotKey === "sidebar" ? (
