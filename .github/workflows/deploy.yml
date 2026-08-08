@@ -1,160 +1,29 @@
-# Continuous integration — runs on every push and pull request.
-#
-# This is the gate that `deploy.yml` waits on: nothing is built or shipped
-# until this workflow is green, so a broken commit cannot reach a server.
-#
-# Everything here is offline by design. The test suite stubs the database and
-# the NVIDIA client (see test/conftest.py), so CI needs no Postgres service
-# and no API key.
-
-name: CI
+name: Deploy to EC2
 
 on:
   push:
-    branches: ["**"]
-  pull_request:
-  workflow_call: # lets deploy.yml reuse this job rather than duplicating it
-
-concurrency:
-  # A newer push to the same branch makes an in-flight run obsolete.
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+    branches: ["main"] # Change to "master" if your default branch is named master
 
 jobs:
-  backend-tests:
-    name: Backend tests (pytest)
+  # Gate: Runs tests in ci.yml first before deploying
+  run-ci:
+    uses: ./.github/workflows/ci.yml
+
+  # Deploy: Runs only if run-ci succeeds
+  deploy-to-ec2:
+    needs: run-ci
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - name: SSH into EC2 and update container
+        uses: appleboy/ssh-action@v1.2.0
         with:
-          python-version: "3.12" # matches the Dockerfile base image
-          cache: pip
-
-      # requirements.txt is UTF-16 (written by PowerShell redirection on
-      # Windows). pip cannot read it, so it is transcoded to UTF-8 into a
-      # temporary file here rather than modifying the committed file.
-      - name: Normalise requirements encoding
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          raw = Path("requirements.txt").read_bytes()
-          for encoding in ("utf-16", "utf-8-sig", "utf-8"):
-              try:
-                  text = raw.decode(encoding)
-                  print(f"decoded requirements.txt as {encoding}")
-                  break
-              except UnicodeDecodeError:
-                  continue
-          else:
-              raise SystemExit("could not decode requirements.txt")
-
-          Path("requirements.ci.txt").write_text(text, encoding="utf-8")
-          PY
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # psycopg2 (source build) needs libpq headers, same as the Dockerfile.
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libpq-dev
-          pip install -r requirements.ci.txt
-
-      - name: Run test suite
-        # The suite is database-free; these placeholders only satisfy Settings
-        # validation at import time. No real credentials are involved.
-        env:
-          DATABASE_HOSTNAME: localhost
-          DATABASE_PORT: "5432"
-          POSTGRES_EXPOSE_PORT: "5432"
-          DATABASE_NAME: handyman_test
-          DATABASE_USERNAME: test_user
-          DATABASE_PASSWORD: test_password
-          PUBLIC_API_URL: http://127.0.0.1:8000
-          SECRET_KEY: ci-secret-key-not-used-outside-tests
-          ALGORITHM: HS256
-          ACCESS_TOKEN_EXPIRE_MINUTES: "60"
-          NVIDIA_API_KEY: nvapi-ci-placeholder-never-called
-          GEMINI_API_KEY: ci-placeholder-never-called
-        run: pytest ./test -v --durations=10
-
-  frontend-build:
-    name: Frontend build (vite)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22" # matches frontend/user_app/Dockerfile
-          cache: npm
-          cache-dependency-path: frontend/user_app/package.json
-
-      - name: Install dependencies
-        working-directory: frontend/user_app
-        run: npm install
-
-      # A build failure here is the most common way a deploy breaks, since the
-      # production image compiles the bundle inside Docker where the error
-      # surfaces much later.
-      - name: Build
-        working-directory: frontend/user_app
-        env:
-          VITE_API_URL: http://localhost:8000
-        run: npm run build
-
-  docker-build:
-    name: Docker images build
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      # Same UTF-16 problem as the test job
-      - name: Normalise requirements encoding
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          raw = Path("requirements.txt").read_bytes()
-          for encoding in ("utf-16", "utf-8-sig", "utf-8"):
-              try:
-                  text = raw.decode(encoding)
-                  break
-              except UnicodeDecodeError:
-                  continue
-          else:
-              raise SystemExit("could not decode requirements.txt")
-
-          Path("requirements.txt").write_text(text, encoding="utf-8")
-          PY
-
-      # Build backend image
-      - name: Build backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Build frontend image - Context is set to './frontend' so it can access 'user_app' and 'shared'
-      - name: Build frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          file: ./frontend/user_app/Dockerfile
-          target: production
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd Handy_Man
+            git pull origin main
+            docker compose down
+            docker compose up --build -d
+            docker image prune -f
