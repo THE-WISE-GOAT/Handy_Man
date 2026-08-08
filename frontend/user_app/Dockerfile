@@ -2,6 +2,9 @@ FROM node:22-alpine AS dev
 
 WORKDIR /app
 
+ARG VITE_API_URL=http://localhost:8000
+ENV VITE_API_URL=$VITE_API_URL
+
 COPY user_app/package*.json ./user_app/
 RUN npm install --prefix ./user_app
 
