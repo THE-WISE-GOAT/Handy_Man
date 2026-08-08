@@ -16,7 +16,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY user_app/package*.json ./user_app/
-RUN npm ci --prefix ./user_app
+RUN npm install --prefix ./user_app
 
 COPY shared ./shared
 COPY user_app ./user_app
