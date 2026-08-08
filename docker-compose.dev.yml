@@ -1,9 +1,13 @@
 services:
   user_app:
+    container_name: handy_man_user_app
+    restart: unless-stopped
     build:
       context: ./frontend
       dockerfile: ./user_app/Dockerfile
       target: dev
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
     environment:
       VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
       VITE_PORT: 5173
@@ -12,12 +16,12 @@ services:
       VITE_HMR_PROTOCOL: ws
       VITE_USE_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "${USER_APP_PORT:-5173}:5173"
     volumes:
       - ./frontend/user_app:/app/user_app
       - ./frontend/shared:/app/shared
       - user_node_modules:/app/user_app/node_modules
-    ports:
-      - "5173:5173"
 
 volumes:
   user_node_modules:
