@@ -109,17 +109,27 @@ def _extract_json_array(raw_text: str) -> list[Any]:
     except json.JSONDecodeError:
         pass
 
-    # Attempt 2: Find outermost bracket boundaries directly (prevents non-greedy regex truncation)
+    # Attempt 2: Extract the first complete array by counting brackets
     start_idx = raw_text.find("[")
-    end_idx = raw_text.rfind("]")
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        substring = raw_text[start_idx : end_idx + 1]
-        try:
-            data = json.loads(substring)
-            if isinstance(data, list):
-                return data
-        except json.JSONDecodeError:
-            pass
+    if start_idx != -1:
+        bracket_count = 0
+        for i, char in enumerate(raw_text[start_idx:]):
+            if char == "[":
+                bracket_count += 1
+            elif char == "]":
+                bracket_count -= 1
+            
+            # When count returns to 0, we've found the matching closing bracket
+            if bracket_count == 0:
+                end_idx = start_idx + i
+                substring = raw_text[start_idx : end_idx + 1]
+                try:
+                    data = json.loads(substring)
+                    if isinstance(data, list):
+                        return data
+                except json.JSONDecodeError:
+                    pass
+                break # Stop searching after evaluating the first complete array
 
     return []
 
