@@ -190,20 +190,22 @@ export default function Dash2Board({ viewSlug }) {
     }, [chatMessages, viewAllBids]);
 
     useEffect(() => {
-      if (selectedJob && selectedJob.booking_chat_id) {
-        useCustomerDashboardData.getState().connectCustomerChat(selectedJob.booking_chat_id);
-        useCustomerDashboardData.getState().fetchChatHistory(selectedJob.booking_chat_id);
+      const bookingChatId = selectedJob?.booking_chat_id;
+      if (bookingChatId) {
+        useCustomerDashboardData.getState().connectCustomerChat(bookingChatId);
+        useCustomerDashboardData.getState().fetchChatHistory(bookingChatId);
       }
-    }, [selectedJob]);
+    }, [selectedJob?.booking_chat_id]);
 
     // ── Fetch historical bids for the selected job on mount and when selectedJob changes ──
     useEffect(() => {
-      if (selectedJob && selectedJob.id) {
-        useCustomerDashboardData.getState().fetchJobBids(selectedJob.id);
+      const selectedJobId = selectedJob?.id;
+      if (selectedJobId) {
+        useCustomerDashboardData.getState().fetchJobBids(selectedJobId);
       } else {
         useCustomerDashboardData.getState().fetchPendingJobs();
       }
-    }, [selectedJob]);
+    }, [selectedJob?.id]);
 
     useEffect(() => {
       if (!viewSlug) return;

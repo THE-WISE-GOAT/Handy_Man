@@ -1,4 +1,4 @@
-import { apiClient } from "@shared/api/client";
+import { apiClient, ApiClientError } from "@shared/api/client";
 import { API_BASE_URL } from "@shared/config/api";
 
 const normalizeMessage = (msg) => {
@@ -104,7 +104,7 @@ export const createPostingsZlice = (set, get) => ({
   },
 
   fetchJobBids: async (jobId) => {
-    if (!jobId) return;
+    if (!jobId) return [];
     try {
       const data = await apiClient.get(`/workers/jobs/${jobId}/bids`);
 
@@ -127,9 +127,17 @@ export const createPostingsZlice = (set, get) => ({
           };
         });
         set({ biddingsStream: normalizedBids });
+        return normalizedBids;
       }
+      set({ biddingsStream: [] });
+      return [];
     } catch (error) {
+      if (error instanceof ApiClientError && error.status === 404) {
+        set({ biddingsStream: [] });
+        return [];
+      }
       console.error(`❌ Failed to fetch bids for Job ${jobId}:`, error);
+      return [];
     }
   },
 
@@ -189,7 +197,7 @@ export const createPostingsZlice = (set, get) => ({
     }),
 
   fetchMatchedWorkersForJob: async (jobId) => {
-    if (!jobId) return;
+    if (!jobId) return [];
 
     try {
       const job = get().pendingJobs.find((j) => j.id === jobId);
@@ -214,12 +222,32 @@ export const createPostingsZlice = (set, get) => ({
       if (workerIds.length > 0) {
         get().fetchWorkerLocations(workerIds);
       }
+
+      return workers;
     } catch (error) {
+      const is404 = error instanceof ApiClientError && error.status === 404;
+      const noMatchingWorkers =
+        error instanceof ApiClientError &&
+        typeof error.message === "string" &&
+        error.message.toLowerCase().includes("no matching workers");
+
+      if (is404 || noMatchingWorkers) {
+        get().updateJobMetrics(jobId, { matchedCount: 0 });
+        set((state) => ({
+          matchedWorkersMap: {
+            ...state.matchedWorkersMap,
+            [jobId]: [],
+          },
+        }));
+        return [];
+      }
+
       console.error(`❌ Failed to fetch matched workers for Job ${jobId}:`, error);
       get().updateJobMetrics(jobId, { matchedCount: 0 });
       set((state) => ({
         matchedWorkersMap: { ...state.matchedWorkersMap, [jobId]: [] }
       }));
+      return [];
     }
   },
 
