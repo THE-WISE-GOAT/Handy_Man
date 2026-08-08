@@ -121,7 +121,7 @@ export const createMeZlice = (set, get) => ({
   setTurnsRemaining: (val) => set({ turnsRemaining: val }),
   setScenarioQuestion: (val) => set({ scenarioQuestion: val }),
 
-  setIsMapOpen: (val) => set({ setIsMapOpen: val }),
+  setIsMapOpen: (val) => set({ isMapOpen: val }),
   setMapReady: (val) => set({ mapReady: val }),
   setModalSearchQuery: (val) => set({ modalSearchQuery: val }),
   setModalLat: (val) => set({ modalLat: val }),
@@ -484,12 +484,25 @@ export const createMeZlice = (set, get) => ({
       );
 
       if (!response.ok) {
-        throw new Error(
-          `Completion / submit pipeline failed: ${response.status}`
+        let errorDetail = response.statusText;
+        try {
+          const errorBody = await response.json();
+          errorDetail = errorBody.detail || errorBody.message || JSON.stringify(errorBody);
+        } catch (_err) {
+          // Ignore JSON parse failures; keep statusText.
+        }
+        console.error(
+          "Worker application completion failed:",
+          response.status,
+          errorDetail
         );
+        set({
+          profileSaveMessage: `Submission failed: ${response.status} ${errorDetail}`,
+        });
+        return;
       }
 
-      await response.json();
+      const data = await response.json();
 
       set({
         applicantStage: "pending_admin_review",
