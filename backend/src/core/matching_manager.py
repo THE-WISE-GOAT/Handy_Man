@@ -1,22 +1,24 @@
+import logging
+import math
 import os
 import re
 import json
-import math
-import logging
 from typing import Any, Optional
-from openai import OpenAI
-from sqlalchemy import select, func
-from sqlalchemy.orm import Session
+
+from dotenv import load_dotenv
 from geoalchemy2 import Geography
 from geoalchemy2.elements import WKBElement
+from openai import OpenAI
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
 from src.core import model
 from src.core.schema import (
-    MatchingResult,
     MatchDetail,
-    WorkerMatchingResult,
     MatchedJobDetail,
+    MatchingResult,
+    WorkerMatchingResult,
 )
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -69,22 +71,26 @@ def _ensure_geography(location: Any):
 def calculate_match_score(distance: float) -> float:
     """
     The system's single source of truth scoring mechanism (Sigmoid).
-    Uses a gentler curve (8.0 multiplier) to prevent "cliff edge" drop-offs.
+    Calibrated for dense/compact embeddings (midpoint=0.68, slope=11.0)
+    to yield reliable score distributions above the 70.0 threshold.
     """
+    if distance is None:
+        return 0.0
+
     try:
-        return max(
-            0.0,
-            min(
-                100.0,
-                round((1.0 / (1.0 + math.exp(8.0 * (distance - 0.60)))) * 100.0, 2),
-            ),
-        )
-    except Exception:
+        dist_val = float(distance)
+        raw_score = (1.0 / (1.0 + math.exp(11.0 * (dist_val - 0.68)))) * 100.0
+        return max(0.0, min(100.0, round(raw_score, 2)))
+    except (ValueError, TypeError, OverflowError) as e:
+        logger.error(f"Error calculating match score for distance={distance}: {e}")
         return 0.0
 
 
 def _extract_json_array(raw_text: str) -> list[Any]:
-    """Robustly extracts a JSON array from LLM responses using standard parsing and regex fallback."""
+    """Robustly extracts a JSON array from LLM responses using parsing and bracket extraction fallbacks."""
+    if not raw_text:
+        return []
+
     cleaned_text = (
         raw_text.strip()
         .removeprefix("```json")
@@ -93,7 +99,7 @@ def _extract_json_array(raw_text: str) -> list[Any]:
         .strip()
     )
 
-    # Attempt 1: Standard JSON parse
+    # Attempt 1: Standard JSON parse on cleaned text
     try:
         data = json.loads(cleaned_text)
         if isinstance(data, list):
@@ -103,11 +109,13 @@ def _extract_json_array(raw_text: str) -> list[Any]:
     except json.JSONDecodeError:
         pass
 
-    # Attempt 2: Regex search for embedded JSON array
-    match = re.search(r"\[\s*.*?\s*\]", raw_text, re.DOTALL)
-    if match:
+    # Attempt 2: Find outermost bracket boundaries directly (prevents non-greedy regex truncation)
+    start_idx = raw_text.find("[")
+    end_idx = raw_text.rfind("]")
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        substring = raw_text[start_idx : end_idx + 1]
         try:
-            data = json.loads(match.group(0))
+            data = json.loads(substring)
             if isinstance(data, list):
                 return data
         except json.JSONDecodeError:
@@ -121,7 +129,7 @@ def _search_workers(
     query_vector: list[float],
     customer_location: Any,
     radius_meters: int,
-    job_category: Optional[str] = None, # Kept for signature compatibility, but strict ILIKE filtering is removed
+    job_category: Optional[str] = None,
 ) -> list[tuple[model.WorkerProfile, model.User, model.WorkerSkill, float]]:
     distance_expr = model.WorkerSkill.embedding.cosine_distance(query_vector)
     spatial_point = _ensure_geography(customer_location)
@@ -143,9 +151,6 @@ def _search_workers(
             model.WorkerProfile.is_rejected.is_(False),
         )
     )
-
-    # Strict ILIKE category filtering removed here to make Client & Worker flows symmetrical. 
-    # We now trust the vector search + LLM Reranker to handle the job_category semantically.
 
     if spatial_point is not None:
         stmt = stmt.where(
@@ -203,15 +208,15 @@ def _llm_rerank_matches(
     candidates = rich_matches[:MAX_CANDIDATES_FOR_RERANK]
     candidate_payload = [_build_candidate_summary(m) for m in candidates]
 
-    # Softer prompt focused on ranking rather than aggressive deletion
+    # Updated Prompt: Forbid omission, mandate sorting only.
     prompt = (
         "You are a helpful assistant sorting tradespeople for a customer's job.\n\n"
         f"Job category: {job_category or 'unknown'}\n"
         f"Job description:\n{job_description}\n\n"
         f"Candidates (JSON):\n{json.dumps(candidate_payload)}\n\n"
         "Rank these candidates from best fit to worst fit based on how well their skills match the job description. "
-        "Omit candidates ONLY if their trade is completely irrelevant to the job.\n\n"
-        "Return ONLY a JSON array of worker_id integers, ordered best fit first."
+        "Do NOT omit any candidates. Return ALL worker_id integers from the provided list, ordered best fit first.\n\n"
+        "Return ONLY a JSON array of worker_id integers."
     )
 
     try:
@@ -219,7 +224,7 @@ def _llm_rerank_matches(
         response = client.chat.completions.create(
             model=RERANK_MODEL,
             max_tokens=1024,
-            temperature=0.0, # STABILIZES THE OUTPUT - No more mood swings
+            temperature=0.0,
             messages=[{"role": "user", "content": prompt}],
         )
         raw_text = response.choices[0].message.content or ""
@@ -237,13 +242,24 @@ def _llm_rerank_matches(
     reranked: list[MatchDetail] = []
     seen_ids: set[int] = set()
 
-    for new_rank, worker_id in enumerate(ordered_ids, start=1):
+    # 1. Process the candidates the LLM successfully ranked
+    for worker_id in ordered_ids:
         match = by_worker_id.get(worker_id)
         if match is None or worker_id in seen_ids:
             continue
-        match["rank"] = new_rank
         reranked.append(match)
         seen_ids.add(worker_id)
+
+    # 2. Safety Net: Append any candidates the LLM missed/omitted (keeps it reliable)
+    for m in candidates:
+        worker_id = int(m["worker_profile"].id)
+        if worker_id not in seen_ids:
+            reranked.append(m)
+            seen_ids.add(worker_id)
+
+    # 3. Assign final chronological ranks based on the final merged list
+    for rank, match in enumerate(reranked, start=1):
+        match["rank"] = rank
 
     return reranked
 
@@ -290,14 +306,14 @@ def _llm_rerank_jobs_for_worker(
         for m in candidates
     ]
 
-    # Softer prompt focused on ranking rather than aggressive deletion
+    # Updated Prompt: Forbid omission, mandate sorting only.
     prompt = (
         "You are a helpful assistant matching a tradesperson to available customer jobs.\n\n"
         f"Worker Capabilities:\n{json.dumps(worker_summary, indent=2)}\n\n"
         f"Candidate Jobs:\n{json.dumps(candidate_payload, indent=2)}\n\n"
         "Rank these jobs from best fit to worst fit based on the worker's capabilities. "
-        "Omit jobs ONLY if the worker is completely unqualified to perform them.\n\n"
-        "Return ONLY a JSON array of the job_id integers, ordered best fit first."
+        "Do NOT omit any jobs. Return ALL job_id integers from the provided list, ordered best fit first.\n\n"
+        "Return ONLY a JSON array of the job_id integers."
     )
 
     try:
@@ -305,7 +321,7 @@ def _llm_rerank_jobs_for_worker(
         response = client.chat.completions.create(
             model=RERANK_MODEL,
             max_tokens=1024,
-            temperature=0.0, # STABILIZES THE OUTPUT - No more mood swings
+            temperature=0.0,
             messages=[{"role": "user", "content": prompt}],
         )
         raw_text = response.choices[0].message.content or ""
@@ -323,13 +339,24 @@ def _llm_rerank_jobs_for_worker(
     reranked: list[dict] = []
     seen_ids: set[int] = set()
 
-    for new_rank, job_id in enumerate(ordered_ids, start=1):
+    # 1. Process the jobs the LLM successfully ranked
+    for job_id in ordered_ids:
         match = by_job_id.get(job_id)
         if match is None or job_id in seen_ids:
             continue
-        match["rank"] = new_rank
         reranked.append(match)
         seen_ids.add(job_id)
+
+    # 2. Safety Net: Append any jobs the LLM missed/omitted (keeps it reliable)
+    for m in candidates:
+        job_id = int(m["job"].id)
+        if job_id not in seen_ids:
+            reranked.append(m)
+            seen_ids.add(job_id)
+
+    # 3. Assign final chronological ranks based on the final merged list
+    for rank, match in enumerate(reranked, start=1):
+        match["rank"] = rank
 
     return reranked
 
@@ -339,7 +366,7 @@ def create_matches_for_job(
     job_id: int,
     query_vector: list[float],
     customer_location: Any,
-    radius_meters: int = 60_000, # Matched default fallback with worker function
+    radius_meters: int = 60_000,
     job_description: str = "",
     job_category: Optional[str] = None,
 ) -> MatchingResult:
@@ -355,7 +382,7 @@ def create_matches_for_job(
     for worker, user, skill, distance in search_results:
         dist_val = float(distance)
         score = calculate_match_score(dist_val)
-        if score > SCORE_THRESHOLD:
+        if score >= SCORE_THRESHOLD:
             rich_matches.append(
                 {
                     "worker_profile": worker,
@@ -389,7 +416,6 @@ def create_matches_for_job(
         matched_worker_ids.add(worker.id)
 
         if worker.id in existing_matches:
-            # Update existing record, preserving user flags
             match_row = existing_matches[worker.id]
             match_row.matched_skill_id = match.get("matched_skill_id")
             match_row.match_score = match["score"]
@@ -397,7 +423,6 @@ def create_matches_for_job(
             match_row.semantic_distance = match["distance"]
             match_row.is_active = True
         else:
-            # Create new record
             match_row = model.JobWorkerMatch(
                 job_id=job_id,
                 worker_id=worker.id,
@@ -497,7 +522,7 @@ def create_matches_for_worker(
 
         dist_val = float(distance)
         score = calculate_match_score(dist_val)
-        if score > SCORE_THRESHOLD:
+        if score >= SCORE_THRESHOLD:
             candidate_jobs.append(
                 {
                     "job": job,
