@@ -6,9 +6,12 @@ import "./dash3worker.css";
 export default function Dash3Worker({ viewSlug }) {
   const navigate = useNavigate();
   const [chatInput, setChatInput] = useState("");
-  const [activeModule, setActiveModule] = useState("interview");
 
   const {
+    // Canvas Slot Management
+    meSlots,
+    swapMeSlots,
+
     // Onboarding state
     applicantStage,
     isApplicantComplete,
@@ -127,20 +130,27 @@ export default function Dash3Worker({ viewSlug }) {
     }
   }, [applicationSubmitted, loadApplicantStatus]);
 
-  // Sync activeModule with URL slug
-  useEffect(() => {
-    if (!viewSlug) return;
-    const slugToModule = {
-      MeInterview: "interview",
-      MeProfile: "profile",
-      MeConfiguration: "extraction",
-      MeCollectedTags: "status",
-    };
-    const mod = slugToModule[viewSlug];
-    if (mod && mod !== activeModule) {
-      setActiveModule(mod);
+  // Handle 1-to-1 Slot Swap & Navigation
+  const handleSlotClick = (slotKey, targetSlug) => {
+    if (swapMeSlots) {
+      swapMeSlots(slotKey);
     }
-  }, [viewSlug]);
+    if (targetSlug) {
+      navigate(`/worker/me/${targetSlug}`);
+    }
+  };
+
+  // Sync active main slot with URL slug on route change or initial load
+  useEffect(() => {
+    if (!viewSlug || !meSlots) return;
+
+    if (meSlots.main !== viewSlug) {
+      const slotKey = Object.keys(meSlots).find((k) => meSlots[k] === viewSlug);
+      if (slotKey && slotKey !== "main") {
+        swapMeSlots(slotKey);
+      }
+    }
+  }, [viewSlug, meSlots, swapMeSlots]);
 
   // ====================================================
   // MAP ASSET LOADER
@@ -196,7 +206,7 @@ export default function Dash3Worker({ viewSlug }) {
 
     const map = L.map(mapContainerRef.current, { zoomControl: false }).setView(
       [modalLat, modalLng],
-      14,
+      14
     );
     L.control.zoom({ position: "bottomright" }).addTo(map);
     leafletMapRef.current = map;
@@ -214,7 +224,7 @@ export default function Dash3Worker({ viewSlug }) {
     const runReverseGeocode = async (lat, lng) => {
       try {
         const resp = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
         );
         if (resp.ok) {
           const data = await resp.json();
@@ -264,7 +274,9 @@ export default function Dash3Worker({ viewSlug }) {
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(modalSearchQuery)}&countrycodes=np&limit=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          modalSearchQuery
+        )}&countrycodes=np&limit=1`
       );
       if (response.ok) {
         const results = await response.json();
@@ -287,7 +299,7 @@ export default function Dash3Worker({ viewSlug }) {
           leafletMarkerRef.current.setLatLng([newLat, newLng]);
         } else {
           alert(
-            "NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL.",
+            "NO DETECTED LOCATIONS FOUND MATCHING CONSTRAINTS WITHIN NEPAL."
           );
         }
       }
@@ -299,7 +311,7 @@ export default function Dash3Worker({ viewSlug }) {
   const handleModalLiveTracking = () => {
     if (!navigator.geolocation) {
       alert(
-        "GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER.",
+        "GEOLOCATION SELECTION SYSTEM IS NOT SUPPORTED BY THIS CLIENT BROWSER."
       );
       return;
     }
@@ -317,7 +329,7 @@ export default function Dash3Worker({ viewSlug }) {
 
         try {
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
           );
           if (!response.ok) throw new Error("Reverse lookup failed");
           const data = await response.json();
@@ -333,10 +345,10 @@ export default function Dash3Worker({ viewSlug }) {
       },
       (error) => {
         alert(
-          "LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS.",
+          "LOCATION ACQUISITION LOCK DENIED. PLEASE ALLOW LOCATION PERMISSIONS."
         );
       },
-      { enableHighAccuracy: true, timeout: 7000 },
+      { enableHighAccuracy: true, timeout: 7000 }
     );
   };
 
@@ -356,7 +368,7 @@ export default function Dash3Worker({ viewSlug }) {
 
   const confirmMapLocation = () => {
     setAddressText(
-      modalAddrText || `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`,
+      modalAddrText || `POINT(${modalLng.toFixed(4)} ${modalLat.toFixed(4)})`
     );
     setLatitude(modalLat);
     setLongitude(modalLng);
@@ -384,14 +396,14 @@ export default function Dash3Worker({ viewSlug }) {
   };
 
   // ====================================================
-  // RENDER: AI Chat Terminal / Post-Application Sketch UI
+  // MODULE RENDERERS
   // ====================================================
-  const renderChatTerminal = ({ isActive }) => {
-    if (!isActive) {
+  const renderChatTerminal = ({ isMain, slotKey }) => {
+    if (!isMain) {
       return (
         <div
           className="dashboard-card module-preview"
-          onClick={() => setActiveModule("interview")}
+          onClick={() => handleSlotClick(slotKey, "MeInterview")}
         >
           <div className="card-header">••• AI INTERVIEW TERMINAL</div>
           <div className="main-panel">
@@ -402,8 +414,8 @@ export default function Dash3Worker({ viewSlug }) {
               {isAddingSkill
                 ? "Specialty Session"
                 : chatMessages.length > 1
-                  ? `${chatMessages.length} messages`
-                  : "Not started"}
+                ? `${chatMessages.length} messages`
+                : "Not started"}
             </span>
           </div>
         </div>
@@ -522,30 +534,30 @@ export default function Dash3Worker({ viewSlug }) {
       const workerSkillList =
         workerSkills && workerSkills.length > 0
           ? workerSkills.map((s) =>
-              typeof s === "object" ? s.title || s.name || s.skill_name : s,
+              typeof s === "object" ? s.title || s.name || s.skill_name : s
             )
           : [];
 
       const extractedSpecs = normalizeSpecialities(
-        extractedProfile?.specialities,
+        extractedProfile?.specialities
       );
       const editableSpecs = normalizeSpecialities(
-        editableProfile?.specialities,
+        editableProfile?.specialities
       );
 
       const skillsList =
         extractedSpecs.length > 0
           ? extractedSpecs
           : editableSpecs.length > 0
-            ? editableSpecs
-            : workerSkillList.length > 0
-              ? workerSkillList
-              : [
-                  "Speciality 1",
-                  "Speciality 2",
-                  "Speciality 3",
-                  "Speciality 4",
-                ];
+          ? editableSpecs
+          : workerSkillList.length > 0
+          ? workerSkillList
+          : [
+              "Speciality 1",
+              "Speciality 2",
+              "Speciality 3",
+              "Speciality 4",
+            ];
 
       return (
         <div className="dashboard-card slot-main">
@@ -742,15 +754,12 @@ export default function Dash3Worker({ viewSlug }) {
     );
   };
 
-  // ====================================================
-  // RENDER: Extraction & Submission Module
-  // ====================================================
-  const renderExtractionModule = ({ isActive }) => {
-    if (!isActive) {
+  const renderExtractionModule = ({ isMain, slotKey }) => {
+    if (!isMain) {
       return (
         <div
           className="dashboard-card module-preview"
-          onClick={() => setActiveModule("extraction")}
+          onClick={() => handleSlotClick(slotKey, "MeConfiguration")}
         >
           <div className="card-header">••• EXTRACTION & SUBMISSION</div>
           <div className="main-panel">
@@ -808,18 +817,18 @@ export default function Dash3Worker({ viewSlug }) {
                       const list = Array.isArray(raw)
                         ? raw
                         : typeof raw === "string"
-                          ? (() => {
-                              try {
-                                const p = JSON.parse(raw.trim());
-                                return Array.isArray(p) ? p : [];
-                              } catch {
-                                return raw
-                                  .split(",")
-                                  .map((s) => s.trim())
-                                  .filter(Boolean);
-                              }
-                            })()
-                          : [];
+                        ? (() => {
+                            try {
+                              const p = JSON.parse(raw.trim());
+                              return Array.isArray(p) ? p : [];
+                            } catch {
+                              return raw
+                                .split(",")
+                                .map((s) => s.trim())
+                                .filter(Boolean);
+                            }
+                          })()
+                        : [];
                       return list.length > 0 ? list.join(", ") : "—";
                     })()}
                   </span>
@@ -835,7 +844,7 @@ export default function Dash3Worker({ viewSlug }) {
                   <span className="extracted-value">
                     {extractedProfile.specialized_tools_or_equipment?.length > 0
                       ? extractedProfile.specialized_tools_or_equipment.join(
-                          ", ",
+                          ", "
                         )
                       : "—"}
                   </span>
@@ -897,7 +906,7 @@ export default function Dash3Worker({ viewSlug }) {
                           removeAttachment(
                             i,
                             setLicenseAttachments,
-                            licenseAttachments,
+                            licenseAttachments
                           )
                         }
                       >
@@ -926,7 +935,7 @@ export default function Dash3Worker({ viewSlug }) {
                     handleFileUpload(
                       e,
                       setCertificateAttachments,
-                      certificateAttachments,
+                      certificateAttachments
                     )
                   }
                   className="file-input"
@@ -942,7 +951,7 @@ export default function Dash3Worker({ viewSlug }) {
                           removeAttachment(
                             i,
                             setCertificateAttachments,
-                            certificateAttachments,
+                            certificateAttachments
                           )
                         }
                       >
@@ -979,7 +988,7 @@ export default function Dash3Worker({ viewSlug }) {
                           removeAttachment(
                             i,
                             setMiscAttachments,
-                            miscAttachments,
+                            miscAttachments
                           )
                         }
                       >
@@ -1039,10 +1048,7 @@ export default function Dash3Worker({ viewSlug }) {
     );
   };
 
-  // ====================================================
-  // RENDER: Worker Profile Module
-  // ====================================================
-  const renderProfileModule = ({ isActive }) => {
+  const renderProfileModule = ({ isMain, slotKey }) => {
     const displayName =
       [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" ") ||
       userProfile.username ||
@@ -1053,11 +1059,11 @@ export default function Dash3Worker({ viewSlug }) {
     const primaryTag =
       extractedProfile?.job_category || editableProfile.job_category || "";
 
-    if (!isActive) {
+    if (!isMain) {
       return (
         <div
           className="dashboard-card module-preview"
-          onClick={() => setActiveModule("profile")}
+          onClick={() => handleSlotClick(slotKey, "MeProfile")}
         >
           <div className="card-header">••• WORKER PROFILE</div>
           <div className="main-panel">
@@ -1067,7 +1073,11 @@ export default function Dash3Worker({ viewSlug }) {
               <span className="badge">ID: {userProfile.id || "—"}</span>
               {primaryTag && <span className="badge">{primaryTag}</span>}
             </div>
-            <p className="card-summary">{locationLine}</p>
+            {locationLine && (
+              <p className="card-summary" title={locationLine}>
+                {locationLine}
+              </p>
+            )}
           </div>
         </div>
       );
@@ -1232,7 +1242,13 @@ export default function Dash3Worker({ viewSlug }) {
                   type="button"
                   className="icon-btn"
                   onClick={() => {
-                    setActiveModule("interview");
+                    if (swapMeSlots && meSlots?.main !== "MeInterview") {
+                      const slotKey = Object.keys(meSlots).find(
+                        (k) => meSlots[k] === "MeInterview"
+                      );
+                      if (slotKey) swapMeSlots(slotKey);
+                    }
+                    navigate("/worker/me/MeInterview");
                     startAddSkill();
                   }}
                   title="Add new specialty"
@@ -1244,7 +1260,13 @@ export default function Dash3Worker({ viewSlug }) {
                   type="button"
                   className="icon-btn"
                   onClick={() => {
-                    setActiveModule("interview");
+                    if (swapMeSlots && meSlots?.main !== "MeInterview") {
+                      const slotKey = Object.keys(meSlots).find(
+                        (k) => meSlots[k] === "MeInterview"
+                      );
+                      if (slotKey) swapMeSlots(slotKey);
+                    }
+                    navigate("/worker/me/MeInterview");
                     startAddCategory();
                   }}
                   title="Add new trade category"
@@ -1299,11 +1321,11 @@ export default function Dash3Worker({ viewSlug }) {
             <div className="profile-read-only-grid">
               {renderEmpty(
                 "Job Category",
-                extractedProfile?.job_category || editableProfile.job_category,
+                extractedProfile?.job_category || editableProfile.job_category
               )}
               {renderEmpty(
                 "Category Tag",
-                extractedProfile?.category_tag || editableProfile.category_tag,
+                extractedProfile?.category_tag || editableProfile.category_tag
               )}
               {renderEmpty(
                 "Specialities",
@@ -1315,20 +1337,20 @@ export default function Dash3Worker({ viewSlug }) {
                   const list = Array.isArray(raw)
                     ? raw
                     : typeof raw === "string"
-                      ? (() => {
-                          try {
-                            const p = JSON.parse(raw.trim());
-                            return Array.isArray(p) ? p : [];
-                          } catch {
-                            return raw
-                              .split(",")
-                              .map((s) => s.trim())
-                              .filter(Boolean);
-                          }
-                        })()
-                      : [];
+                    ? (() => {
+                        try {
+                          const p = JSON.parse(raw.trim());
+                          return Array.isArray(p) ? p : [];
+                        } catch {
+                          return raw
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                        }
+                      })()
+                    : [];
                   return list.length > 0 ? list.join(", ") : "None";
-                })(),
+                })()
               )}
               {renderEmpty(
                 "Tools",
@@ -1342,22 +1364,22 @@ export default function Dash3Worker({ viewSlug }) {
                       editableProfile.specialized_tools_or_equipment ||
                       []
                     ).join(", ")
-                  : "None",
+                  : "None"
               )}
               {renderEmpty(
                 "Years Experience",
                 extractedProfile?.years_experience ??
-                  editableProfile.years_experience,
+                  editableProfile.years_experience
               )}
               {renderEmpty(
                 "License / Certification",
                 extractedProfile?.license_or_certification ||
-                  editableProfile.license_or_certification,
+                  editableProfile.license_or_certification
               )}
               {renderEmpty(
                 "Job Description",
                 extractedProfile?.job_description ||
-                  editableProfile.job_description,
+                  editableProfile.job_description
               )}
             </div>
           </div>
@@ -1366,12 +1388,12 @@ export default function Dash3Worker({ viewSlug }) {
     );
   };
 
-  const renderStatusModule = ({ isActive }) => {
-    if (!isActive) {
+  const renderStatusModule = ({ isMain, slotKey }) => {
+    if (!isMain) {
       return (
         <div
           className="dashboard-card module-preview"
-          onClick={() => setActiveModule("status")}
+          onClick={() => handleSlotClick(slotKey, "MeCollectedTags")}
         >
           <div className="card-header">••• INTERVIEW STATUS</div>
           <div className="main-panel">
@@ -1408,45 +1430,19 @@ export default function Dash3Worker({ viewSlug }) {
     );
   };
 
-  // ====================================================
-  // RESOLVE MODULE BY ACTIVE STATE
-  // ====================================================
-  const modules = [
-    { key: "interview", label: "AI Interview Terminal" },
-    { key: "extraction", label: "Extraction & Submission" },
-    { key: "profile", label: "Worker Profile" },
-    { key: "status", label: "Interview Status" },
-  ];
-
-  const inactiveModules = modules.filter((m) => m.key !== activeModule);
-
-  const renderActiveModule = () => {
-    switch (activeModule) {
-      case "interview":
-        return renderChatTerminal({ isActive: true });
-      case "extraction":
-        return renderExtractionModule({ isActive: true });
-      case "profile":
-        return renderProfileModule({ isActive: true });
-      case "status":
-        return renderStatusModule({ isActive: true });
+  // Helper resolver by slug
+  const renderModuleBySlug = (slug, isMain, slotKey = "main") => {
+    switch (slug) {
+      case "MeInterview":
+        return renderChatTerminal({ isMain, slotKey });
+      case "MeConfiguration":
+        return renderExtractionModule({ isMain, slotKey });
+      case "MeProfile":
+        return renderProfileModule({ isMain, slotKey });
+      case "MeCollectedTags":
+        return renderStatusModule({ isMain, slotKey });
       default:
-        return renderChatTerminal({ isActive: true });
-    }
-  };
-
-  const renderInactiveModule = (mod) => {
-    switch (mod.key) {
-      case "interview":
-        return renderChatTerminal({ isActive: false });
-      case "extraction":
-        return renderExtractionModule({ isActive: false });
-      case "profile":
-        return renderProfileModule({ isActive: false });
-      case "status":
-        return renderStatusModule({ isActive: false });
-      default:
-        return null;
+        return renderChatTerminal({ isMain, slotKey });
     }
   };
 
@@ -1648,18 +1644,23 @@ export default function Dash3Worker({ viewSlug }) {
   };
 
   // ====================================================
-  // MAIN RENDER
+  // MAIN CANVAS GRID RENDER
   // ====================================================
   return (
     <div className="worker-me-canvas-grid">
-      <div className="grid-area-main">{renderActiveModule()}</div>
+      <div className="grid-area-main">
+        {renderModuleBySlug(meSlots?.main || "MeInterview", true, "main")}
+      </div>
 
       <div className="grid-area-sidebar">
-        {inactiveModules.map((mod) => (
-          <div key={mod.key} className="module-preview-wrapper">
-            {renderInactiveModule(mod)}
-          </div>
-        ))}
+        {["slot1", "slot2", "slot3"].map((slotKey) => {
+          const slug = meSlots?.[slotKey] || "MeProfile";
+          return (
+            <div key={slotKey} className="module-preview-wrapper">
+              {renderModuleBySlug(slug, false, slotKey)}
+            </div>
+          );
+        })}
       </div>
 
       {renderMapModal()}
