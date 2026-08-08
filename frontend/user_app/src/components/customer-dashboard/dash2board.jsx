@@ -237,7 +237,6 @@ export default function Dash2Board({ viewSlug }) {
       }
     };
 
-    // ── Chat View: Full-width chat with "View All bids" button ──
     const renderChatView = () => (
       <div style={{ width: "100%", height: "100%", display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", flexShrink: 0, marginBottom: "8px" }}>
