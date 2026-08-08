@@ -8,8 +8,11 @@ from src.configuration.config import (
 
 SQLALCHEMY_DATABASE_URL = f"postgresql://{settings.DATABASE_USERNAME}:{settings.DATABASE_PASSWORD}@{settings.DATABASE_HOSTNAME}:{settings.DATABASE_PORT}/{settings.DATABASE_NAME}"  # URL to connect to the PostgreSQL database
 
+# --- UPDATED: Added pool_pre_ping and pool_recycle to handle closed Docker/DB sockets ---
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL
+    SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True,  # Tests the DB connection before issuing queries; drops dead connections seamlessly
+    pool_recycle=3600,   # Recycles pool connections every hour to prevent OS socket timeouts
 )  # creates an engine to connect to the database
 
 # --- FIX: Activate pgvector extension inside the database on startup ---
